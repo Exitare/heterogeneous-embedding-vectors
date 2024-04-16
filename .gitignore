@@ -1,1 +1,4 @@
 .idea
+.DS_Store
+data/images/*
+.ipynb_checkpoints/*
