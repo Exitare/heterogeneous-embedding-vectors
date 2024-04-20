@@ -7,7 +7,6 @@ from tensorflow.keras import optimizers
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras import backend as K
 import tensorflow as tf
-from tensorflow.keras.losses import BinaryCrossentropy
 import pandas as pd
 from pathlib import Path
 
@@ -22,28 +21,27 @@ def compute_latent(x):
 
 class CustomVariationalLayer(Layer):
     """
-    Define a custom layer that calculates the VAE loss.
+    Define a custom layer for Variational Autoencoder with loss calculation
     """
 
-    def __init__(self, feature_dim, z_mean_encoded, z_log_var_encoded, beta, **kwargs):
+    def __init__(self, **kwargs):
         super(CustomVariationalLayer, self).__init__(**kwargs)
-        self.feature_dim = feature_dim
-        self.z_mean_encoded = z_mean_encoded
-        self.z_log_var_encoded = z_log_var_encoded
-        self.beta = beta
-        self.loss_fn = BinaryCrossentropy(reduction=tf.keras.losses.Reduction.SUM)
 
-    def vae_loss(self, x_input, x_decoded):
-        reconstruction_loss = self.feature_dim * self.loss_fn(x_input, x_decoded)
-        kl_loss = -0.5 * tf.reduce_sum(1 + self.z_log_var_encoded - tf.square(self.z_mean_encoded) -
-                                       tf.exp(self.z_log_var_encoded), axis=-1)
-        return tf.reduce_mean(reconstruction_loss + (self.beta * kl_loss))
+    def vae_loss(self, x_input, x_decoded, z_mean_encoded, z_log_var_encoded, beta):
+        reconstruction_loss = feature_dim * tf.keras.losses.binary_crossentropy(x_input, x_decoded)
+        kl_loss = -0.5 * K.sum(1 + z_log_var_encoded - K.square(z_mean_encoded) - K.exp(z_log_var_encoded), axis=-1)
+        total_loss = K.mean(reconstruction_loss + (beta * kl_loss))
+        return total_loss
 
     def call(self, inputs):
-        x_input, x_decoded = inputs
-        loss = self.vae_loss(x_input, x_decoded)
+        x = inputs[0]
+        x_decoded = inputs[1]
+        z_mean_encoded = inputs[2]
+        z_log_var_encoded = inputs[3]
+        beta = inputs[4]
+        loss = self.vae_loss(x, x_decoded, z_mean_encoded, z_log_var_encoded, beta)
         self.add_loss(loss)
-        return x_input
+        return x_decoded
 
 
 class WarmUpCallback(Callback):
@@ -53,9 +51,8 @@ class WarmUpCallback(Callback):
         self.kappa = kappa
 
     def on_epoch_end(self, epoch, logs=None):
-        if self.beta < 1:
-            self.beta += self.kappa
-            tf.keras.backend.set_value(self.beta, self.beta)
+        new_beta = K.get_value(self.beta) + self.kappa
+        K.set_value(self.beta, new_beta if new_beta < 1 else 1)
 
 
 if __name__ == '__main__':
@@ -70,10 +67,15 @@ if __name__ == '__main__':
     fine_tune_epochs = args.fine_tune_epochs
     data_path: Path = args.data
 
-    data: pd.DataFrame = pd.read_csv(data_path)
+    data: pd.DataFrame = pd.read_csv(data_path, sep="\t", index_col=0)
+
+    # check that all columns to be float
+    for column in data.columns:
+        if data[column].dtype != float:
+            print(f"{column} is not float")
 
     feature_dim = len(data.columns)
-    latent_dim = 250
+    latent_dim = 256
     batch_size = 50
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
@@ -101,7 +103,7 @@ if __name__ == '__main__':
     beta = K.variable(0)
 
     adam = optimizers.Adam(learning_rate=learning_rate)
-    vae_layer = CustomVariationalLayer()([encoder_inputs, decoder_outputs])
+    vae_layer = CustomVariationalLayer()([encoder_inputs, decoder_outputs, z_mean_encoded, z_log_var_encoded, beta])
     vae = Model(encoder_inputs, vae_layer)
     vae.compile(optimizer=adam, loss=None, loss_weights=[beta])
 
@@ -113,23 +115,21 @@ if __name__ == '__main__':
                       batch_size=batch_size,
                       shuffle=True,
                       callbacks=[WarmUpCallback(beta, kappa)],
-                      verbose=0)
+                      verbose=1)
 
     batch_size = 10
     _ = vae.fit(data,
                 epochs=fine_tune_epochs, batch_size=batch_size, shuffle=True,
-                callbacks=[WarmUpCallback(beta, kappa)], verbose=0)
+                callbacks=[WarmUpCallback(beta, kappa)], verbose=1)
 
     encoder = Model(encoder_inputs, z_mean_encoded)
     decoder_input = keras.Input(shape=(latent_dim,))
     _x_decoded_mean = decoder_to_reconstruct(decoder_input)
     decoder = Model(decoder_input, _x_decoded_mean)
 
-    y_df = data.Labels
     decoded = pd.DataFrame(decoder.predict(encoder.predict(data)), columns=data.columns)
 
-    latent_space = pd.DataFrame(encoder.predict(data),
-                                index=data.index)
+    latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
     # save latent space
     latent_space.to_csv("latent_space.csv", index=False)
