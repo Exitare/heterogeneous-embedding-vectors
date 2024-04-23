@@ -10,6 +10,8 @@ import tensorflow as tf
 import pandas as pd
 from pathlib import Path
 
+save_folder = Path("results", "embeddings")
+
 
 def compute_latent(x):
     mu, sigma = x
@@ -56,6 +58,9 @@ class WarmUpCallback(Callback):
 
 
 if __name__ == '__main__':
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
@@ -75,7 +80,7 @@ if __name__ == '__main__':
             print(f"{column} is not float")
 
     feature_dim = len(data.columns)
-    latent_dim = 256
+    latent_dim = 384
     batch_size = 50
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
@@ -132,4 +137,4 @@ if __name__ == '__main__':
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
     # save latent space
-    latent_space.to_csv("latent_space.csv", index=False)
+    latent_space.to_csv(Path(save_folder, "rna_embeddings.csv"), index=False)
