@@ -7,11 +7,12 @@ from tensorflow.keras.models import Model
 import numpy as np
 from sklearn.metrics import confusion_matrix, accuracy_score, f1_score, precision_score, recall_score
 
+from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 embeddings = ['Text', 'Image', 'RNA']
-save_path = Path("results","recognizer")
+save_path = Path("results", "recognizer")
 load_path = Path("results")
 
 
@@ -26,14 +27,25 @@ def build_model(input_dim, num_outputs=3):
     x = Dense(64, activation='relu', name='base_dense2')(x)
     x = BatchNormalization()(x)
 
+    # Increasing complexity for text data
+    text_x = Dense(64, activation='tanh', name='text_dense_1')(x)
+    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
+    text_x = Dense(64, activation='tanh', name='text_dense_2')(text_x)
+    text_x = Dense(32, activation='tanh', name='text_dense_3')(text_x)
+    text_output = Dense(1, activation='relu', name='output_text')(text_x)
+
+    # Less complex paths for other outputs
+    image_output = Dense(1, activation='relu', name='output_image')(x)
+    rna_output = Dense(1, activation='relu', name='output_rna')(x)
+
     # Separate output layers for each count
-    outputs = []
-    for i in range(num_outputs):
-        outputs.append(Dense(1, activation='relu', name=f'output_{i}')(x))
+    outputs = [text_output, image_output, rna_output]
+    # for i in range(num_outputs):
+    #    outputs.append(Dense(1, activation='relu', name=f'output_{i}')(x))
 
     # Create model
     model = Model(inputs=inputs, outputs=outputs, name='multi_output_model')
-    model.compile(optimizer='adam', loss='mse', metrics=['mae', 'mae', 'mae'])
+    model.compile(optimizer='adam', loss='mse', loss_weights=[2, 1, 1], metrics=['mae', 'mae', 'mae'])
 
     return model
 
@@ -61,6 +73,13 @@ if __name__ == '__main__':
     # Splitting the dataset into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, np.array(y).T, test_size=0.2, random_state=42)
 
+    # scale the data
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
+
+
     # create early stopping callback
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
@@ -83,14 +102,17 @@ if __name__ == '__main__':
     y_pred = model.predict(X_test)
 
     # Convert predictions to rounded integers
-    y_pred_rounded = [np.round(pred) for pred in y_pred]
+    y_pred_rounded = [np.rint(pred) for pred in y_pred]
+    # clip any value to the max of the values in the true array
+    y_pred_rounded = [np.clip(pred, 0, np.max(y_pred_rounded[:, i])) for i, pred in enumerate(y_pred_rounded)]
     # save numpy array
-    np.save(Path(save_path, "y_pred_rounded.npy"), y_pred_rounded)
+    np.save(Path(save_path, "y_pred.npy"), y_pred_rounded)
 
     # Ensure y_test is an integer array (necessary if y_test is not already in integer form)
     y_test_int = y_test.astype(int)
+
     # save y_test_int numpy array
-    np.save(Path(save_path, "y_test_int.npy"), y_test_int)
+    np.save(Path(save_path, "y_test.npy"), y_test_int)
 
     # save predictions for all outputs
     for i, embedding in enumerate(embeddings):
