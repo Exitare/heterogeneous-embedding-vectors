@@ -3,3 +3,7 @@
 data/images/*
 .ipynb_checkpoints/*
 *.npy
+/results
+/figures
+/data
+/data
