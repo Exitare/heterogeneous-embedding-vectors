@@ -2,6 +2,7 @@ import pandas as pd
 import random
 from tqdm import tqdm
 from pathlib import Path
+from argparse import ArgumentParser
 
 load_folder = Path("results", "embeddings")
 save_folder = Path("results")
@@ -25,13 +26,22 @@ def random_sum_embeddings(embeddings):
 
 
 if __name__ == '__main__':
+
+    parser = ArgumentParser(description='Sum embeddings from different sources')
+    parser.add_argument("--embeddings", "-e", type=Path, nargs='+')
+    parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
+    args = parser.parse_args()
+
+    iterations = args.iterations
+    embeddings = args.embeddings
+
     # Load embeddings
     rna_embeddings, sentence_embeddings, image_embeddings = load_embeddings()
 
     # List to hold all combined embeddings and their indices
     combined_data = []
 
-    for _ in tqdm(range(100000)):  # Generate 10,000 combined embeddings
+    for _ in tqdm(range(iterations)):
         # Randomly sum embeddings for each type independently
         rna_sum, rna_count = random_sum_embeddings(rna_embeddings)
         sentence_sum, sentence_count = random_sum_embeddings(sentence_embeddings)
@@ -56,4 +66,5 @@ if __name__ == '__main__':
     combined_df = pd.DataFrame(combined_data, columns=column_names)
 
     # Save the new embeddings
+    print("Saving combined embeddings to CSV...")
     combined_df.to_csv(Path(save_folder, "summed_embeddings.csv"), index=False)

@@ -65,12 +65,14 @@ if __name__ == '__main__':
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
     parser.add_argument("--data", "-d", type=Path, required=True)
+    parser.add_argument("--output", "-o", type=str, required=True)
 
     args = parser.parse_args()
 
     pre_train_epochs = args.pre_train_epochs
     fine_tune_epochs = args.fine_tune_epochs
     data_path: Path = args.data
+    output: str = args.output
 
     data: pd.DataFrame = pd.read_csv(data_path, sep="\t", index_col=0)
 
@@ -80,7 +82,8 @@ if __name__ == '__main__':
             print(f"{column} is not float")
 
     feature_dim = len(data.columns)
-    latent_dim = 384
+    # latent_dim = 384
+    latent_dim = 768
     batch_size = 50
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
@@ -136,5 +139,9 @@ if __name__ == '__main__':
 
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
+    # if output does not contain .csv add it
+    if not output.endswith(".csv"):
+        output = output + ".csv"
+
     # save latent space
-    latent_space.to_csv(Path(save_folder, "rna_embeddings.csv"), index=False)
+    latent_space.to_csv(Path(save_folder, output), index=False)

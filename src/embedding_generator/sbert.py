@@ -3,10 +3,11 @@ from pathlib import Path
 import pandas as pd
 import argparse
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
+#model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("all-mpnet-base-v2")
 
-load_folder = Path("data")
-save_folder = Path("results", "embeddings")
+load_folder = Path("../../data")
+save_folder = Path("../../results", "embeddings")
 
 if not save_folder.exists():
     save_folder.mkdir(parents=True)

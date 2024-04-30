@@ -5,7 +5,7 @@ from tensorflow.keras.datasets import fashion_mnist
 from tensorflow.keras.models import Model
 from pathlib import Path
 
-save_folder = Path("results", "embeddings")
+save_folder = Path("../../results", "embeddings")
 
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
@@ -37,7 +37,8 @@ class Autoencoder(Model):
 
 
 shape = x_test.shape[1:]
-latent_dim = 384
+#latent_dim = 384
+latent_dim = 768
 
 autoencoder = Autoencoder(latent_dim, shape)
 

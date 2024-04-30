@@ -39,7 +39,7 @@ if __name__ == '__main__':
         axs[i].set_ylabel("True")
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig(Path(save_folder, "confusion_matrices.png"), dpi=300)
 
     # plot binary confusion matrices
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
@@ -50,4 +50,4 @@ if __name__ == '__main__':
         axs[i].set_ylabel("True")
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig(Path(save_folder, "confusion_matrices_binary.png"), dpi=300)

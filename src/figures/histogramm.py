@@ -17,7 +17,31 @@ if __name__ == '__main__':
         axs[i].set_title(f"Embedding Sum Distribution for {embeddings[i]}")
         axs[i].set_xlabel("Value")
         axs[i].set_ylabel("Frequency")
-    # change x axis to only the distinct values of the y_test
-    plt.xticks(np.unique(y_test))
+        # change x axis to only the distinct values of the y_test
+        axs[i].set_xticks(np.unique(y))
     plt.tight_layout()
     plt.savefig(Path("figures", "recognizer", "histogram.png"), dpi=300)
+    plt.close('all')
+
+
+    # count unique combination of Image, Text and RNA embeddings
+    # count the unique combinations of the embeddings
+    unique_combinations = pd.DataFrame(y_test).drop_duplicates()
+    unique_combinations = unique_combinations.groupby(list(range(3))).size().reset_index(name='count')
+    # Create a 3D scatter plot
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Scatter plot
+    ax.scatter(unique_combinations[0], unique_combinations[1], unique_combinations[2], c='blue', marker='o')
+
+    # Labels
+    ax.set_xlabel('Column 0')
+    ax.set_ylabel('Column 1')
+    ax.set_zlabel('Column 2')
+
+    # Title
+    ax.set_title('3D Scatter Plot of Unique Combinations')
+
+    plt.savefig(Path("figures", "recognizer", "scatter.png"), dpi=300)
+    plt.close('all')
