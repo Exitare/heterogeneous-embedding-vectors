@@ -10,6 +10,7 @@ from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
+import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer")
@@ -90,6 +91,11 @@ if __name__ == '__main__':
     image_counts = data["Image"].values
     rna_counts = data["RNA"].values
 
+    # convert counts to int
+    text_counts = text_counts.astype(int)
+    image_counts = image_counts.astype(int)
+    rna_counts = rna_counts.astype(int)
+
     X = data.drop(columns=["Text", "Image", "RNA"]).values
 
     # Assuming these are the actual labels from your dataset
@@ -145,9 +151,10 @@ if __name__ == '__main__':
                   loss_weights={'output_text': 4., 'output_image': 0.1, 'output_rna': 0.1},
                   metrics=['mae', 'mae', 'mae'])
     model.summary()
+
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=100, batch_size=batch_size,
-                        callbacks=[fine_tuning_early_stopping, reduce_lr])
+                            validation_split=0.2, epochs=100, batch_size=batch_size,
+                            callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate model
     results = model.evaluate(X_test, [y_test[:, i] for i in range(y_test.shape[1])])
