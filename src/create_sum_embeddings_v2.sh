@@ -14,4 +14,4 @@
 
 total_embeddings=$1
 
-python3 src/create_sum_embeddings_v2.py -l results/  -i 1000000 -e 2
+python3 src/create_sum_embeddings_v2.py -l results/  -i 1000000 -e "${total_embeddings}"
