@@ -7,3 +7,5 @@ data/images/*
 /figures
 /data
 /data
+venv
+.venv
