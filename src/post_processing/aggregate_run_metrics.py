@@ -14,6 +14,7 @@ if __name__ == '__main__':
     for root, dirs, files in os.walk(results_path):
         for file in files:
             if file == "metrics.csv":
+                print("Processing", Path(root, file))
                 metrics = pd.read_csv(Path(root, file))
                 results.append(metrics)
 
