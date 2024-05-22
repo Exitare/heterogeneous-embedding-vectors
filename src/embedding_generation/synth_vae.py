@@ -9,8 +9,7 @@ from tensorflow.keras import backend as K
 import tensorflow as tf
 import pandas as pd
 from pathlib import Path
-
-save_folder = Path("results", "embeddings")
+from sklearn.preprocessing import MinMaxScaler
 
 
 def compute_latent(x):
@@ -58,28 +57,35 @@ class WarmUpCallback(Callback):
 
 
 if __name__ == '__main__':
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
     parser.add_argument("--data", "-d", type=Path, required=True)
-    parser.add_argument("--output", "-o", type=str, required=True)
+    parser.add_argument("--output", "-o", type=Path, required=True)
 
     args = parser.parse_args()
 
     pre_train_epochs = args.pre_train_epochs
     fine_tune_epochs = args.fine_tune_epochs
     data_path: Path = args.data
-    output: str = args.output
+    output: Path = args.output
 
-    data: pd.DataFrame = pd.read_csv(data_path, sep="\t", index_col=0)
+    if data_path.suffix == ".csv":
+        print("Reading csv file...")
+        data: pd.DataFrame = pd.read_csv(data_path)
+    else:
+        print("Reading tsv file...")
+        data: pd.DataFrame = pd.read_csv(data_path, sep="\t", index_col=0)
 
     # check that all columns to be float
     for column in data.columns:
         if data[column].dtype != float:
-            print(f"{column} is not float")
+            print(f"{column} is not float. Converting...")
+            data[column] = data[column].astype(float)
+
+    # scale the data
+    data = pd.DataFrame(MinMaxScaler().fit_transform(data), columns=data.columns)
 
     feature_dim = len(data.columns)
     # latent_dim = 384
@@ -139,9 +145,8 @@ if __name__ == '__main__':
 
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
-    # if output does not contain .csv add it
-    if not output.endswith(".csv"):
-        output = output + ".csv"
+    if not output.parent.exists():
+        output.parent.mkdir(parents=True)
 
     # save latent space
-    latent_space.to_csv(Path(save_folder, output), index=False)
+    latent_space.to_csv(output, index=False)
