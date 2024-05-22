@@ -6,6 +6,7 @@ data/images/*
 /results
 /figures
 /data
-/data
 venv
 .venv
+error_reports/*
+output_reports/*
