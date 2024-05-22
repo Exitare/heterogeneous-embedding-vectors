@@ -238,7 +238,6 @@ if __name__ == '__main__':
     for i, embedding in enumerate(embeddings):
         metrics.append({
             "embeddings": total_embeddings,
-            "iteration": i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -285,7 +284,6 @@ if __name__ == '__main__':
     for i, embedding in enumerate(embeddings):
         binary_metrics.append({
             'embeddings': total_embeddings,
-            'iteration': i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
