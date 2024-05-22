@@ -10,12 +10,14 @@ from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
+import os
 
 embeddings = ['Text', 'Image', 'RNA']
-save_path = Path("results", "recognizer")
+save_path = Path("results", "simple_recognizer")
 
 
-def build_model(input_dim, num_subtypes: int):
+def build_model(input_dim, num_outputs=3):
+    # Input layer
     inputs = Input(shape=(input_dim,), name='input_layer')
     x = Dense(512, activation='relu', name='base_dense1')(inputs)
     x = BatchNormalization()(x)
@@ -31,33 +33,23 @@ def build_model(input_dim, num_subtypes: int):
 
     # Increasing complexity for text data
     text_x = Dense(128, activation='relu', name='text_dense_1')(x)
-    text_x = Dropout(0.2)(text_x)
+    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(64, activation='relu', name='text_dense_2')(text_x)
     text_x = BatchNormalization()(text_x)
-    text_x = Dropout(0.2)(text_x)
+    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
     text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
 
-    # Less complex paths for image output
+    # Less complex paths for other outputs
     image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
+    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(x)
 
-    # Path for RNA embeddings, including subtype classification
-    rna_x = Dense(128, activation='relu', name='rna_dense_1')(x)
-    rna_x = Dropout(0.2)(rna_x)
-    rna_x = Dense(64, activation='relu', name='rna_dense_2')(rna_x)
-    rna_x = BatchNormalization()(rna_x)
-    rna_x = Dropout(0.2)(rna_x)
-    rna_x = Dense(32, activation='relu', name='rna_dense_3')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(rna_x)
-
-    # Multi-label output for RNA subtypes
-    subtype_x = Dense(num_subtypes, activation='sigmoid', name='subtype_output')(rna_x)
-
-    # Combine outputs
-    outputs = [text_output, image_output, rna_output, subtype_x]
+    # Separate output layers for each count
+    outputs = [text_output, image_output, rna_output]
 
     # Create model
-    return Model(inputs=inputs, outputs=outputs, name='multi_output_model')
+    model = Model(inputs=inputs, outputs=outputs, name='multi_output_model')
+    return model
 
 
 if __name__ == '__main__':
@@ -67,7 +59,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--embeddings', "-e", type=int, required=True, help='The number of embeddings to work with.')
-    parser.add_argument("--run_iteration", "-ri", type=int, required=True,
+    parser.add_argument("--run_iteration", "-ri", type=int, required=False, default=1,
                         help="The iteration number for the run. Used for saving the results and validation.")
     args = parser.parse_args()
 
@@ -79,7 +71,7 @@ if __name__ == '__main__':
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
 
-    load_path = Path("results", f"summed_embeddings_{total_embeddings}", "embeddings.csv")
+    load_path = Path("results", f"summed_embeddings", "simple_embeddings", f"{total_embeddings}_embeddings.csv")
     print(f"Loading data from {load_path}")
     save_path = Path(save_path, f"{total_embeddings}_embeddings")
 
@@ -98,22 +90,22 @@ if __name__ == '__main__':
     text_counts = data["Text"].values
     image_counts = data["Image"].values
     rna_counts = data["RNA"].values
-    rna_subtypes = data["Subtype"].values
 
-    # one hot encode the subtypes
-    rna_subtypes = pd.get_dummies(rna_subtypes, prefix='subtype')
+    # convert counts to int
+    text_counts = text_counts.astype(int)
+    image_counts = image_counts.astype(int)
+    rna_counts = rna_counts.astype(int)
 
-    X = data.drop(columns=["Text", "Image", "RNA", "Subtype"]).values
+    X = data.drop(columns=["Text", "Image", "RNA"]).values
 
     # Assuming these are the actual labels from your dataset
     y = [text_counts, image_counts, rna_counts]
 
     model = build_model(X.shape[1])
     model.compile(optimizer='adam',
-                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse',
-                        'subtype_output': 'binary_crossentropy'},
+                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},
                   loss_weights={'output_text': 3.0, 'output_image': 1., 'output_rna': 1.},
-                  metrics=['mae', 'mae', 'mae', 'accuracy'])
+                  metrics=['mae', 'mae', 'mae'])
     model.summary()
 
     # Splitting the dataset into training and testing sets
@@ -159,6 +151,7 @@ if __name__ == '__main__':
                   loss_weights={'output_text': 4., 'output_image': 0.1, 'output_rna': 0.1},
                   metrics=['mae', 'mae', 'mae'])
     model.summary()
+
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
                         validation_split=0.2, epochs=100, batch_size=batch_size,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])

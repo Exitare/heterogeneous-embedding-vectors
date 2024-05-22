@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=embedding_recognizer
+#SBATCH --job-name=sple_recognizer
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
@@ -15,4 +15,4 @@
 total_embeddings=$1
 run_iteration=$2
 
-python3 src/recognizer/recognizer_v2.py -e "${total_embeddings}" -ri "${run_iteration}"
+python3 src/recognizer/simple_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}"

@@ -5,19 +5,17 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import Input, Dense, BatchNormalization, Dropout, ReLU
 from tensorflow.keras.models import Model
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 embeddings = ['Text', 'Image', 'RNA']
-save_path = Path("results", "recognizer")
-load_path = Path("results")
+save_path = Path("results", "multi_recognizer")
 
 
-def build_model(input_dim, num_outputs=3):
-    # Input layer
+def build_model(input_dim, cancer_list: []):
     inputs = Input(shape=(input_dim,), name='input_layer')
     x = Dense(512, activation='relu', name='base_dense1')(inputs)
     x = BatchNormalization()(x)
@@ -33,23 +31,33 @@ def build_model(input_dim, num_outputs=3):
 
     # Increasing complexity for text data
     text_x = Dense(128, activation='relu', name='text_dense_1')(x)
-    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
+    text_x = Dropout(0.2)(text_x)
     text_x = Dense(64, activation='relu', name='text_dense_2')(text_x)
     text_x = BatchNormalization()(text_x)
-    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
+    text_x = Dropout(0.2)(text_x)
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=3), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
 
-    # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=3), name='output_image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=3), name='output_rna')(x)
+    # Less complex paths for image output
+    image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
 
-    # Separate output layers for each count
-    outputs = [text_output, image_output, rna_output]
+    # Path for RNA embeddings, including subtype classification
+    rna_x = Dense(128, activation='relu', name='rna_dense_1')(x)
+    rna_x = Dropout(0.2)(rna_x)
+    rna_x = Dense(64, activation='relu', name='rna_dense_2')(rna_x)
+    rna_x = BatchNormalization()(rna_x)
+    rna_x = Dropout(0.2)(rna_x)
+    rna_x = Dense(32, activation='relu', name='rna_dense_3')(rna_x)
+    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(rna_x)
+
+    cancer_outputs = [Dense(1, activation=ReLU(max_value=total_embeddings), name=f'output_cancer_{cancer_type}')(x) for
+                      cancer_type in cancer_list]
+
+    # Combine all outputs
+    outputs = [text_output, image_output, rna_output] + cancer_outputs
 
     # Create model
-    model = Model(inputs=inputs, outputs=outputs, name='multi_output_model')
-    return model
+    return Model(inputs=inputs, outputs=outputs, name='multi_output_model')
 
 
 if __name__ == '__main__':
@@ -57,35 +65,75 @@ if __name__ == '__main__':
         save_path.mkdir(parents=True)
 
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
-    parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
-    parser.add_argument('--run_name', "-rn", type=str, required=True, help='The name of the run')
+    parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
+    parser.add_argument('--embeddings', "-e", type=int, required=True, help='The number of embeddings to work with.')
+    parser.add_argument("--run_iteration", "-ri", type=int, required=False,
+                        help="The iteration number for the run. Used for saving the results and validation.", default=1)
+    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     args = parser.parse_args()
 
     batch_size = args.batch_size
-    run_name = args.run_name
+    total_embeddings = args.embeddings
+    run_iteration = args.run_iteration
+    selected_cancers = args.cancer
+    # lower case the cancer types
+    selected_cancers = [cancer.lower() for cancer in selected_cancers]
+    cancer_types = "_".join(selected_cancers)
 
+    print(f"Total embeddings: {total_embeddings}")
+    print(f"Batch size: {batch_size}")
+    print(f"Run iteration: {run_iteration}")
+
+    load_path = Path("results", f"summed_embeddings", "multi_cancer", cancer_types,
+                     f"{total_embeddings}_embeddings.csv")
+    print(f"Loading data from {load_path}")
+    save_path = Path(save_path, f"{total_embeddings}_embeddings")
+
+    run_name = f"run_{run_iteration}"
     save_path = Path(save_path, run_name)
+
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
+    print(f"Saving results to {save_path}")
+
     # load data
-    data = pd.read_csv(Path(load_path, "summed_embeddings.csv"))
+    data = pd.read_csv(load_path)
 
     # Random counts for demonstration; replace with actual data
     text_counts = data["Text"].values
     image_counts = data["Image"].values
     rna_counts = data["RNA"].values
 
-    X = data.drop(columns=["Text", "Image", "RNA"]).values
+    # extract cancer data
+    cancer_data = []
+    for cancer in selected_cancers:
+        cancer_data.append(data[cancer].values)
+        embeddings.append(cancer)
+
+    # get the number of subtypes
+    X = data.drop(columns=embeddings).values
 
     # Assuming these are the actual labels from your dataset
-    y = [text_counts, image_counts, rna_counts]
+    y = [text_counts, image_counts, rna_counts] + cancer_data
 
-    model = build_model(X.shape[1])
+    model = build_model(X.shape[1], selected_cancers)
+
+    # Set up a list of metrics
+    loss = {'output_text': 'mae', 'output_image': 'mae', 'output_rna': 'mae'}
+    loss_weights = {'output_text': 3.0, 'output_image': 1., 'output_rna': 1.}
+    metrics = ['mae', 'mae', 'mae']
+
+    # Adding dynamic metrics for cancer outputs based on their number
+    for i in selected_cancers:  # Assuming num_cancer_types is defined
+        loss[f'output_cancer_{i}'] = 'mae'
+        loss_weights[f'output_cancer_{i}'] = 1.
+        metrics.append('mae')
+
     model.compile(optimizer='adam',
-                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},
-                  loss_weights={'output_text': 3.0, 'output_image': 1., 'output_rna': 1.},
-                  metrics=['mae', 'mae', 'mae'])
+                  loss=loss,
+                  loss_weights=loss_weights,
+                  metrics=metrics)
     model.summary()
 
     # Splitting the dataset into training and testing sets
@@ -126,10 +174,15 @@ if __name__ == '__main__':
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
     reduce_lr = ReduceLROnPlateau(monitor='val_output_text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
+    # adjust the text loss weight
+    loss_weights["output_text"] = 4.0
+    loss_weights["output_image"] = 0.1
+    loss_weights["output_rna"] = 0.1
+
     model.compile(optimizer=optimizer,
-                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},
-                  loss_weights={'output_text': 4., 'output_image': 0.1, 'output_rna': 0.1},
-                  metrics=['mae', 'mae', 'mae'])
+                  loss=loss,
+                  loss_weights=loss_weights,
+                  metrics=metrics)
     model.summary()
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
                         validation_split=0.2, epochs=100, batch_size=batch_size,
@@ -178,18 +231,19 @@ if __name__ == '__main__':
                  zip(y_test_int.T, y_pred_rounded)]
     # calculate recall for each output
     recall = [recall_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
-    # calculate MAE for each output
-    mae = [np.mean(np.abs(y_true - y_pred)) for y_true, y_pred in zip(y_test_int.T, y_pred)]
+    # calculate auc for each output
+    # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
 
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         metrics.append({
+            "embeddings": total_embeddings,
+            "iteration": i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
             'recall': recall[i],
-            'f1': f1[i],
-            'mae': mae[i]
+            'f1': f1[i]
         })
 
     metrics_df = pd.DataFrame(metrics)
@@ -224,18 +278,19 @@ if __name__ == '__main__':
     recall = [recall_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
     # calculate f1 score
     f1 = [f1_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate mae for binary values
-    mae = [np.mean(np.abs(y_true - y_pred)) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
+    # calculate auc
+    # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
 
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         binary_metrics.append({
+            'embeddings': total_embeddings,
+            'iteration': i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
             'recall': recall[i],
-            'f1': f1[i],
-            'mae': mae[i]
+            'f1': f1[i]
         })
 
     binary_metrics_df = pd.DataFrame(binary_metrics)
