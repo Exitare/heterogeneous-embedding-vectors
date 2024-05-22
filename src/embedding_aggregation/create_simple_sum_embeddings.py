@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 load_folder = Path("results", "embeddings")
-save_folder = Path("results")
+save_folder = Path("results", "summed_embeddings")
 
 
 def load_embeddings(load_folder):
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     total_embeddings = args.embeddings
     load_folder = Path(args.load_folder)
 
-    save_folder = Path(save_folder, f"summed_embeddings_{total_embeddings}")
+    save_folder = Path(save_folder, f"simple_summed_embeddings")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
@@ -72,12 +72,19 @@ if __name__ == '__main__':
             combined_sum += current_sum
             combination_counts[name] = count
 
+
+
         # Combine combined_sum and the combination_counts
         combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],
                                                    combination_counts['RNA']])
 
+
+
+
     # Save the data to CSV
     column_names = list(embeddings_list[0][0].columns) + ["Text", "Image", "RNA"]
     combined_df = pd.DataFrame(combined_data, columns=column_names)
+    # convert all columns to int
+    combined_df = combined_df.astype(float)
     print("Saving combined embeddings to CSV...")
-    combined_df.to_csv(Path(save_folder, "embeddings.csv", index=False))
+    combined_df.to_csv(Path(save_folder, f"{total_embeddings}_embeddings.csv"), index=False)
