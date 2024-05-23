@@ -15,4 +15,4 @@
 total_embeddings=$1
 cancer_types=$2
 
-python3 src/embedding_aggregation/create_multi_cancer_sum_embeddings.py  -i 1000000 -e "${total_embeddings}" -c "${cancer_types}"
+python3 src/embedding_aggregation/create_multi_cancer_sum_embeddings.py  -i 1000000 -e "${total_embeddings}" -c ${cancer_types}
