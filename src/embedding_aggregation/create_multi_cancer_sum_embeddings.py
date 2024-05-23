@@ -38,11 +38,15 @@ if __name__ == '__main__':
 
     loaded_cancer_embeddings = {}
     for cancer_embedding in cancer_embeddings:
-        temp_df = pd.read_csv(Path(cancer_embedding))
-        cancer_type = Path(cancer_embedding).stem.split("_")[0]
-        loaded_cancer_embeddings[cancer_type] = temp_df
+        try:
+            temp_df = pd.read_csv(Path(cancer_embedding))
+            cancer_type = Path(cancer_embedding).stem.split("_")[0]
+            loaded_cancer_embeddings[cancer_type] = temp_df
+        except:
+            print(f"Could not load {cancer_embedding}")
+            raise
 
-    # combine cancer types
+            # combine cancer types
     cancer_types = "_".join([cancer_type for cancer_type in loaded_cancer_embeddings.keys()])
     save_folder = Path(save_folder, cancer_types)
     if not save_folder.exists():
