@@ -4,13 +4,20 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from argparse import ArgumentParser
 
+save_folder = Path("figures", "performance")
+
+if not save_folder.exists():
+    save_folder.mkdir(parents=True)
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
     parser.add_argument("--data", "-d", type=Path, required=True,
                         help="Data containing the recognizer results")
+    parser.add_argument("--file_name", "-fn", type=Path, required=False, help="File name to save the plot")
 
     args = parser.parse_args()
-    data_folder: Path = args.data_folder
+    data_folder: Path = args.data
+    file_name: Path = args.file_name
 
     df = pd.read_csv(data_folder)
 
@@ -33,4 +40,7 @@ if __name__ == '__main__':
     plt.xlabel("Embedding")
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.show()
+    if file_name is None:
+        plt.show()
+    else:
+        plt.savefig(Path(save_folder, file_name))
