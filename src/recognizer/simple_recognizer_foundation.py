@@ -97,9 +97,12 @@ if __name__ == '__main__':
     rna_counts = rna_counts.astype(int)
 
     # find max value of embeddings for ReLU activation
-    total_embeddings = data["Text"].max()
-    total_embeddings = max(total_embeddings, data["Image"].max())
-    total_embeddings = max(total_embeddings, data["RNA"].max())
+    max_text = data["Text"].max()
+    max_image = data["Image"].max()
+    max_rna = data["RNA"].max()
+
+    total_embeddings = max(max_text, max_image, max_rna)
+
     print(f"Detected max embeddings: {total_embeddings}")
 
     X = data.drop(columns=["Text", "Image", "RNA"]).values

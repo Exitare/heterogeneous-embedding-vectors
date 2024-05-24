@@ -92,9 +92,12 @@ if __name__ == '__main__':
     data = pd.concat(data, axis=1)
 
     # find max value of embeddings for ReLU activation
-    total_embeddings = data["Text"].max()
-    total_embeddings = max(total_embeddings, data["Image"].max())
-    total_embeddings = max(total_embeddings, data["RNA"].max())
+    max_text = data["Text"].max()
+    max_image = data["Image"].max()
+    max_rna = data["RNA"].max()
+
+    # find max of max_text, max_image, and max_rna
+    total_embeddings = max(max_text, max_image, max_rna)
     print(f"Detected max embeddings: {total_embeddings}")
 
     run_name = f"run_{run_iteration}"
