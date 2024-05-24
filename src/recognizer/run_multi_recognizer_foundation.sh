@@ -13,5 +13,7 @@
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 run_iteration=$1
+cancer_types=$2
 
-python3 src/recognizer/multi_cancer_recognizer_foundation.py -ri "${run_iteration}"
+
+python3 src/recognizer/multi_cancer_recognizer_foundation.py -ri "${run_iteration}" -c ${cancer_types}
