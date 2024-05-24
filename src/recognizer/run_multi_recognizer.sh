@@ -16,4 +16,5 @@ total_embeddings=$1
 run_iteration=$2
 cancer_types=$3
 
-python3 src/recognizer/multi_cancer_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}" -c "${cancer_types}"
+
+python3 src/recognizer/multi_cancer_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}" -c ${cancer_types}

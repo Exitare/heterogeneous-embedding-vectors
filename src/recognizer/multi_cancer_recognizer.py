@@ -63,19 +63,21 @@ def build_model(input_dim, cancer_list: []):
 if __name__ == '__main__':
     if not save_path.exists():
         save_path.mkdir(parents=True)
-
+    # python3 src/recognizer/multi_cancer_recognizer.py -e 5 -c blca brca
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
     parser.add_argument('--embeddings', "-e", type=int, required=True, help='The number of embeddings to work with.')
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=True,
+                        help="The cancer types to work with, e.g. blca brca")
     args = parser.parse_args()
 
     batch_size = args.batch_size
     total_embeddings = args.embeddings
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
+
     # lower case the cancer types
     selected_cancers = [cancer.lower() for cancer in selected_cancers]
     cancer_types = "_".join(selected_cancers)
@@ -154,7 +156,7 @@ if __name__ == '__main__':
 
     # Train model
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=100, batch_size=batch_size, callbacks=[early_stopping])
+                        validation_split=0.2, epochs=500, batch_size=batch_size, callbacks=[early_stopping])
 
     # save history
     pd.DataFrame(history.history).to_csv(Path(save_path, "history.csv"), index=False)
@@ -185,7 +187,7 @@ if __name__ == '__main__':
                   metrics=metrics)
     model.summary()
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=100, batch_size=batch_size,
+                        validation_split=0.2, epochs=500, batch_size=batch_size,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate model
