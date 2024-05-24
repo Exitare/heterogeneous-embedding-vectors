@@ -12,7 +12,6 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-total_embeddings=$1
-run_iteration=$2
+run_iteration=$1
 
 python3 src/recognizer/simple_recognizer_foundation.py -ri "${run_iteration}"
