@@ -14,7 +14,8 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "simple_recognizer_foundation")
-embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+# embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+embedding_counts = [2, 3]
 
 
 def build_model(input_dim, num_outputs=3):
@@ -97,9 +98,9 @@ if __name__ == '__main__':
     rna_counts = rna_counts.astype(int)
 
     # find max value of embeddings for ReLU activation
-    max_text = data["Text"].max()
-    max_image = data["Image"].max()
-    max_rna = data["RNA"].max()
+    max_text = data["Text"].max().max()
+    max_image = data["Image"].max().max()
+    max_rna = data["RNA"].max().max()
 
     total_embeddings = max(max_text, max_image, max_rna)
 
