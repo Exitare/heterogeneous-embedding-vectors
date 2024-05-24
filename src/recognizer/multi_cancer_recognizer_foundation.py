@@ -79,6 +79,8 @@ if __name__ == '__main__':
     selected_cancers = [cancer.lower() for cancer in selected_cancers]
     cancer_types = "_".join(selected_cancers)
 
+    save_path = Path(save_path, cancer_types)
+
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
 
