@@ -75,9 +75,11 @@ if __name__ == '__main__':
     for embedding_count in embedding_counts:
         load_path = Path("results", f"summed_embeddings", "simple_embeddings", f"{embedding_count}_embeddings.csv")
         print(f"Loading data from {load_path}")
+        # only load 10000 entries for demonstration
         data.append(pd.read_csv(load_path))
+        # data.append(pd.read_csv(load_path))
 
-    data = pd.concat(data, axis=1)
+    data = pd.concat(data, axis=0)
 
     run_name = f"run_{run_iteration}"
     save_path = Path(save_path, run_name)

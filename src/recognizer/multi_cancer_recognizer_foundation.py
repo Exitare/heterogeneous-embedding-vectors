@@ -89,7 +89,7 @@ if __name__ == '__main__':
         print(f"Loading data from {load_path}")
         data.append(pd.read_csv(load_path))
 
-    data = pd.concat(data, axis=1)
+    data = pd.concat(data, axis=0)
 
     # find max value of embeddings for ReLU activation
     max_text = data["Text"].max().max()
