@@ -31,14 +31,13 @@ if __name__ == '__main__':
     df = df.reset_index()
 
     # print mean accuracy for each embedding
-    print(df[["embedding", "accuracy"]].groupby("embedding").mean(numeric_only=True))
-
+    print(df[["embedding", "accuracy"]])
 
     # plot
     fig = plt.figure(figsize=(10, 5), dpi=150)
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
-    sns.lineplot(data=df, x="embeddings", y="accuracy", hue="embedding")
+    sns.barplot(data=df, x="embedding", y="accuracy")
     plt.title("Mean accuracy for each embedding")
     plt.ylabel("Accuracy")
     plt.xlabel("Embedding")
