@@ -10,12 +10,29 @@ from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
+from sklearn.model_selection import StratifiedShuffleSplit
 import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "simple_recognizer_foundation")
 # embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 embedding_counts = [2, 3]
+
+
+# Function to create stratified splits for multi-label data
+def multilabel_stratified_split(X, y, test_size=0.2, random_state=None):
+    n_samples, n_labels = y.shape
+    indices = np.arange(n_samples)
+
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=test_size, random_state=random_state)
+    train_idx, test_idx = next(sss.split(indices, y[:, 0]))  # Start with the first label
+
+    for i in range(1, n_labels):
+        _, new_test_idx = next(sss.split(indices[train_idx], y[train_idx, i]))
+        test_idx = np.union1d(test_idx, new_test_idx)
+        train_idx = np.setdiff1d(indices, test_idx)
+
+    return train_idx, test_idx
 
 
 def build_model(input_dim, num_outputs=3):
@@ -120,8 +137,21 @@ if __name__ == '__main__':
                   metrics=['mae', 'mae', 'mae'])
     model.summary()
 
+    # Convert y_list to a multi-dimensional numpy array
+    y = np.array(y).T  # Transpose to get shape (900, 3)
+
+    # Perform the split
+    train_index, test_index = multilabel_stratified_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+
+    # Check the balance for each label dimension
+    # for i in range(y.shape[1]):
+    #    print(f"Label {i} distribution in training set: {Counter(y_train[:, i])}")
+    #    print(f"Label {i} distribution in test set: {Counter(y_test[:, i])}")
+
     # Splitting the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, np.array(y).T, test_size=0.2, random_state=42)
+    # X_train, X_test, y_train, y_test = train_test_split(X, np.array(y).T, test_size=0.2, random_state=42)
 
     # scale the data
     scaler = StandardScaler()

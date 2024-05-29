@@ -26,6 +26,7 @@ def random_sum_embeddings(embeddings, max_count):
 
 
 if __name__ == '__main__':
+    # example call: python3 src/embedding_aggregation/create_multi_cancer_sum_embeddings.py -e 10 -i 100 -c ./results/embeddings/cancer/blca_embeddings.csv ./results/embeddings/cancer/brca_embeddings.csv
     parser = ArgumentParser(description='Sum embeddings from different sources')
     parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum")
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
