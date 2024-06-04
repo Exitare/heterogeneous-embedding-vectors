@@ -80,7 +80,7 @@ def build_model(input_dim, cancer_list: []):
 
 
 if __name__ == '__main__':
-    #python3 src/recognizer/multi_cancer_recognizer_foundation.py -c blca brca
+    # python3 src/recognizer/multi_cancer_recognizer_foundation.py -c blca brca
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
@@ -129,7 +129,6 @@ if __name__ == '__main__':
 
     print(f"Saving results to {save_path}")
 
-    # Random counts for demonstration; replace with actual data
     text_counts = data["Text"].values
     image_counts = data["Image"].values
     rna_counts = data["RNA"].values
@@ -171,20 +170,10 @@ if __name__ == '__main__':
     # Convert y_list to a multi-dimensional numpy array
     y = np.array(y).T  # Transpose to get shape (900, 5)
 
-
     # Perform the split
     train_index, test_index = multilabel_stratified_split(X, y, test_size=0.2, random_state=42)
     X_train, X_test = X[train_index], X[test_index]
     y_train, y_test = y[train_index], y[test_index]
-
-    # Check the balance for each label dimension
-    #for i in range(y.shape[1]):
-    #    print(f"Label {i} distribution in training set: {Counter(y_train[:, i])}")
-    #    print(f"Label {i} distribution in test set: {Counter(y_test[:, i])}")
-
-
-    # Splitting the dataset into training and testing sets
-    #X_train, X_test, y_train, y_test = train_test_split(X, np.array(y).T, test_size=0.2, random_state=42, stratify=X)
 
     # scale the data
     scaler = StandardScaler()
@@ -340,3 +329,48 @@ if __name__ == '__main__':
 
     binary_metrics_df = pd.DataFrame(binary_metrics)
     binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
+
+    complete_test_df = pd.DataFrame(X_test)
+    # add the y_test columns
+    for i, embedding in enumerate(embeddings):
+        complete_test_df[embedding] = y_test[:, i]
+
+    complete_test_df["Total Embedding Count"] = np.sum(y_test, axis=1)
+
+    # reset index of y_test and y_pred_round
+    y_test_int = pd.DataFrame(y_test_int)
+    # concat y_pred_rounded
+    y_pred_rounded = pd.concat([pd.DataFrame(y_pred_rounded[i]) for i in range(len(y_pred_rounded))], axis=1)
+
+    y_test_int.reset_index(drop=True, inplace=True)
+    y_pred_rounded.reset_index(drop=True, inplace=True)
+
+    y_test_int.columns = [text_counts, image_counts, rna_counts] + cancer_count_data
+    y_test_int["Total Embeddings"] = np.sum(y_test_int, axis=1)
+    y_pred_rounded.columns = [text_counts, image_counts, rna_counts] + cancer_count_data
+    split_metrics = []
+    for embedding in embeddings:
+        y_test_sub = y_test_int[embedding]
+        y_pred_sub = y_pred_rounded[embedding]
+
+        # iterate over all total embeddings from y_test_int
+        for total_embeddings in y_test_int["Total Embeddings"].unique():
+            y_test_sub_total = y_test_sub[y_test_int["Total Embeddings"] == total_embeddings]
+            y_pred_sub_total = y_pred_sub[y_test_int["Total Embeddings"] == total_embeddings]
+
+            accuracy = accuracy_score(y_test_sub_total, y_pred_sub_total)
+            precision = precision_score(y_test_sub_total, y_pred_sub_total)
+            recall = recall_score(y_test_sub_total, y_pred_sub_total)
+            f1 = f1_score(y_test_sub_total, y_pred_sub_total)
+
+            split_metrics.append({
+                'embeddings': total_embeddings,
+                'embedding': embedding,
+                'accuracy': accuracy,
+                'precision': precision,
+                'recall': recall,
+                'f1': f1
+            })
+
+    split_metrics = pd.DataFrame(split_metrics)
+    split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)

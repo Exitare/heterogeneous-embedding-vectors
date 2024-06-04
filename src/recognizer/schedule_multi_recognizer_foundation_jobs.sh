@@ -1,3 +1,5 @@
+# ./src/recognizer/schedule_multi_recognizer_foundation_jobs.sh "blca brca"
+
 cancer_types=$1
 
 # run it 30 times
