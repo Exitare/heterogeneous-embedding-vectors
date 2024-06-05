@@ -16,6 +16,7 @@ from collections import Counter
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "multi_recognizer_foundation")
 embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+epochs = 100
 
 
 # Function to create stratified splits for multi-label data
@@ -108,7 +109,7 @@ if __name__ == '__main__':
         load_path = Path("results", f"summed_embeddings", "multi_cancer", cancer_types,
                          f"{embedding_count}_embeddings.csv")
         print(f"Loading data from {load_path}")
-        data.append(pd.read_csv(load_path))
+        data.append(pd.read_csv(load_path, nrows=1000))
 
     data = pd.concat(data, axis=0)
 
@@ -190,7 +191,7 @@ if __name__ == '__main__':
 
     # Train model
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=100, batch_size=batch_size, callbacks=[early_stopping])
+                        validation_split=0.2, epochs=epochs, batch_size=batch_size, callbacks=[early_stopping])
 
     # save history
     pd.DataFrame(history.history).to_csv(Path(save_path, "history.csv"), index=False)
@@ -221,7 +222,7 @@ if __name__ == '__main__':
                   metrics=metrics)
     model.summary()
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=100, batch_size=batch_size,
+                        validation_split=0.2, epochs=epochs, batch_size=batch_size,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate model
@@ -345,10 +346,13 @@ if __name__ == '__main__':
     y_test_int.reset_index(drop=True, inplace=True)
     y_pred_rounded.reset_index(drop=True, inplace=True)
 
-    y_test_int.columns = [text_counts, image_counts, rna_counts] + cancer_count_data
-    y_test_int["Total Embeddings"] = np.sum(y_test_int, axis=1)
-    y_pred_rounded.columns = [text_counts, image_counts, rna_counts] + cancer_count_data
-    split_metrics = []
+    columns = ["Text", "Image", "RNA"] + selected_cancers
+    y_test_int.columns = columns
+    # clauclate total embeddings by only using Text Image and RNa columns
+    y_test_int["Total Embeddings"] = y_test_int[["Text", "Image", "RNA"]].sum(axis=1)
+    y_pred_rounded.columns = columns
+    split_metrics = []  #
+
     for embedding in embeddings:
         y_test_sub = y_test_int[embedding]
         y_pred_sub = y_pred_rounded[embedding]
@@ -358,10 +362,14 @@ if __name__ == '__main__':
             y_test_sub_total = y_test_sub[y_test_int["Total Embeddings"] == total_embeddings]
             y_pred_sub_total = y_pred_sub[y_test_int["Total Embeddings"] == total_embeddings]
 
+            # convert to int
+            y_test_sub_total = y_test_sub_total.astype(int)
+            y_pred_sub_total = y_pred_sub_total.astype(int)
+
             accuracy = accuracy_score(y_test_sub_total, y_pred_sub_total)
-            precision = precision_score(y_test_sub_total, y_pred_sub_total)
-            recall = recall_score(y_test_sub_total, y_pred_sub_total)
-            f1 = f1_score(y_test_sub_total, y_pred_sub_total)
+            precision = precision_score(y_test_sub_total, y_pred_sub_total, average='macro')
+            recall = recall_score(y_test_sub_total, y_pred_sub_total, average='macro')
+            f1 = f1_score(y_test_sub_total, y_pred_sub_total, average='macro')
 
             split_metrics.append({
                 'embeddings': total_embeddings,
