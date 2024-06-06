@@ -31,7 +31,7 @@ class CustomVariationalLayer(Layer):
     def vae_loss(self, x_input, x_decoded, z_mean_encoded, z_log_var_encoded, beta):
         reconstruction_loss = feature_dim * tf.keras.losses.binary_crossentropy(x_input, x_decoded)
         kl_loss = -0.5 * K.sum(1 + z_log_var_encoded - K.square(z_mean_encoded) - K.exp(z_log_var_encoded), axis=-1)
-        total_loss = K.mean(reconstruction_loss + (beta * kl_loss))
+        total_loss = K.mean(reconstruction_loss + 5 * (beta * kl_loss))
         return total_loss
 
     def call(self, inputs):
@@ -61,28 +61,37 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
-    parser.add_argument("--data", "-d", type=Path, required=True)
-    parser.add_argument("--output", "-o", type=Path, required=True)
+    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
 
     args = parser.parse_args()
 
     pre_train_epochs = args.pre_train_epochs
     fine_tune_epochs = args.fine_tune_epochs
-    data_path: Path = args.data
-    output: Path = args.output
+    selected_cancers = args.cancer
 
-    if data_path.suffix == ".csv":
-        print("Reading csv file...")
-        data: pd.DataFrame = pd.read_csv(data_path)
-    else:
-        print("Reading tsv file...")
-        data: pd.DataFrame = pd.read_csv(data_path, sep="\t", index_col=0)
+    cancer_load_path = Path("data", "bmeg")
+
+    cancer_df = []
+    for cancer in selected_cancers:
+        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0)
+        df["Cancer"] = cancer
+        cancer_df.append(df)
+
+    data = pd.concat(cancer_df, axis=0)
+    data.reset_index(drop=True, inplace=True)
 
     # check that all columns to be float
     for column in data.columns:
+        if column == "Cancer":
+            continue
         if data[column].dtype != float:
             print(f"{column} is not float. Converting...")
             data[column] = data[column].astype(float)
+
+    cancer_types = data["Cancer"]
+
+    # drop the cancer column
+    data.drop(columns=["Cancer"], inplace=True)
 
     # scale the data
     data = pd.DataFrame(MinMaxScaler().fit_transform(data), columns=data.columns)
@@ -93,13 +102,16 @@ if __name__ == '__main__':
     batch_size = 50
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
+    # add dense layer
+    x = layers.Dense(feature_dim // 2, activation='relu')(encoder_inputs)
+    x = layers.Dense(feature_dim // 3, activation='relu')(x)
     z_mean_dense_linear = layers.Dense(
-        latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(encoder_inputs)
+        latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(x)
     z_mean_dense_batchnorm = layers.BatchNormalization()(z_mean_dense_linear)
     z_mean_encoded = layers.Activation('relu')(z_mean_dense_batchnorm)
 
     z_log_var_dense_linear = layers.Dense(
-        latent_dim, kernel_initializer='glorot_uniform', name="encoder_2")(encoder_inputs)
+        latent_dim, kernel_initializer='glorot_uniform', name="encoder_2")(x)
     z_log_var_dense_batchnorm = layers.BatchNormalization()(z_log_var_dense_linear)
     z_log_var_encoded = layers.Activation('relu')(z_log_var_dense_batchnorm)
 
@@ -145,8 +157,13 @@ if __name__ == '__main__':
 
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
-    if not output.parent.exists():
-        output.parent.mkdir(parents=True)
 
-    # save latent space
-    latent_space.to_csv(output, index=False)
+    # assign cancer types to latnet space
+    latent_space["Cancer"] = cancer_types
+
+    # iterate through all cancer types and the save the subset of the latent space
+    for cancer in selected_cancers:
+        subset = latent_space[latent_space["Cancer"] == cancer].copy()
+        subset.drop(columns=["Cancer"], inplace=True)
+        subset.to_csv(Path(Path("results", "embeddings", "cancer"), f"{cancer.lower()}_embeddings.csv"), index=False)
+
