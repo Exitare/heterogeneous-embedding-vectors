@@ -1,70 +1,75 @@
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_distances
+from pathlib import Path
+from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.cluster import KMeans
-from pathlib import Path
-from sklearn.decomposition import PCA
-
 
 if __name__ == '__main__':
-    brca_cancer = pd.read_csv(Path("results", "embeddings", "cancer", "brca_embeddings.csv"))
-    blca_cancer = pd.read_csv(Path("results", "embeddings","cancer", "THCA_embeddings.csv"))
+    parser = ArgumentParser()
+    parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
 
-    # Combine datasets
-    data = pd.concat([brca_cancer, blca_cancer])
-    labels = np.array([0] * len(brca_cancer) + [1] * len(blca_cancer))
-    # Calculate cosine distances
-    cosine_dist = cosine_distances(data)
+    args = parser.parse_args()
 
-    # Perform KMeans clustering
-    num_clusters = 2  # Set the number of clusters
-    kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(data)
-    labels = kmeans.labels_
+    selected_cancers = args.cancer
 
-    # Calculate intra-cluster and inter-cluster distances
-    intra_cluster_distances = []
-    inter_cluster_distances = []
+    cancer_dfs = {}
+    for cancer in selected_cancers:
+        cancer_dfs[cancer] = pd.read_csv(Path("results", "embeddings", "cancer", f"{cancer.lower()}_embeddings.csv"))
 
-    for i in range(num_clusters):
-        cluster_points = data[labels == i]
-        other_points = data[labels != i]
-        intra_dist = cosine_distances(cluster_points)
-        intra_cluster_distances.extend(intra_dist[np.triu_indices(len(cluster_points), k=1)])
-        if other_points.size > 0:
-            inter_dist = cosine_distances(cluster_points, other_points)
-            inter_cluster_distances.extend(inter_dist.flatten())
+    intra_distances = {}
+    for cancer, df in cancer_dfs.items():
+        intra_distance = cosine_distances(df)
+        intra_distance = intra_distance[np.triu_indices_from(intra_distance, k=1)]
+        intra_distances[cancer] = intra_distance
 
-    # remove datapoints with distance greater than 3std
-    intra_cluster_distances = np.array(intra_cluster_distances)
-    inter_cluster_distances = np.array(inter_cluster_distances)
-
-    intra_cluster_distances = intra_cluster_distances[intra_cluster_distances < np.mean(intra_cluster_distances) + 3 * np.std(intra_cluster_distances)]
-    inter_cluster_distances = inter_cluster_distances[inter_cluster_distances < np.mean(inter_cluster_distances) + 3 * np.std(inter_cluster_distances)]
-
-    # Plotting the distances
-    plt.figure(figsize=(12, 6))
-
-    sns.histplot(intra_cluster_distances, kde=True, color='blue', label='Intra-cluster Distances')
-    sns.histplot(inter_cluster_distances, kde=True, color='red', label='Inter-cluster Distances')
-
-    plt.title('Cosine Distances within and between Clusters')
-    plt.xlabel('Cosine Distance')
-    plt.ylabel('Frequency')
-    plt.legend()
-    plt.show()
+    # calculate the distance between all cancer dfs and create a dictionary that allows to track the distance
+    inter_distances = {}
+    for cancer1, df1 in cancer_dfs.items():
+        for cancer2, df2 in cancer_dfs.items():
+            if cancer1 == cancer2:
+                continue
+            inter_distance = cosine_distances(df1, df2).flatten()
+            inter_distances[(cancer1, cancer2)] = inter_distance
 
     # Output the average distances
-    print(f"Average Intra-cluster Distance: {np.mean(intra_cluster_distances)}")
-    print(f"Average Inter-cluster Distance: {np.mean(inter_cluster_distances)}")
+    for cancer, distances in intra_distances.items():
+        print(f"Average intra-cancer distance for {cancer}: {np.mean(distances)}")
 
-    # plot the kmeans cluster
-    pca = PCA(n_components=2)
-    reduced_embeddings = pca.fit_transform(data)
-    plt.scatter(reduced_embeddings[:, 0], reduced_embeddings[:, 1], c=labels)
-    plt.title('PCA of Embeddings with KMeans Labels')
-    plt.xlabel('Principal Component 1')
-    plt.ylabel('Principal Component 2')
+    # output the average inter distances
+    for (cancer1, cancer2), distances in inter_distances.items():
+        print(f"Average inter-cancer distance for {cancer1} and {cancer2}: {np.mean(distances)}")
+
+    # Convert intra_distances to DataFrame
+    intra_df = pd.DataFrame({
+        'Cancer': np.repeat(list(intra_distances.keys()), [len(d) for d in intra_distances.values()]),
+        'Distance': np.concatenate(list(intra_distances.values()))
+    })
+
+    # Convert inter_distances to DataFrame
+    inter_df = pd.DataFrame({
+        'Cancer_Pair': np.repeat([f"{k[0]}-{k[1]}" for k in inter_distances.keys()],
+                                 [len(v) for v in inter_distances.values()]),
+        'Distance': np.concatenate(list(inter_distances.values()))
+    })
+
+
+    # only keep one of the cancer pair e.g. BRCA-STAD and STAD-BRCA, only keep one
+    inter_df = inter_df[inter_df['Cancer_Pair'].apply(lambda x: x.split('-')[0] < x.split('-')[1])]
+
+
+    # Plotting the distances both inter and intra, create two axis
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+    # create hist plot for intra cluster distances with a hue
+    sns.histplot(intra_df, x='Distance', hue='Cancer', kde=True, ax=ax[0])
+    sns.histplot(inter_df, x='Distance', kde=True, hue="Cancer_Pair", ax=ax[1])
+
+    ax[0].set_title('Intra-cluster Distances')
+    ax[1].set_title('Inter-cluster Distances')
+
+    # sns.histplot(inter_cluster_distances, kde=True, color='red', label='Inter-cluster Distances')
+
+    plt.xlabel('Cosine Distance')
+    plt.ylabel('Frequency')
     plt.show()
-
