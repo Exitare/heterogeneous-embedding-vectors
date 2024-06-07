@@ -11,7 +11,7 @@ if not save_folder.exists():
 if __name__ == '__main__':
     parser = ArgumentParser(description='Download bmeg data')
     parser.add_argument("--creds", "-c", type=Path)
-    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA"], required=True)
+    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "LAML"], required=True)
 
     args = parser.parse_args()
 
@@ -30,6 +30,7 @@ if __name__ == '__main__':
     c = c.render(
         ["$sample._data.gdc_attributes.submitter_id", "$exp._data.values"])
 
+    print("Downloading data...")
     data = {}
     for row in c.execute(stream=True):
         data[row[0]] = row[1]
