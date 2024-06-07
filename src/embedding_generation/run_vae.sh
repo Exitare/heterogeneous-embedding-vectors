@@ -14,4 +14,4 @@
 
 cancer_types=$1
 
-python3 src/embedding_generation/synth_vae.py -c "${cancer_types}"
+python3 src/embedding_generation/synth_vae.py -c ${cancer_types}
