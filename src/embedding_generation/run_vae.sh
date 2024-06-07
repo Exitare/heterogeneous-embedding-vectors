@@ -12,6 +12,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
+# sbatch ./src/embedding_generation/run_vae.sh "BRCA BLCA LAML STAD THCA"
+
 cancer_types=$1
 
 python3 src/embedding_generation/synth_vae.py -c ${cancer_types}
