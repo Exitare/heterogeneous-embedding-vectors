@@ -4,6 +4,7 @@ from tensorflow.keras import layers, losses
 from tensorflow.keras.datasets import fashion_mnist
 from tensorflow.keras.models import Model
 from pathlib import Path
+import numpy as np
 
 save_folder = Path("../../results", "embeddings")
 
@@ -49,7 +50,10 @@ autoencoder.fit(x_train, x_train,
                 shuffle=True,
                 validation_data=(x_test, x_test))
 
-embeddings = autoencoder.encoder(x_test).numpy()
+# combine train and test data
+x_merged = np.concatenate((x_train, x_test))
+
+embeddings = autoencoder.encoder(x_merged).numpy()
 embeddings = pd.DataFrame(embeddings)
 # save embeddings
 embeddings.to_csv(Path(save_folder, "image_embeddings.csv"), index=False)
