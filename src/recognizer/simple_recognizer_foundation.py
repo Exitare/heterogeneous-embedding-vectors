@@ -15,8 +15,8 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "simple_recognizer_foundation")
-# embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
-embedding_counts = [2, 3]
+embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+#embedding_counts = [2, 3]
 
 
 # Function to create stratified splits for multi-label data
@@ -304,3 +304,48 @@ if __name__ == '__main__':
 
     binary_metrics_df = pd.DataFrame(binary_metrics)
     binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
+
+    # reset index of y_test and y_pred_round
+    y_test_int = pd.DataFrame(y_test_int)
+    # concat y_pred_rounded
+    y_pred_rounded = pd.concat([pd.DataFrame(y_pred_rounded[i]) for i in range(len(y_pred_rounded))], axis=1)
+
+    y_test_int.reset_index(drop=True, inplace=True)
+    y_pred_rounded.reset_index(drop=True, inplace=True)
+
+    y_test_int.columns = embeddings
+    # clauclate total embeddings by only using Text Image and RNa columns
+    y_test_int["Total Embeddings"] = y_test_int[embeddings].sum(axis=1)
+    y_pred_rounded.columns = embeddings
+    split_metrics = []  #
+
+    for embedding in embeddings:
+        y_test_sub = y_test_int[embedding]
+        y_pred_sub = y_pred_rounded[embedding]
+
+        # iterate over all total embeddings from y_test_int
+        for total_embeddings in y_test_int["Total Embeddings"].unique():
+            y_test_sub_total = y_test_sub[y_test_int["Total Embeddings"] == total_embeddings]
+            y_pred_sub_total = y_pred_sub[y_test_int["Total Embeddings"] == total_embeddings]
+
+            # convert to int
+            y_test_sub_total = y_test_sub_total.astype(int)
+            y_pred_sub_total = y_pred_sub_total.astype(int)
+
+            accuracy = accuracy_score(y_test_sub_total, y_pred_sub_total)
+            precision = precision_score(y_test_sub_total, y_pred_sub_total, average='macro')
+            recall = recall_score(y_test_sub_total, y_pred_sub_total, average='macro')
+            f1 = f1_score(y_test_sub_total, y_pred_sub_total, average='macro')
+
+            split_metrics.append({
+                'embeddings': total_embeddings,
+                'embedding': embedding,
+                'accuracy': accuracy,
+                'precision': precision,
+                'recall': recall,
+                'f1': f1
+            })
+
+    split_metrics = pd.DataFrame(split_metrics)
+    split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+
