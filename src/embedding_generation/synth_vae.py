@@ -104,7 +104,7 @@ if __name__ == '__main__':
     encoder_inputs = keras.Input(shape=(feature_dim,))
     # add dense layer
     x = layers.Dense(feature_dim // 2, activation='relu')(encoder_inputs)
-    # x = layers.Dense(feature_dim // 3, activation='relu')(x)
+    x = layers.Dense(feature_dim // 3, activation='relu')(x)
     z_mean_dense_linear = layers.Dense(
         latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(x)
     z_mean_dense_batchnorm = layers.BatchNormalization()(z_mean_dense_linear)
