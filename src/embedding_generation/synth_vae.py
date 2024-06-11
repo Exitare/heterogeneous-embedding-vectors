@@ -104,7 +104,7 @@ if __name__ == '__main__':
     encoder_inputs = keras.Input(shape=(feature_dim,))
     # add dense layer
     x = layers.Dense(feature_dim // 2, activation='relu')(encoder_inputs)
-    #x = layers.Dense(feature_dim // 3, activation='relu')(x)
+    # x = layers.Dense(feature_dim // 3, activation='relu')(x)
     z_mean_dense_linear = layers.Dense(
         latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(x)
     z_mean_dense_batchnorm = layers.BatchNormalization()(z_mean_dense_linear)
@@ -144,12 +144,6 @@ if __name__ == '__main__':
                       callbacks=[WarmUpCallback(beta, kappa), early_stopping],
                       verbose=1)
 
-    batch_size = 10
-
-    _ = vae.fit(data,
-                epochs=fine_tune_epochs, batch_size=batch_size, shuffle=True,
-                callbacks=[WarmUpCallback(beta, kappa), early_stopping], verbose=1)
-
     encoder = Model(encoder_inputs, z_mean_encoded)
     decoder_input = keras.Input(shape=(latent_dim,))
     _x_decoded_mean = decoder_to_reconstruct(decoder_input)
@@ -159,7 +153,6 @@ if __name__ == '__main__':
 
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
-
     # assign cancer types to latnet space
     latent_space["Cancer"] = cancer_types
 
@@ -168,4 +161,3 @@ if __name__ == '__main__':
         subset = latent_space[latent_space["Cancer"] == cancer].copy()
         subset.drop(columns=["Cancer"], inplace=True)
         subset.to_csv(Path(Path("results", "embeddings", "cancer"), f"{cancer.lower()}_embeddings.csv"), index=False)
-
