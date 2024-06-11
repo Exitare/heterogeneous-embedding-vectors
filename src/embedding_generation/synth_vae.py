@@ -99,12 +99,12 @@ if __name__ == '__main__':
     feature_dim = len(data.columns)
     # latent_dim = 384
     latent_dim = 768
-    batch_size = 50
+    batch_size = 512
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
     # add dense layer
     x = layers.Dense(feature_dim // 2, activation='relu')(encoder_inputs)
-    x = layers.Dense(feature_dim // 3, activation='relu')(x)
+    #x = layers.Dense(feature_dim // 3, activation='relu')(x)
     z_mean_dense_linear = layers.Dense(
         latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(x)
     z_mean_dense_batchnorm = layers.BatchNormalization()(z_mean_dense_linear)
@@ -134,19 +134,21 @@ if __name__ == '__main__':
     vae.compile(optimizer=adam, loss=None, loss_weights=[beta])
 
     pre_train_epochs = pre_train_epochs
-
+    # add early stopping callback
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
     fit_start = time.time()
     history = vae.fit(data,
                       epochs=pre_train_epochs,
                       batch_size=batch_size,
                       shuffle=True,
-                      callbacks=[WarmUpCallback(beta, kappa)],
+                      callbacks=[WarmUpCallback(beta, kappa), early_stopping],
                       verbose=1)
 
     batch_size = 10
+
     _ = vae.fit(data,
                 epochs=fine_tune_epochs, batch_size=batch_size, shuffle=True,
-                callbacks=[WarmUpCallback(beta, kappa)], verbose=1)
+                callbacks=[WarmUpCallback(beta, kappa), early_stopping], verbose=1)
 
     encoder = Model(encoder_inputs, z_mean_encoded)
     decoder_input = keras.Input(shape=(latent_dim,))
