@@ -1,6 +1,6 @@
 #!/bin/bash
 cancer_embeddings=$1 # the data files
-# ./src/embedding_aggregation/schedule_multi_sum_embeddings.sh "./results/embeddings/cancer/brca_embeddings.csv ./results/embeddings/cancer/stad_embeddings.csv"
+# ./src/embedding_aggregation/schedule_multi_sum_embeddings.sh "./results/embeddings/cancer/brca_embeddings.csv ./results/embeddings/cancer/laml_embeddings.csv"
 
 
 # iterate through 2 to 10

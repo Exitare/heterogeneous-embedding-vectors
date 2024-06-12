@@ -96,7 +96,7 @@ if __name__ == '__main__':
     image_counts = image_counts.astype(int)
     rna_counts = rna_counts.astype(int)
 
-    X = data.drop(columns=["Text", "Image", "RNA"]).values
+    X = data.drop(columns=embeddings).values
 
     # Assuming these are the actual labels from your dataset
     y = [text_counts, image_counts, rna_counts]

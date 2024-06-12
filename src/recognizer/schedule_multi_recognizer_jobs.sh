@@ -1,4 +1,4 @@
-
+# ./src/recognizer/schedule_multi_recognizer_jobs.sh "brca laml"
 cancer_types=$1
 
 for i in $(seq 2 9)

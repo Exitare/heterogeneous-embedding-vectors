@@ -1,4 +1,4 @@
-# ./src/recognizer/schedule_multi_recognizer_foundation_jobs.sh "blca brca"
+# ./src/recognizer/schedule_multi_recognizer_foundation_jobs.sh "brca laml"
 
 cancer_types=$1
 
