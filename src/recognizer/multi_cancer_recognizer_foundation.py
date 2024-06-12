@@ -95,6 +95,9 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
+
+    print("Selected cancers: ", selected_cancers)
+
     # lower case the cancer types
     selected_cancers = [cancer.lower() for cancer in selected_cancers]
     cancer_types = "_".join(selected_cancers)

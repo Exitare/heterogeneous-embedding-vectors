@@ -6,7 +6,7 @@
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
 #SBATCH --mem=128000
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=32
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
 #SBATCH --mail-type=FAIL
@@ -15,6 +15,5 @@
 total_embeddings=$1
 run_iteration=$2
 cancer_types=$3
-
 
 python3 src/recognizer/multi_cancer_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}" -c ${cancer_types}

@@ -5,8 +5,8 @@
 #SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
-#SBATCH --mem=186000
-#SBATCH --cpus-per-task=4
+#SBATCH --mem=384000
+#SBATCH --cpus-per-task=32
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
 #SBATCH --mail-type=FAIL
