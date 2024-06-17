@@ -18,6 +18,7 @@ if __name__ == '__main__':
 
     # iterate through results recognizer folder and all its sub folders
     results = []
+    split_metrics = []
     for root, dirs, files in os.walk(data_folder):
         for file in files:
             if file == "metrics.csv":
@@ -25,8 +26,16 @@ if __name__ == '__main__':
                 metrics = pd.read_csv(Path(root, file))
                 results.append(metrics)
 
+            if file == 'split_metrics':
+                print("Processing", Path(root, file))
+                split_metrics.append(pd.read_csv(Path(root, file)))
+
     # concatenate all metrics
     results = pd.concat(results)
+
+    if len(split_metrics) > 0:
+        split_metrics = pd.concat(split_metrics)
+        split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
 
     # save the concatenated metrics
     results.to_csv(Path(save_path, "metrics.csv"), index=False)
