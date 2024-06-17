@@ -33,6 +33,8 @@ if __name__ == '__main__':
     # print mean accuracy for each embedding
     print(df[["embedding", "accuracy"]].groupby("embedding").mean(numeric_only=True))
 
+    # upper case all embedding
+    df["embedding"] = df["embedding"].str.upper()
 
     # plot
     fig = plt.figure(figsize=(10, 5), dpi=150)
