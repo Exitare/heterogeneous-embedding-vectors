@@ -26,7 +26,7 @@ if __name__ == '__main__':
                 metrics = pd.read_csv(Path(root, file))
                 results.append(metrics)
 
-            if file == 'split_metrics':
+            if file == 'split_metrics.csv':
                 print("Processing", Path(root, file))
                 split_metrics.append(pd.read_csv(Path(root, file)))
 
