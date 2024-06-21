@@ -97,10 +97,11 @@ if __name__ == '__main__':
     rna_counts = rna_counts.astype(int)
 
     X = data.drop(columns=embeddings).values
+    assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
     # Assuming these are the actual labels from your dataset
     y = [text_counts, image_counts, rna_counts]
-
+    print("Building model....")
     model = build_model(X.shape[1])
     model.compile(optimizer='adam',
                   loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},

@@ -126,6 +126,7 @@ if __name__ == '__main__':
     print(f"Detected max embeddings: {total_embeddings}")
 
     X = data.drop(columns=["Text", "Image", "RNA"]).values
+    assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
     # Assuming these are the actual labels from your dataset
     y = [text_counts, image_counts, rna_counts]

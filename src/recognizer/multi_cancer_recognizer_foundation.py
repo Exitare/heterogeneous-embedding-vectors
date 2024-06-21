@@ -145,6 +145,7 @@ if __name__ == '__main__':
 
     # get the number of subtypes
     X = data.drop(columns=embeddings).values
+    assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
     # Assuming these are the actual labels from your dataset
     y = [text_counts, image_counts, rna_counts] + cancer_count_data
