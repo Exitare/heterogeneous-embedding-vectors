@@ -32,6 +32,44 @@ def unique_nodes(predictions: np.array, composition_details: pd.DataFrame):
     return extracted_nodes_df
 
 
+def extract_unique_nodes(predictions: np.array, composition_details: pd.DataFrame):
+    # Flatten the composition_df to get a list of unique nodes (rows)
+    unique_nodes = pd.unique(composition_details.values.ravel())
+
+    # Create a dictionary to store the embeddings for each unique node (row)
+    node_embeddings = {node: [] for node in unique_nodes}
+
+    # Iterate over the composition_df and predictions to extract embeddings for each unique node (row)
+    for idx, composition in composition_details.iterrows():
+        if idx >= predictions.shape[0]:
+            continue  # Skip out-of-bounds indices
+        for i, node in enumerate(composition):
+            # Append the correct embedding to the corresponding node
+            if node in node_embeddings:
+                node_embeddings[node].append(predictions[idx, i])
+
+    # Average the embeddings for each unique node (row) if there are duplicates
+    for node in node_embeddings:
+        if node_embeddings[node]:
+            avg_embedding = np.mean(node_embeddings[node], axis=0)
+            # Exclude nodes where the average embedding is all zeros
+            if not np.all(avg_embedding == 0):
+                node_embeddings[node] = avg_embedding
+            else:
+                node_embeddings[node] = None  # Mark for removal
+        else:
+            node_embeddings[node] = None  # Mark for removal if no embeddings
+
+    # Remove nodes with None embeddings
+    node_embeddings = {k: v for k, v in node_embeddings.items() if v is not None}
+
+    # Convert the dictionary to a DataFrame for easier viewing and manipulation
+    unique_node_embeddings_df = pd.DataFrame.from_dict(node_embeddings, orient='index')
+
+    # Save the unique node embeddings to a CSV file
+    unique_node_embeddings_df.to_csv(Path(results_folder, "unique_nodes.csv"), index_label='Node')
+
+
 if __name__ == '__main__':
 
     parser = ArgumentParser()
@@ -115,6 +153,8 @@ if __name__ == '__main__':
 
     composition_details = pd.read_csv(Path(load_folder, cancers, "graph_generation", "composition_details.csv"))
     extracted_nodes = unique_nodes(predictions, composition_details)
+    print(extracted_nodes)
+    input()
 
     # calculate the mae between the extracted nodes and the ground truth embeddings based on the Node Id
     mae = []
@@ -132,19 +172,20 @@ if __name__ == '__main__':
 
         mae.append(mean_absolute_error(extracted_node, original_node))
 
-    composition_details = pd.read_csv(Path(load_folder, cancers, "graph_generation", "composition_details.csv"))
-    unique_nodes(predictions, composition_details)
+    print("MAE")
+    print(np.mean(mae))
+    input()
 
-    # compare the predictions with the ground truth embedding using cosine similarity
+    # compare the predictions with the ground truth embedding using cosine similiarty
 
     # for each prediction and ground truth embedding, calculate the cosine similarity
     similarities = [cosine_similarity(predictions[i], y_test[i]) for i in range(len(predictions))]
     similarity = sum(similarities) / len(similarities)
 
+    print(similarity)
+
     # calculate MAE for each prediction and ground truth embedding
     mae = [np.mean(np.abs(predictions[i] - y_test[i])) for i in range(len(predictions))]
-
-    # calcualte MAE for each prediction and ground truth embedding inside an array and average it
 
     # save similarity results
     similarity_df = pd.DataFrame(similarity)
