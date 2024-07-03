@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from pathlib import Path
-
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -139,17 +139,14 @@ if __name__ == '__main__':
 
     # for each prediction and ground truth embedding, calculate the cosine similarity
     similarities = [cosine_similarity(predictions[i], y_test[i]) for i in range(len(predictions))]
+    print(f'Cosine Similarity: {np.mean(similarities)}')
     similarity = sum(similarities) / len(similarities)
 
     # calculate MAE for each prediction and ground truth embedding
     mae = [np.mean(np.abs(predictions[i] - y_test[i])) for i in range(len(predictions))]
-
-    # calcualte MAE for each prediction and ground truth embedding inside an array and average it
+    print(f'Mean Absolute Error: {np.mean(mae)}')
 
     # save similarity results
     similarity_df = pd.DataFrame(similarity)
     similarity_df.to_csv(Path(results_folder, "similarity.csv"), index=False)
 
-    # Flatten the array
-    predictions = pd.DataFrame(predictions.reshape(-1, 768))
-    predictions.to_csv(Path(results_folder, "disaggregated_nodes.csv"), index=False)
