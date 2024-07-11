@@ -98,7 +98,7 @@ if __name__ == '__main__':
     ground_truth_embeddings_array = ground_truth_nodes.values
     ground_truth_embeddings_reshaped = ground_truth_embeddings_array.reshape(-1, max_sequence_length, embedding_size)
 
-    X_train, X_test, y_train, y_test, train_idx, test_idx = train_test_split(
+    X_node_train, X_node_test, y_node_train, y_node_test, train_idx, test_idx = train_test_split(
         walk_data.values,
         ground_truth_embeddings_reshaped,
         walk_data.index.values,
@@ -106,9 +106,9 @@ if __name__ == '__main__':
         random_state=42
     )
 
-    input_dim = X_train.shape[1]
-    output_dim = y_train.shape[1]
-    embedding_dim = y_train.shape[2]
+    input_dim = X_node_train.shape[1]
+    output_dim = y_node_train.shape[1]
+    embedding_dim = y_node_train.shape[2]
 
     encoder_inputs = tf.keras.Input(shape=(input_dim,))
     encoder = layers.Dense(512, activation='relu')(encoder_inputs)
@@ -119,9 +119,9 @@ if __name__ == '__main__':
     decoder = layers.LSTM(256, return_sequences=True)(decoder_inputs)
     decoder_outputs = layers.TimeDistributed(layers.Dense(embedding_dim))(decoder)
 
-    model = models.Model(inputs=encoder_inputs, outputs=decoder_outputs)
-    model.compile(optimizer='adam', loss='mse')
-    model.summary()
+    random_walk_model = models.Model(inputs=encoder_inputs, outputs=decoder_outputs)
+    random_walk_model.compile(optimizer='adam', loss='mse')
+    random_walk_model.summary()
 
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
@@ -129,16 +129,17 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
 
-    history = model.fit(X_train, y_train, epochs=epochs, batch_size=32, validation_split=0.2, callbacks=early_stopping)
+    history = random_walk_model.fit(X_node_train, y_node_train, epochs=epochs, batch_size=32, validation_split=0.2,
+                                    callbacks=early_stopping)
     history_df = pd.DataFrame(history.history)
     history_df.to_csv(Path(results_folder, "history.csv"), index=False)
 
-    loss = model.evaluate(X_test, y_test)
+    loss = random_walk_model.evaluate(X_node_test, y_node_test)
     print(f'Test Loss: {loss}')
 
-    predictions = model.predict(X_test)
+    random_walk_predictions = random_walk_model.predict(X_node_test)
 
-    extracted_nodes = unique_nodes(predictions, composition_details)
+    extracted_nodes = unique_nodes(random_walk_predictions, composition_details)
 
     # TODO: CHECK THAT. Should it be nodes? is the terminology correct, we want to exclude the nodes yes, but are these the right ones?
     # create a train test split for the combined embeddings that does not include the extracted nodes in the train set
@@ -166,7 +167,9 @@ if __name__ == '__main__':
     y = [text_counts, image_counts, rna_counts] + cancer_data
 
     # Splitting the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, np.array(y).T, test_size=0.2, random_state=42)
+    X_recognizer_train, X_recognizer_test, y_recognizer_train, y_recognizer_test = train_test_split(X, np.array(y).T,
+                                                                                                    test_size=0.2,
+                                                                                                    random_state=42)
 
     # Set up a list of metrics
     loss = {'output_text': 'mae', 'output_image': 'mae', 'output_rna': 'mae'}
@@ -190,17 +193,22 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
 
-    history = recognizer_model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])], epochs=epochs,
+    history = recognizer_model.fit(X_recognizer_train,
+                                   [y_recognizer_train[:, i] for i in range(y_recognizer_train.shape[1])],
+                                   epochs=epochs,
                                    batch_size=32, validation_split=0.2,
                                    callbacks=early_stopping)
     recognizer_history = pd.DataFrame(history.history)
     recognizer_history.to_csv(Path(results_folder, "recognizer_history.csv"), index=False)
 
-    mae_list = []
+    mae_node_list = []
+    accuracy_recognizer_list = []
+    cosine_similarities = []
     for idx, row in extracted_nodes.iterrows():
         extracted_node = pd.DataFrame(row).T.iloc[:, :embedding_size]
         node_id = row['Node Id']
         original_node = combined_embeddings.loc[combined_embeddings.index == node_id]
+        cosine_similarities.append(cosine_similarity(extracted_node, original_node.iloc[:, :embedding_size]).mean())
         print(f'MAE: {mean_absolute_error(extracted_node, original_node.iloc[:, :embedding_size])}')
         print(f"Cosing Similarity: {cosine_similarity(extracted_node, original_node.iloc[:, :embedding_size])}")
 
@@ -210,34 +218,38 @@ if __name__ == '__main__':
         print(y_true)
 
         # recognize the node composition
-        y_pred = recognizer_model.predict(extracted_node)
+        y_recognizer_pred = recognizer_model.predict(extracted_node)
         # Convert predictions to rounded integers
-        y_pred_rounded = [np.rint(pred) for pred in y_pred]
+        y_recognizer_pred_rounded = [np.rint(pred) for pred in y_recognizer_pred]
 
         # Convert y_pred_rounded to a DataFrame
-        predictions = [pred[0][0] for pred in y_pred_rounded]  # Extract the predictions
-        y_pred_rounded = pd.DataFrame([predictions], columns=y_true.columns, index=y_true.index)
-
+        node_predictions = [pred[0][0] for pred in y_recognizer_pred_rounded]  # Extract the predictions
+        y_recognizer_pred_rounded = pd.DataFrame([node_predictions], columns=y_true.columns, index=y_true.index)
 
         # Calculating the accuracy for each dataset
-        accuracy = {col: np.mean(y_true[col] == y_pred_rounded[col]) for col in y_true.columns}
+        accuracy = {col: np.mean(y_true[col] == y_recognizer_pred_rounded[col]) for col in y_true.columns}
 
         # convert y_pred_rounded into a dataframe
         # Convert to a flat list
-        y_pred_rounded = [item[0][0] for item in y_pred_rounded]
+        y_recognizer_pred_rounded = [item[0][0] for item in y_recognizer_pred_rounded]
 
         # Convert to DataFrame
-        y_pred_rounded = pd.DataFrame([y_pred_rounded], columns=embeddings)
+        y_recognizer_pred_rounded = pd.DataFrame([y_recognizer_pred_rounded], columns=embeddings)
 
         if original_node.size == 0:
             continue
         original_node = original_node.iloc[:, :embedding_size]
-        mae_list.append(mean_absolute_error(extracted_node, original_node))
+        mae_node_list.append(mean_absolute_error(extracted_node, original_node))
+        accuracy_recognizer_list.append(accuracy)
 
-    similarities = [cosine_similarity(predictions[i], y_test[i]).mean() for i in range(len(predictions))]
-    print(f'Cosine Similarity: {np.mean(similarities)}')
+    # Create DataFrame for accuracies
+    accuracies = pd.DataFrame(accuracy_recognizer_list, columns=embeddings)
+    cosine_similarities = pd.DataFrame(cosine_similarities, columns=["Cosine Similarity"])
 
-    # Calculate walk lengths based on composition details, where 0 indicates the end of the walk
+    # Print cosine similarities and their mean
+    print(cosine_similarities)
+    print(f'Cosine Similarity: {np.mean(cosine_similarities["Cosine Similarity"])}')
+
     walk_lengths = []
     for _, row in composition_details.iterrows():
         walk_length = sum(row != 0)
@@ -253,9 +265,9 @@ if __name__ == '__main__':
 
     for length, indices in walk_length_categories.items():
         for i in indices:
-            if i < len(mae_list) and i < len(similarities):  # Ensure index is within bounds
-                walk_length_mae[length].append(mae_list[i])
-                walk_length_similarity[length].append(similarities[i])
+            if i < len(mae_node_list) and i < len(cosine_similarities):
+                walk_length_mae[length].append(mae_node_list[i])
+                walk_length_similarity[length].append(cosine_similarities.iloc[i]["Cosine Similarity"])
 
     walk_length_mae_mean = {length: np.mean(values) for length, values in walk_length_mae.items()}
     walk_length_similarity_mean = {length: np.mean(values) for length, values in walk_length_similarity.items()}
@@ -265,7 +277,7 @@ if __name__ == '__main__':
     # sort mae ascending
     walk_length_mae_mean = dict(sorted(walk_length_mae_mean.items(), key=lambda x: x[1]))
 
-    print(f'Walk Length MAE: {walk_length_mae_mean}')
+    print(f'Walk Length mean MAE: {walk_length_mae_mean}')
     print(f'Walk Length Cosine Similarity: {walk_length_similarity_mean}')
 
     similarity_df = pd.DataFrame(list(walk_length_similarity_mean.items()),
