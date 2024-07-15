@@ -9,10 +9,9 @@ from node2vec import Node2Vec
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 
-results_folder = Path("results", "graph_embeddings")
+results_folder = Path("results", "node2vec")
+image_folder = Path("figures", "node2vec")
 embeddings_size = 768
-
-
 
 
 # Function to sum embeddings from the random walk and return individual embeddings and additional info
@@ -32,7 +31,17 @@ def random_sum_embeddings(embeddings, max_count):
     return summed_embeddings, n
 
 
+# Function to determine cancer type
+def determine_cancer_type(row, selected_cancers):
+    for cancer in selected_cancers:
+        if row[cancer] > 0:
+            return cancer
+    return 'Unknown'
+
+
 if __name__ == '__main__':
+    if not image_folder.exists():
+        image_folder.mkdir(parents=True)
 
     parser = ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
@@ -46,10 +55,18 @@ if __name__ == '__main__':
     cancers = "_".join(selected_cancers)
     num_walks = args.walks
 
-    results_folder = Path(results_folder, cancers, "graph_generation")
+    print(f"Selected cancers: {selected_cancers}")
+    print(f"Iterations: {iterations}")
+    print(f"Number of walks: {num_walks}")
+
+    results_folder = Path(results_folder, cancers)
+    image_folder = Path(image_folder, cancers)
 
     if not results_folder.exists():
         results_folder.mkdir(parents=True)
+
+    if not image_folder.exists():
+        image_folder.mkdir(parents=True)
 
     loaded_cancer_embeddings = {}
     for cancer in selected_cancers:
@@ -70,35 +87,46 @@ if __name__ == '__main__':
 
         random.shuffle(embeddings_list)
 
-        combined_sum = pd.Series(np.zeros_like(embeddings_list[0][0].iloc[0]), index=embeddings_list[0][0].columns)
+        # Initialize combined_sum with the correct dimensions
+        combined_sum = np.zeros(embeddings_list[0][0].shape[1])
+
         # remaining embeddings should be a number between 2 and 10
         remaining_embeddings = random.randint(2, 10)
         combination_counts = {}
         selected_cancer_type = None
 
+        # Ensure that one cancer embedding is selected first
+        cancer_embeddings_first = [e for e in embeddings_list if e[1] in loaded_cancer_embeddings.keys()]
+        initial_embedding, selected_cancer_type = random.choice(cancer_embeddings_first)
+        current_sum, count = random_sum_embeddings(initial_embedding,
+                                                   1)  # Select one embedding from the selected cancer type
+        combined_sum += current_sum
+        remaining_embeddings -= count
+        combination_counts[selected_cancer_type] = count
+
+        # Process remaining embeddings
         for embeddings, name in embeddings_list:
             if remaining_embeddings > 0:
                 if name in loaded_cancer_embeddings.keys():
-                    # If a specific cancer type was selected, continue using that type
-                    if selected_cancer_type is None:
-                        selected_cancer_type = name
-                    elif name != selected_cancer_type:
+                    if name != selected_cancer_type:
                         combination_counts[name] = 0
                         continue
-
                 current_sum, count = random_sum_embeddings(embeddings, remaining_embeddings)
                 combined_sum += current_sum
                 remaining_embeddings -= count
-                combination_counts[name] = count
+                if name in combination_counts:
+                    combination_counts[name] += count
+                else:
+                    combination_counts[name] = count
             else:
                 combination_counts[name] = 0
 
-        # Ensure there is at least one embedding selected in total (avoid all-zero entries)
-        if all(v == 0 for v in combination_counts.values()):
-            embeddings, name = random.choice(embeddings_list)
+        # Ensure there is at least one embedding from the selected cancer type
+        if combination_counts[selected_cancer_type] == 0:
+            embeddings = loaded_cancer_embeddings[selected_cancer_type]
             current_sum, count = random_sum_embeddings(embeddings, 1)  # Force at least one selection
             combined_sum += current_sum
-            combination_counts[name] = count
+            combination_counts[selected_cancer_type] = count
 
         # Sort the combination counts by the keys
         combination_counts = dict(sorted(combination_counts.items()))
@@ -121,7 +149,6 @@ if __name__ == '__main__':
     # Separate the embeddings and the additional columns
     embeddings = combined_df.iloc[:, :embeddings_size].values
     additional_columns = combined_df.iloc[:, embeddings_size:]
-    print(additional_columns)
 
     # Create the graph and add nodes with embeddings
     G = nx.Graph()
@@ -131,14 +158,7 @@ if __name__ == '__main__':
         embedding = row[:embeddings_size].values
         additional_info = row[embeddings_size:].values
 
-        # Determine cancer type
-        if row['BRCA'] > 0:
-            cancer_type = 'BRCA'
-        elif row['LAML'] > 0:
-            cancer_type = 'LAML'
-        else:
-            cancer_type = 'Unknown'
-
+        cancer_type = determine_cancer_type(row, selected_cancers)
         # Add node with attributes
         G.add_node(node_id, embedding=embedding, additional_info=additional_info, cancer_type=cancer_type)
         node_to_index[node_id] = idx
@@ -153,9 +173,11 @@ if __name__ == '__main__':
                 G.add_edge(i, j, weight=similarity_matrix[i, j])
 
     print(G)
+    # save G
+    nx.write_gpickle(G, Path(results_folder, "graph.gpickle"))
 
     # Step 2: Configure Node2Vec
-    node2vec = Node2Vec(G, dimensions=64, walk_length=30, num_walks=200, p=1, q=1)
+    node2vec = Node2Vec(G, dimensions=64, walk_length=30, num_walks=num_walks, p=1, q=1)
 
     # Step 3: Generate walks and train the model
     model = node2vec.fit(window=10, min_count=1, batch_words=4)
@@ -169,10 +191,36 @@ if __name__ == '__main__':
     embeddings_matrix = np.array(list(embeddings_dict.values()))
     cancer_labels = [G.nodes[node]['cancer_type'] for node in G.nodes()]
 
+    print("Calculating t-SNE...")
     # t-SNE for dimensionality reduction
     tsne = TSNE(n_components=2, random_state=42)
     embeddings_2d = tsne.fit_transform(embeddings_matrix)
 
+    # calculate inter and intra cluster distances
+    print("Calculating inter and intra cluster distances...")
+    inter_cluster_distances = []
+    intra_cluster_distances = []
+    for i in range(len(embeddings_2d)):
+        for j in range(i + 1, len(embeddings_2d)):
+            if cancer_labels[i] == cancer_labels[j]:
+                intra_cluster_distances.append(np.linalg.norm(embeddings_2d[i] - embeddings_2d[j]))
+            else:
+                inter_cluster_distances.append(np.linalg.norm(embeddings_2d[i] - embeddings_2d[j]))
+
+    # create dataframes
+    inter_cluster_df = pd.DataFrame(inter_cluster_distances, columns=["Distance"])
+    inter_cluster_df["Type"] = "Inter-cluster"
+    intra_cluster_df = pd.DataFrame(intra_cluster_distances, columns=["Distance"])
+    intra_cluster_df["Type"] = "Intra-cluster"
+
+    # save the df
+    inter_cluster_df.to_csv(Path(results_folder, "inter_cluster_distances.csv"), index=False)
+    intra_cluster_df.to_csv(Path(results_folder, "intra_cluster_distances.csv"), index=False)
+
+    print(f"Mean intra-cluster distance: {np.mean(intra_cluster_distances)}")
+    print(f"Mean inter-cluster distance: {np.mean(inter_cluster_distances)}")
+
+    print("Plotting t-SNE...")
     # Color coding
     unique_labels = list(set(cancer_labels))
     label_to_color = {label: idx for idx, label in enumerate(unique_labels)}
@@ -188,4 +236,4 @@ if __name__ == '__main__':
     plt.title('Node Embeddings Visualized with t-SNE and Color-Coded by Cancer Type')
     plt.xlabel('t-SNE Component 1')
     plt.ylabel('t-SNE Component 2')
-    plt.show()
+    plt.savefig(Path(image_folder, "node_embeddings_tsne.png"))
