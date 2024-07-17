@@ -8,11 +8,29 @@ import networkx as nx
 from node2vec import Node2Vec
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from collections import Counter
+
 
 results_folder = Path("results", "node2vec")
 image_folder = Path("figures", "node2vec")
 embeddings_size = 768
 
+# Calculate purity
+def calculate_purity(df):
+    clusters = df['cluster_label'].unique()
+    total_samples = len(df)
+    weighted_purity_sum = 0
+
+    for cluster in clusters:
+        cluster_data = df[df['cluster_label'] == cluster]
+        cluster_size = len(cluster_data)
+        most_common_label, count = Counter(cluster_data['cancer_type']).most_common(1)[0]
+        cluster_purity = count / cluster_size
+        weighted_purity_sum += cluster_purity * cluster_size
+
+    overall_purity = weighted_purity_sum / total_samples
+    return overall_purity
 
 # Function to sum embeddings from the random walk and return individual embeddings and additional info
 def sum_embeddings_from_walk(graph, walk):
@@ -78,7 +96,7 @@ if __name__ == '__main__':
     sentence_embeddings = pd.read_csv(Path("results", "embeddings", 'sentence_embeddings.csv'), nrows=100)
 
     combined_data = []
-
+    print("Generating combined embeddings...")
     for _ in tqdm(range(iterations)):
         # Determine random order for processing embeddings
         embeddings_list = [(sentence_embeddings, 'Text'), (image_embeddings, 'Image')]
@@ -195,6 +213,19 @@ if __name__ == '__main__':
     # t-SNE for dimensionality reduction
     tsne = TSNE(n_components=2, random_state=42)
     embeddings_2d = tsne.fit_transform(embeddings_matrix)
+
+    print("Calculating purity...")
+    # Create a DataFrame for easier manipulation
+    df = pd.DataFrame(embeddings_2d, columns=['x', 'y'])
+    df['cancer_type'] = cancer_labels
+
+    num_clusters = len(set(cancer_labels))  # Assuming one cluster per cancer type
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+    df['cluster_label'] = kmeans.fit_predict(embeddings_2d)
+
+    # Calculate and print overall purity
+    overall_purity = calculate_purity(df)
+    print("Overall Purity:", overall_purity)
 
     # calculate inter and intra cluster distances
     print("Calculating inter and intra cluster distances...")
