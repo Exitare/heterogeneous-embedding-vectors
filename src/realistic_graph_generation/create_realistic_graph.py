@@ -36,16 +36,65 @@ def generate_patient(patient_id):
     }
 
 
-def generate_relationships(patients):
+def generate_relationships(patients, max_children_per_family=2):
     relationship_types = ["mother", "father", "daughter", "son", "brother", "sister"]
+    parent_child_count = {patient["id"]: 0 for patient in patients}
+
     for patient in patients:
         if np.random.rand() < 0.5:  # 50% chance of having a relationship
             relative = np.random.choice(patients)
             while relative["id"] == patient["id"]:
                 relative = np.random.choice(patients)
             relationship_type = np.random.choice(relationship_types)
+
+            if relationship_type in ["mother", "father"]:
+                if parent_child_count[relative["id"]] >= max_children_per_family:
+                    continue
+                parent_child_count[relative["id"]] += 1
+
             patient["relationships"].append({"relative": relative["id"], "type": relationship_type})
             relative["relationships"].append({"relative": patient["id"], "type": relationship_type})
+
+    for parent, count in parent_child_count.items():
+        if count > max_children_per_family:
+            parent_children = [rel for rel in patients[parent]["relationships"] if rel["type"] in ["daughter", "son"]]
+            while len(parent_children) > max_children_per_family:
+                child_to_remove = parent_children.pop()
+                patients[parent]["relationships"] = [rel for rel in patients[parent]["relationships"] if
+                                                     rel["relative"] != child_to_remove["relative"]]
+                patients[child_to_remove["relative"]]["relationships"] = [rel for rel in
+                                                                          patients[child_to_remove["relative"]][
+                                                                              "relationships"] if
+                                                                          rel["relative"] != parent]
+
+
+def connect_families(G):
+    family_clusters = list(nx.connected_components(G))
+
+    for i in range(len(family_clusters) - 1):
+        family_a = list(family_clusters[i])
+        family_b = list(family_clusters[i + 1])
+
+        max_similarity = 0
+        best_pair = (None, None)
+
+        for node_a in family_a:
+            for node_b in family_b:
+                similarity = calculate_similarity(G.nodes[node_a]['embeddings'], G.nodes[node_b]['embeddings'])
+                if similarity > max_similarity:
+                    max_similarity = similarity
+                    best_pair = (node_a, node_b)
+
+        if best_pair != (None, None):
+            G.add_edge(best_pair[0], best_pair[1], relationship_type="relative")
+
+    components = list(nx.connected_components(G))
+    while len(components) > 1:
+        for i in range(len(components) - 1):
+            component_a = list(components[i])
+            component_b = list(components[i + 1])
+            G.add_edge(component_a[0], component_b[0], relationship_type="component_link")
+        components = list(nx.connected_components(G))
 
 
 def generate_patients_and_relationships(num_patients):
@@ -168,6 +217,8 @@ def construct_graph_with_aggregated_embeddings(patients):
                    aggregated_embeddings=aggregated_embeddings, embeddings=patient.get("embeddings", {}))
         for relationship in patient["relationships"]:
             G.add_edge(patient["id"], relationship["relative"], relationship_type=relationship["type"])
+
+    connect_families(G)
     return G
 
 
@@ -195,5 +246,5 @@ if __name__ == '__main__':
     update_cancer_probabilities(patients)
     assign_embeddings(patients, embeddings)
     G = construct_graph_with_aggregated_embeddings(patients)
-    connect_isolated_patients(G)
+    #connect_isolated_patients(G)
     visualize_graph_with_embeddings(G)
