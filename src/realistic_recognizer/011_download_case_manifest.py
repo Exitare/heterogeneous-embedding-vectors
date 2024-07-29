@@ -4,6 +4,7 @@ import argparse
 import logging
 import time
 from tqdm import tqdm
+from pathlib import Path
 
 # added filter to param to subset by project - code via:
 # https://github.com/bmeg/bmeg-etl/blob/develop/transform/gdc/gdc-scan.py
@@ -124,13 +125,20 @@ if __name__ == "__main__":
 
     parser.add_argument("-e", "--endpoint", default=URL_BASE)
     parser.add_argument("-t", "--token", default=None)
-    parser.add_argument("--destination", "-d", required=True, help="Destination file to write")
+    parser.add_argument("--destination", "-d", required=False, help="Destination file to write",
+                        default=Path("data", "annotations"))
 
     args = parser.parse_args()
+
+    destination = Path(args.destination)
+    if not destination.exists():
+        destination.mkdir(parents=True)
+
+    destination = Path(destination, "manifest.json")
 
     URL_BASE = args.endpoint
     if args.token is not None:
         with open(args.token, "rt") as handle:
             TOKEN = handle.read().strip()
 
-    scrapeFiles(args.destination)
+    scrapeFiles(destination)
