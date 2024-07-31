@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     cancers = "_".join(selected_cancers)
 
-    embedding_save_path = Path("results", "embeddings", "annotated_cancer", cancers)
+    embedding_save_path = Path("results", "realistic_recognizer", "embeddings", "annotated_cancer", cancers)
     if not embedding_save_path.exists():
         embedding_save_path.mkdir(parents=True)
 
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     cancer_df = []
     for cancer in selected_cancers:
-        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0, nrows=1)
+        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0)
         df["Cancer"] = cancer
         cancer_df.append(df)
 
@@ -166,11 +166,16 @@ if __name__ == '__main__':
     # assign cancer types to latent space
     latent_space["Cancer"] = cancer_types
 
+    # load the patient mapping to retrieve the submitter id
+    patient_mapping = pd.read_csv(Path("results", "mappings", "realistic_mappings.csv"))
+
     # iterate through all cancer types and the save the subset of the latent space
     for cancer in selected_cancers:
         subset = latent_space[latent_space["Cancer"] == cancer].copy()
         subset.drop(columns=["Cancer"], inplace=True)
         # add the patients back to the respective subset based on the index
-        subset["Patient"] = patients.loc[subset.index]
+        subset["patient"] = patients.loc[subset.index]
+        # map the patients to the submitter id
+        subset["submitter_id"] = subset["patient"].map(patient_mapping.set_index("patient")["submitter_id"])
 
         subset.to_csv(Path(embedding_save_path, f"{cancer.lower()}_embeddings.csv"), index=False)

@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 
-save_folder = Path("results", "mappings")
+save_folder = Path("results", "realistic_recognizer", "mappings")
 
 if __name__ == '__main__':
     if not save_folder.exists():
@@ -10,11 +10,17 @@ if __name__ == '__main__':
 
     # Load data
     brca_data = pd.read_csv(Path("data", "bmeg", "v_2", "BRCA", "data.csv"), index_col=0)
+    brca_data["Cancer"] = "BRCA"
     laml_data = pd.read_csv(Path("data", "bmeg", "v_2", "LAML", "data.csv"), index_col=0)
+    laml_data["Cancer"] = "LAML"
     coad_data = pd.read_csv(Path("data", "bmeg", "v_2", "COAD", "data.csv"), index_col=0)
+    coad_data["Cancer"] = "COAD"
     blca_data = pd.read_csv(Path("data", "bmeg", "v_2", "BLCA", "data.csv"), index_col=0)
+    blca_data["Cancer"] = "BLCA"
     stad_data = pd.read_csv(Path("data", "bmeg", "v_2", "STAD", "data.csv"), index_col=0)
+    stad_data["Cancer"] = "STAD"
     thca_data = pd.read_csv(Path("data", "bmeg", "v_2", "THCA", "data.csv"), index_col=0)
+    thca_data["Cancer"] = "THCA"
 
     # Concatenate data
     tcga_data = pd.concat([brca_data, laml_data, coad_data, blca_data, stad_data, thca_data], axis=0)
@@ -35,7 +41,8 @@ if __name__ == '__main__':
             for patient in found_patients:
                 mappings.append({
                     "submitter_id": submitter_id,
-                    "patient": patient
+                    "patient": patient,
+                    "cancer": tcga_data[tcga_data["Patient"] == patient]["Cancer"].values[0]
                 })
 
     # Convert mappings to DataFrame
