@@ -1,6 +1,7 @@
 import pandas as pd
 from pathlib import Path
 import argparse
+import numpy as np
 
 save_folder = Path("results", "realistic_recognizer", "embeddings")
 
@@ -28,7 +29,9 @@ if __name__ == '__main__':
                  f"{cancer.lower()}_embeddings.csv"))
 
     summed_embeddings = []
+
     for submitter_id in mappings["submitter_id"]:
+        concatenated_summed_embeddings = []
         for walk in range(3):
             # Get the annotation embedding
             annotation_embedding = annotation_embeddings[annotation_embeddings["submitter_id"] == submitter_id]
@@ -44,18 +47,25 @@ if __name__ == '__main__':
             text_embeddings = annotation_embedding.sample(n=num_text_embeddings)
 
             # Sum all embeddings
-            summed_embedding = cancer_embedding + text_embeddings.sum()
+            summed_embedding = cancer_embedding.iloc[:, 1:].values + text_embeddings.iloc[:, 1:].sum().values
 
-            # Add the number of cancer embeddings and text embeddings as new columns
-            summed_embedding['num_cancer_embeddings'] = len(cancer_embedding)
-            summed_embedding['num_text_embeddings'] = num_text_embeddings
+            # Flatten the summed embedding to a long vector and add to the list for concatenation
+            concatenated_summed_embeddings.append(summed_embedding.flatten())
 
-            # Assuming you want to store or use the summed_embedding
-            # Here, you can append it to a list or DataFrame for further use
-            # For example, let's append it to a list:
-            summed_embeddings.append(summed_embedding)
+        # Concatenate all three summed embeddings to form a long vector of length 2304
+        concatenated_summed_embeddings = np.concatenate(concatenated_summed_embeddings)
 
-    summed_embeddings = pd.DataFrame(summed_embeddings)
+        # Create a DataFrame for the concatenated summed embedding with additional columns
+        concatenated_embedding_df = pd.DataFrame([concatenated_summed_embeddings])
+        concatenated_embedding_df['submitter_id'] = submitter_id
+        concatenated_embedding_df['cancer'] = cancer
+        concatenated_embedding_df['num_cancer_embeddings'] = len(cancer_embedding)
+        concatenated_embedding_df['num_text_embeddings'] = num_text_embeddings
 
+        # Append the concatenated summed embedding DataFrame to the list
+        summed_embeddings.append(concatenated_embedding_df)
+
+    # Concatenate all the DataFrames in the list into a single DataFrame
+    summed_embeddings = pd.concat(summed_embeddings, ignore_index=True)
     # Save the summed embeddings
     summed_embeddings.to_csv(Path(save_folder, "summed_embeddings.csv"), index=False)

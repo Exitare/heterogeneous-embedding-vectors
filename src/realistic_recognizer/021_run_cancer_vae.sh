@@ -12,7 +12,7 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-# sbatch ./src/realistic_recognizer/021_create_cancer_embeddings.py "BRCA BLCA LAML STAD THCA COAD"
+# sbatch ./src/realistic_recognizer/021_run_cancer_vae.sh "BRCA BLCA LAML STAD THCA COAD"
 
 cancer_types=$1
 

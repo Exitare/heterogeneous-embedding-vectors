@@ -167,7 +167,7 @@ if __name__ == '__main__':
     latent_space["Cancer"] = cancer_types
 
     # load the patient mapping to retrieve the submitter id
-    patient_mapping = pd.read_csv(Path("results", "mappings", "realistic_mappings.csv"))
+    patient_mapping = pd.read_csv(Path("results", "realistic_recognizer", "mappings", "realistic_mappings.csv"))
 
     # iterate through all cancer types and the save the subset of the latent space
     for cancer in selected_cancers:
