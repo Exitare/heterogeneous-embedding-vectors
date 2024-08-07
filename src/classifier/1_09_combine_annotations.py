@@ -14,5 +14,4 @@ if __name__ == '__main__':
 
     # save data as dataframe
     df = pd.DataFrame(data)
-    print(df)
     df.to_csv(Path("data", "annotations", "annotations.csv"), sep=',', index=False, escapechar='\\')
