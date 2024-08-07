@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     cancers = "_".join(selected_cancers)
 
-    embedding_save_path = Path("results", "realistic_recognizer", "embeddings", "annotated_cancer", cancers)
+    embedding_save_path = Path("results", "classifier", "embeddings", "annotated_cancer", cancers)
     if not embedding_save_path.exists():
         embedding_save_path.mkdir(parents=True)
 

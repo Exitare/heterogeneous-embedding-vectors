@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 
-save_folder = Path("results", "realistic_recognizer", "mappings")
+save_folder = Path("results", "classifier", "mappings")
 
 if __name__ == '__main__':
     if not save_folder.exists():

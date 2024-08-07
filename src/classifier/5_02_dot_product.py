@@ -5,7 +5,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-fig_save_folder = Path("results", "realistic_recognizer", "distance_plots")
+fig_save_folder = Path("results", "classifier", "distance_plots")
 
 
 def dot_product_distance(X, Y=None):
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     cancer_dfs = {}
     for cancer in selected_cancers:
         cancer_dfs[cancer] = pd.read_csv(
-            Path("results", "realistic_recognizer", "embeddings", "annotated_cancer", cancers,
+            Path("results", "classifier", "embeddings", "annotated_cancer", cancers,
                  f"{cancer.lower()}_embeddings.csv"))
 
     # drop the submitter_id and patient column

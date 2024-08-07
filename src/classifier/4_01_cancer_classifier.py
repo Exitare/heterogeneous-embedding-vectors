@@ -6,8 +6,8 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 import argparse
 
-load_folder = Path("results", "realistic_recognizer", "summed_embeddings")
-save_folder = Path("results", "realistic_recognizer", "classification")
+load_folder = Path("results", "classifier", "summed_embeddings")
+save_folder = Path("results", "classifier", "classification")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

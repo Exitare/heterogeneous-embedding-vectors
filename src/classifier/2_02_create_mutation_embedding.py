@@ -11,7 +11,7 @@ epochs = 50
 latent_dim = 768
 rotation_factor = 0.3
 
-save_folder = Path("results", "realistic_recognizer", "embeddings")
+save_folder = Path("results", "classifier", "embeddings")
 
 if __name__ == '__main__':
     if not save_folder.exists():

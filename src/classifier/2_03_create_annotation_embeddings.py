@@ -4,7 +4,7 @@ import pandas as pd
 import random
 
 model = SentenceTransformer("all-mpnet-base-v2")
-save_folder = Path("results", "realistic_recognizer", "embeddings")
+save_folder = Path("results", "classifier", "embeddings")
 load_folder = Path("data", "annotations")
 
 

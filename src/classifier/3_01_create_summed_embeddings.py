@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse
 import numpy as np
 
-save_folder = Path("results", "realistic_recognizer", "summed_embeddings")
+save_folder = Path("results", "classifier", "summed_embeddings")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -20,14 +20,14 @@ if __name__ == '__main__':
         save_folder.mkdir(parents=True)
 
     # load mappings
-    mappings = pd.read_csv(Path("results", "realistic_recognizer", "mappings", "realistic_mappings.csv"))
+    mappings = pd.read_csv(Path("results", "classifier", "mappings", "realistic_mappings.csv"))
     # load embeddings
     text_annotation_embeddings = pd.read_csv(
-        Path("results", "realistic_recognizer", "embeddings", "annotations_embeddings.csv"))
+        Path("results", "classifier", "embeddings", "annotations_embeddings.csv"))
 
     # load mutation embeddings
     mutation_embeddings = pd.read_csv(
-        Path("results", "realistic_recognizer", "embeddings", "mutation_embeddings.csv"))
+        Path("results", "classifier", "embeddings", "mutation_embeddings.csv"))
 
     # find all submitter ids with only 1 annotation
     single_annotation = text_annotation_embeddings["submitter_id"].value_counts()[
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     print("Loading cancer embeddings...")
     for cancer in selected_cancers:
         cancer_embeddings[cancer] = pd.read_csv(
-            Path("results", "realistic_recognizer", "embeddings", "annotated_cancer", cancers,
+            Path("results", "classifier", "embeddings", "annotated_cancer", cancers,
                  f"{cancer.lower()}_embeddings.csv"))
 
     summed_embeddings = []
