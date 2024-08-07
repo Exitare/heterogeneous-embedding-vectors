@@ -10,12 +10,15 @@ from argparse import ArgumentParser
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
+import os
 
 embeddings = ['Text', 'Image', 'RNA']
-save_path = Path("results", "multi_recognizer")
+save_path = Path("results", "recognizer", "simple")
+load_path = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
 
 
-def build_model(input_dim, cancer_list: []):
+def build_model(input_dim, num_outputs=3):
+    # Input layer
     inputs = Input(shape=(input_dim,), name='input_layer')
     x = Dense(512, activation='relu', name='base_dense1')(inputs)
     x = BatchNormalization()(x)
@@ -31,67 +34,45 @@ def build_model(input_dim, cancer_list: []):
 
     # Increasing complexity for text data
     text_x = Dense(128, activation='relu', name='text_dense_1')(x)
-    text_x = Dropout(0.2)(text_x)
+    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(64, activation='relu', name='text_dense_2')(text_x)
     text_x = BatchNormalization()(text_x)
-    text_x = Dropout(0.2)(text_x)
+    text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
     text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
 
-    # Less complex paths for image output
+    # Less complex paths for other outputs
     image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
+    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(x)
 
-    # Path for RNA embeddings, including subtype classification
-    rna_x = Dense(128, activation='relu', name='rna_dense_1')(x)
-    rna_x = Dropout(0.2)(rna_x)
-    rna_x = Dense(64, activation='relu', name='rna_dense_2')(rna_x)
-    rna_x = BatchNormalization()(rna_x)
-    rna_x = Dropout(0.2)(rna_x)
-    rna_x = Dense(32, activation='relu', name='rna_dense_3')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(rna_x)
-
-    cancer_outputs = [Dense(1, activation=ReLU(max_value=total_embeddings), name=f'output_cancer_{cancer_type}')(x) for
-                      cancer_type in cancer_list]
-
-    # Combine all outputs
-    outputs = [text_output, image_output, rna_output] + cancer_outputs
+    # Separate output layers for each count
+    outputs = [text_output, image_output, rna_output]
 
     # Create model
-    return Model(inputs=inputs, outputs=outputs, name='multi_output_model')
+    model = Model(inputs=inputs, outputs=outputs, name='multi_output_model')
+    return model
 
 
 if __name__ == '__main__':
     if not save_path.exists():
         save_path.mkdir(parents=True)
-    # python3 src/recognizer/multi_cancer_recognizer.py -e 5 -c blca brca
+
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
-    parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
+    parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--embeddings', "-e", type=int, required=True, help='The number of embeddings to work with.')
-    parser.add_argument("--run_iteration", "-ri", type=int, required=False,
-                        help="The iteration number for the run. Used for saving the results and validation.", default=1)
-    parser.add_argument("--cancer", "-c", nargs="+", required=True,
-                        help="The cancer types to work with, e.g. blca brca")
+    parser.add_argument("--run_iteration", "-ri", type=int, required=False, default=1,
+                        help="The iteration number for the run. Used for saving the results and validation.")
     args = parser.parse_args()
 
     batch_size = args.batch_size
     total_embeddings = args.embeddings
     run_iteration = args.run_iteration
-    selected_cancers = args.cancer
-
-    print("Selected cancers: ", selected_cancers)
-
-    # lower case the cancer types
-    selected_cancers = [cancer.lower() for cancer in selected_cancers]
-    cancer_types = "_".join(selected_cancers)
-
-    save_path = Path(save_path, cancer_types)
 
     print(f"Total embeddings: {total_embeddings}")
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
 
-    load_path = Path("results", f"summed_embeddings", "multi_cancer", cancer_types,
-                     f"{total_embeddings}_embeddings.csv")
+    load_path = Path(load_path, f"{total_embeddings}_embeddings.csv")
     print(f"Loading data from {load_path}")
     save_path = Path(save_path, f"{total_embeddings}_embeddings")
 
@@ -111,38 +92,22 @@ if __name__ == '__main__':
     image_counts = data["Image"].values
     rna_counts = data["RNA"].values
 
-    # extract cancer data
-    cancer_data = []
-    for cancer in selected_cancers:
-        cancer_data.append(data[cancer].values)
-        embeddings.append(cancer)
+    # convert counts to int
+    text_counts = text_counts.astype(int)
+    image_counts = image_counts.astype(int)
+    rna_counts = rna_counts.astype(int)
 
-    # get the number of subtypes
     X = data.drop(columns=embeddings).values
-
-    # assert shape has 768 columns
     assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
     # Assuming these are the actual labels from your dataset
-    y = [text_counts, image_counts, rna_counts] + cancer_data
-
-    model = build_model(X.shape[1], selected_cancers)
-
-    # Set up a list of metrics
-    loss = {'output_text': 'mae', 'output_image': 'mae', 'output_rna': 'mae'}
-    loss_weights = {'output_text': 3.0, 'output_image': 1., 'output_rna': 1.}
-    metrics = ['mae', 'mae', 'mae']
-
-    # Adding dynamic metrics for cancer outputs based on their number
-    for i in selected_cancers:  # Assuming num_cancer_types is defined
-        loss[f'output_cancer_{i}'] = 'mae'
-        loss_weights[f'output_cancer_{i}'] = 1.
-        metrics.append('mae')
-
+    y = [text_counts, image_counts, rna_counts]
+    print("Building model....")
+    model = build_model(X.shape[1])
     model.compile(optimizer='adam',
-                  loss=loss,
-                  loss_weights=loss_weights,
-                  metrics=metrics)
+                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},
+                  loss_weights={'output_text': 3.0, 'output_image': 1., 'output_rna': 1.},
+                  metrics=['mae', 'mae', 'mae'])
     model.summary()
 
     # Splitting the dataset into training and testing sets
@@ -163,7 +128,7 @@ if __name__ == '__main__':
 
     # Train model
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=500, batch_size=batch_size, callbacks=[early_stopping])
+                        validation_split=0.2, epochs=100, batch_size=batch_size, callbacks=[early_stopping])
 
     # save history
     pd.DataFrame(history.history).to_csv(Path(save_path, "history.csv"), index=False)
@@ -183,18 +148,14 @@ if __name__ == '__main__':
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
     reduce_lr = ReduceLROnPlateau(monitor='val_output_text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
-    # adjust the text loss weight
-    loss_weights["output_text"] = 4.0
-    loss_weights["output_image"] = 0.1
-    loss_weights["output_rna"] = 0.1
-
     model.compile(optimizer=optimizer,
-                  loss=loss,
-                  loss_weights=loss_weights,
-                  metrics=metrics)
+                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse'},
+                  loss_weights={'output_text': 4., 'output_image': 0.1, 'output_rna': 0.1},
+                  metrics=['mae', 'mae', 'mae'])
     model.summary()
+
     history = model.fit(X_train, [y_train[:, i] for i in range(y_train.shape[1])],
-                        validation_split=0.2, epochs=500, batch_size=batch_size,
+                        validation_split=0.2, epochs=100, batch_size=batch_size,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate model
@@ -247,6 +208,7 @@ if __name__ == '__main__':
     for i, embedding in enumerate(embeddings):
         metrics.append({
             "embeddings": total_embeddings,
+            "iteration": i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -293,6 +255,7 @@ if __name__ == '__main__':
     for i, embedding in enumerate(embeddings):
         binary_metrics.append({
             'embeddings': total_embeddings,
+            'iteration': i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -302,5 +265,3 @@ if __name__ == '__main__':
 
     binary_metrics_df = pd.DataFrame(binary_metrics)
     binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
-
-

@@ -1,18 +1,17 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=s_r
+#SBATCH --job-name=s_r_f
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
-#SBATCH --mem=128000
+#SBATCH --mem=384000
 #SBATCH --cpus-per-task=32
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-total_embeddings=$1
-run_iteration=$2
+run_iteration=$1
 
-python3 src/recognizer/simple_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}"
+python3 src/recognizer/2_02_simple_recognizer_foundation.py -ri "${run_iteration}"
