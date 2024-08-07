@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 save_folder = Path("data")
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Download bmeg data')
+    parser = ArgumentParser(description='Download rna bmeg data')
     parser.add_argument("--creds", "-c", type=Path)
     parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "LAML", "COAD"], required=True)
 
