@@ -12,8 +12,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-# sbatch ./src/classifier/2_01_run.sh "BRCA BLCA LAML STAD THCA COAD"
+# sbatch ./src/classifier/2_01_run_rna_vae.sh "BRCA BLCA LAML STAD THCA COAD"
 
 cancer_types=$1
 
-python3 ./src/classifier/2_01.py -c ${cancer_types}
+python3 ./src/classifier/2_01_create_cancer_embeddings.py -c ${cancer_types}

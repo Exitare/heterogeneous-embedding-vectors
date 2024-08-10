@@ -74,6 +74,8 @@ if __name__ == '__main__':
 
     # evaluate the model
     loss, accuracy = model.evaluate(X_test, y_test)
+    # calculate f1, precision and recall using sklearn
+    
 
     print(f"Loss: {loss}, Accuracy: {accuracy}")
 
