@@ -12,7 +12,7 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-# sbatch ./src/embedding_generation/run_vae.sh "BRCA BLCA LAML STAD THCA"
+# sbatch ./src/recognizer/0_04_create_cancer_embeddings.sh "BRCA BLCA LAML STAD THCA"
 
 cancer_types=$1
 

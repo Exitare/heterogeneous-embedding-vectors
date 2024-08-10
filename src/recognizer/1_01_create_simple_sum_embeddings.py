@@ -6,13 +6,14 @@ from argparse import ArgumentParser
 import numpy as np
 
 save_folder = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
+load_folder = Path("results", "recognizer", "embeddings")
 
 
-def load_embeddings(load_folder):
+def load_embeddings():
     # Load the embeddings from CSV files
-    rna_embeddings = pd.read_csv(Path(load_folder, "embeddings", "rna_embeddings.csv"))
-    sentence_embeddings = pd.read_csv(Path(load_folder, "embeddings", "sentence_embeddings.csv"))
-    image_embeddings = pd.read_csv(Path(load_folder, "embeddings", "image_embeddings.csv"))
+    rna_embeddings = pd.read_csv(Path(load_folder, "rna_embeddings.csv"))
+    sentence_embeddings = pd.read_csv(Path(load_folder, "sentence_embeddings.csv"))
+    image_embeddings = pd.read_csv(Path(load_folder, "image_embeddings.csv"))
     return rna_embeddings, sentence_embeddings, image_embeddings
 
 
@@ -29,18 +30,16 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Sum embeddings from different sources')
     parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum")
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
-    parser.add_argument("--load_folder", "-l", type=str, required=True, help="Folder containing the embeddings")
     args = parser.parse_args()
 
     iterations = args.iterations
     total_embeddings = args.embeddings
-    load_folder = Path(args.load_folder)
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
     # Load embeddings
-    rna_embeddings, sentence_embeddings, image_embeddings = load_embeddings(args.load_folder)
+    rna_embeddings, sentence_embeddings, image_embeddings = load_embeddings()
 
     # List to hold all combined embeddings and their indices
     combined_data = []
