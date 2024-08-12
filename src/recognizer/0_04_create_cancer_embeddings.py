@@ -12,7 +12,7 @@ from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 
 save_folder = Path("results", "recognizer", "embeddings", "cancer")
-cancer_load_path = Path("data", "bmeg")
+cancer_load_path = Path("data", "rna")
 
 
 def compute_latent(x):
