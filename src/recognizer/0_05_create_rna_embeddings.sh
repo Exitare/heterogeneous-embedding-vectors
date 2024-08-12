@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=c_emb
+#SBATCH --job-name=rna_emb
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
@@ -12,8 +12,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-# sbatch ./src/recognizer/0_04_create_cancer_embeddings.sh "BRCA BLCA LAML STAD THCA"
+# sbatch ./src/recognizer/0_05_create_rna_embeddings.sh
 
 cancer_types=$1
 
-python3 src/recognizer/0_04_create_cancer_embeddings.py -c ${cancer_types}
+python3 src/recognizer/0_05_create_rna_embeddings.py
