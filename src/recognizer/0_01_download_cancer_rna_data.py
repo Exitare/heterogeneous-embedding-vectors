@@ -14,7 +14,6 @@ if __name__ == '__main__':
 
     credentials = args.creds
     cancer = args.cancer
-    version = args.version
 
     save_folder = Path(save_folder, cancer)
     print(f"Using save folder: {save_folder}")
@@ -34,13 +33,11 @@ if __name__ == '__main__':
     for row in c.execute(stream=True):
         submitter_id = row[0]
         values = row[1]
-        if version == "1":
-            data[submitter_id] = values
-        else:
-            if submitter_id not in data:
-                data[submitter_id] = {}
-            for gene, value in values.items():
-                data[submitter_id][gene] = value
+
+        if submitter_id not in data:
+            data[submitter_id] = {}
+        for gene, value in values.items():
+            data[submitter_id][gene] = value
 
     samples = pd.DataFrame.from_dict(data, orient='index').fillna(0.0)
     samples.reset_index(drop=False, inplace=True)
