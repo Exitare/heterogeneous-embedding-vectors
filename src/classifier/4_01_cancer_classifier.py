@@ -5,6 +5,7 @@ import tensorflow as tf
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import MinMaxScaler
 import argparse
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 load_folder = Path("results", "classifier", "summed_embeddings")
 save_folder = Path("results", "classifier", "classification")
@@ -74,10 +75,14 @@ if __name__ == '__main__':
 
     # evaluate the model
     loss, accuracy = model.evaluate(X_test, y_test)
-    # calculate f1, precision and recall using sklearn
-    
 
-    print(f"Loss: {loss}, Accuracy: {accuracy}")
+    y_hat = model.predict(X_test).argmax(axis=1)
+    # calculate f1, precision and recall using sklearn
+    f1_score = f1_score(y_test, y_hat, average='weighted')
+    precision = precision_score(y_test, y_hat, average='weighted')
+    recall = recall_score(y_test, y_hat, average='weighted')
+
+    print(f"Loss: {loss}, Accuracy: {accuracy}, F1: {f1_score}, Precision: {precision}, Recall: {recall}")
 
     # save history
     history_df = pd.DataFrame(history.history)
@@ -85,7 +90,9 @@ if __name__ == '__main__':
     print("History saved.")
 
     # create df with loss and accuracy
-    results = pd.DataFrame({"loss": [loss], "accuracy": [accuracy]})
+    results = pd.DataFrame(
+        {"loss": [loss], "accuracy": [accuracy], "f1": [f1_score], "precision": [precision], "recall": [recall],
+         "iteration": [iteration]})
     results.to_csv(Path(iteration_save_folder, "results.csv"), index=False)
     print("Results saved.")
 
