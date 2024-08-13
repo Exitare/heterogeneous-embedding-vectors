@@ -13,6 +13,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 save_folder = Path("results", "recognizer", "embeddings", "cancer")
 cancer_load_path = Path("data", "rna")
+latent_dim = 768
 
 
 def compute_latent(x):
@@ -77,7 +78,7 @@ if __name__ == '__main__':
 
     cancer_df = []
     for cancer in selected_cancers:
-        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0)
+        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0, nrows=1)
         df["Cancer"] = cancer
         cancer_df.append(df)
 
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
     # check that all columns to be float
     for column in data.columns:
-        if column == "Cancer":
+        if column == "Cancer" or column == "Patient":
             continue
         if data[column].dtype != float:
             print(f"{column} is not float. Converting...")
@@ -99,12 +100,15 @@ if __name__ == '__main__':
     data.drop(columns=["Cancer"], inplace=True)
     data.drop(columns=["Patient"], inplace=True)
 
+    # assert not cancer or patient colunms are in data
+    assert "Cancer" not in data.columns, "Cancer column should not be present"
+    assert "Patient" not in data.columns, "Patient column should not be present"
+
     # scale the data
     data = pd.DataFrame(MinMaxScaler().fit_transform(data), columns=data.columns)
 
     feature_dim = len(data.columns)
-    # latent_dim = 384
-    latent_dim = 768
+
     batch_size = 512
 
     encoder_inputs = keras.Input(shape=(feature_dim,))
