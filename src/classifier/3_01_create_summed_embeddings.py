@@ -20,7 +20,7 @@ if __name__ == '__main__':
         save_folder.mkdir(parents=True)
 
     # load mappings
-    mappings = pd.read_csv(Path("results", "classifier", "mappings", "realistic_mappings.csv"))
+    mappings = pd.read_csv(Path("results", "classifier", "mappings", "mappings.csv"))
     # load embeddings
     text_annotation_embeddings = pd.read_csv(
         Path("results", "classifier", "embeddings", "annotations_embeddings.csv"))
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     # find all submitter ids with only 1 annotation
     single_annotation = text_annotation_embeddings["submitter_id"].value_counts()[
         text_annotation_embeddings["submitter_id"].value_counts() == 1].index
-    if len(single_annotation == 0):
+    if len(single_annotation) != 0:
         print(single_annotation)
         print(f"Number of patients with only 1 annotation: {len(single_annotation)}")
 
@@ -52,33 +52,44 @@ if __name__ == '__main__':
     summed_embeddings = []
 
     print("Creating summed embeddings...")
-    for submitter_id in mappings["submitter_id"]:
+    for patient_id in mappings["patient"]:
+        row = mappings[mappings["patient"] == patient_id]
+        # check if either mutation id or submitter id is Na
+        if row.empty or (row['mutation_id'].isna().values[0] and row['submitter_id'].isna().values[0]):
+            print(f"Skipping patient {patient_id} with no mutation or submitter id.")
+            continue
+
         concatenated_summed_embeddings = []
-        patient_mutation_id = mappings[mappings["submitter_id"] == submitter_id]["mutation_id"].values[0]
+
+        patient_mutation_id = row["mutation_id"].values[0]
+        # load patient mutations
+        patient_mutations = mutation_embeddings[mutation_embeddings["submitter_id"] == patient_mutation_id]
+        patient_mutations = patient_mutations.drop(columns=["submitter_id"])
+
+        patient_annotation_id = row["submitter_id"].values[0]
+        # Get the annotation embedding
+        patient_annotations = text_annotation_embeddings[
+            text_annotation_embeddings["submitter_id"] == patient_annotation_id]
+        # drop submitter_id from text_embeddings
+        patient_annotations = patient_annotations.drop(columns=["submitter_id"])
+
+        # Get the cancer type
+        cancer_type = mappings[mappings["patient"] == patient_id]["cancer"].values[0]
+
+        # Get the cancer embedding
+        cancer_specific_embeddings = cancer_embeddings[cancer_type]
+        cancer_embedding = cancer_specific_embeddings[cancer_specific_embeddings["patient"] == patient_id]
+        # drop submitter and patient from cancer_embedding
+        cancer_embedding = cancer_embedding.drop(columns=["submitter_id", "patient"])
+
         for walk in range(3):
-            # Get the annotation embedding
-            patient_annotations = text_annotation_embeddings[text_annotation_embeddings["submitter_id"] == submitter_id]
-            # patient annotations should not be empty
-            assert patient_annotations.shape[0] > 0, (
-                f"Patient annotations should not be empty, {patient_annotations.shape}, {submitter_id}")
-
-            # load patient mutations
-            patient_mutations = mutation_embeddings[mutation_embeddings["submitter_id"] == patient_mutation_id]
-
-            # Get the cancer type
-            cancer_type = mappings[mappings["submitter_id"] == submitter_id]["cancer"].values[0]
-
-            # Get the cancer embedding
-            cancer_specific_embeddings = cancer_embeddings[cancer_type]
-            cancer_embedding = cancer_specific_embeddings[cancer_specific_embeddings["submitter_id"] == submitter_id]
-
             # if more than one cancer embeddings is found, randomly select one
             if cancer_embedding.shape[0] > 1:
                 cancer_embedding = cancer_embedding.sample(n=1)
 
             # cancer embedding should only have one row
             assert cancer_embedding.shape[0] == 1, (
-                f"Cancer embedding should only have one row, {cancer_embedding.shape}, {submitter_id}")
+                f"Cancer embedding should only have one row, {cancer_embedding.shape}, {patient_id}")
 
             # select max text embeddings or 4
             max_text_embeddings = 4
@@ -91,18 +102,14 @@ if __name__ == '__main__':
             if len(patient_mutations) != 0:
                 patient_mutations = patient_mutations.sample(n=1)
 
-            # drop submitter_id from text_embeddings
-            text_embeddings = text_embeddings.drop(columns=["submitter_id"])
-            # drop submitter and patient from cancer_embedding
-            cancer_embedding = cancer_embedding.drop(columns=["submitter_id", "patient"])
-            # drop submitter_id from mutation_embeddings
-            patient_mutations = patient_mutations.drop(columns=["submitter_id"])
-
-            assert "submitter_id" not in text_embeddings.columns
-            assert "submitter_id" not in cancer_embedding.columns
-            assert "patient" not in cancer_embedding.columns
-            assert "submitter_id" not in patient_mutations.columns
-
+            assert "submitter_id" not in text_embeddings.columns, (
+                f"Submitter id should not be in text embeddings, {text_embeddings.columns}")
+            assert "submitter_id" not in cancer_embedding.columns, (
+                f"Submitter id should not be in cancer embedding, {cancer_embedding.columns}")
+            assert "patient" not in cancer_embedding.columns, (
+                f"Patient should not be in cancer embedding, {cancer_embedding.columns}")
+            assert "submitter_id" not in patient_mutations.columns, (
+                f"Submitter id should not be in patient mutations, {patient_mutations.columns}")
 
             # Sum all embeddings
             if len(patient_mutations) == 0:
@@ -115,7 +122,7 @@ if __name__ == '__main__':
                        1] == 768, f"Shape of summed embedding should be 768 columns, {summed_embedding.shape})"
             # assert that there is only one row
             assert summed_embedding.shape[
-                       0] == 1, f"Shape of summed embedding should be 1 row, {summed_embedding.shape}, {submitter_id}"
+                       0] == 1, f"Shape of summed embedding should be 1 row, {summed_embedding.shape}, {patient_id}"
 
             # Flatten the summed embedding to a long vector and add to the list for concatenation
             concatenated_summed_embeddings.append(summed_embedding.flatten())
@@ -140,7 +147,7 @@ if __name__ == '__main__':
 
         # Create a DataFrame for the concatenated summed embedding with additional columns
         concatenated_embedding_df = pd.DataFrame([concatenated_summed_embeddings])
-        concatenated_embedding_df['submitter_id'] = submitter_id
+        concatenated_embedding_df['patient_id'] = patient_id
         concatenated_embedding_df['cancer'] = cancer_type
 
         # convert the concatenated_embedding_df to a dictionary
@@ -154,6 +161,11 @@ if __name__ == '__main__':
 
     # Concatenate all the DataFrames in the list into a single DataFrame
     summed_embeddings = pd.DataFrame(summed_embeddings)
+
+    # assert that all selected cancers are in the cancer column
+    assert all(cancer in summed_embeddings["cancer"].unique() for cancer in selected_cancers), (
+        f"All selected cancers should be in the summed embeddings, {summed_embeddings['cancer'].unique()}")
+
     print(summed_embeddings)
     print("Summed embeddings created.")
     print("Saving summed embeddings...")

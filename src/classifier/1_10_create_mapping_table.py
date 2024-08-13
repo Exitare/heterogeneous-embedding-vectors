@@ -27,39 +27,57 @@ if __name__ == '__main__':
 
     # Load data json
     manifest_file = pd.read_json(Path("data", "annotations", "manifest.json"))
+
+    # extract all the cases from the manifest file
+    cases = manifest_file["cases"]
+    # get all submitter ids from the cases
+    annotations_submitter_ids = [case[0]["submitter_id"] for case in cases]
+
     mutations = pd.read_csv(Path("data", "mutations", "mutations.csv"))
 
     mappings: list = []
     # Search for overlap between patient and submitter_id
-    for case in manifest_file["cases"]:
-        case = case[0]
-        submitter_id = case["submitter_id"]
-        # Check if case submitter id is in the Patient column of tcga_data
-        # Check that submitter id is part of the tcga data patient value as a substring
-        found_patients = [patient for patient in tcga_data["Patient"].values if submitter_id in patient]
+    for patient_case in tcga_data["Patient"]:
+        found_annotations = [annotation for annotation in annotations_submitter_ids if
+                             annotation in patient_case]
+
         # find patients in mutations
-        found_mutations = [patient for patient in mutations["submitter_id"].values if submitter_id in patient]
+        found_mutations = [mutation for mutation in mutations["submitter_id"].values if patient_case in mutation]
 
-        row = {}
-        if found_patients:
-            for patient in found_patients:
-                row["submitter_id"] = submitter_id
-                row["patient"] = patient
-                row["cancer"] = tcga_data[tcga_data["Patient"] == patient]["Cancer"].values[0]
+        # Always include the patient and cancer information
+        base_row = {
+            "patient": patient_case,
+            "cancer": tcga_data[tcga_data["Patient"] == patient_case]["Cancer"].values[0]
+        }
 
-        if found_mutations:
-            for patient in found_mutations:
-                row["mutation_id"] = patient
+        if found_annotations:
+            for annotation in found_annotations:
+                row = base_row.copy()  # Create a copy of the base row for each annotation
+                row["submitter_id"] = annotation
 
-        mappings.append(row)
+                if found_mutations:
+                    for mutation in found_mutations:
+                        mutation_row = row.copy()  # Create a copy for each mutation
+                        mutation_row["mutation_id"] = mutation
+                        mappings.append(mutation_row)  # Add the row to the list
+                else:
+                    mappings.append(row)  # Add the row without mutations if no mutations are found
+        else:
+            # If no annotations, just handle mutations or add the base row
+            if found_mutations:
+                for mutation in found_mutations:
+                    row = base_row.copy()
+                    row["mutation_id"] = mutation
+                    mappings.append(row)
+            else:
+                mappings.append(base_row)  # Add the base row if no annotations or mutations are found
 
     # Convert mappings to DataFrame
     mappings_df = pd.DataFrame(mappings)
     # only keep distinct mappings
     mappings_df.drop_duplicates(inplace=True)
-    # only keep mappings that are available in both files
-    mappings_df = mappings_df[mappings_df["patient"].isin(tcga_data["Patient"].values)]
+    print(mappings_df)
 
     # Save the mappings to a CSV file
-    mappings_df.to_csv(Path(save_folder, "realistic_mappings.csv"), index=False)
+    mappings_df.to_csv(Path(save_folder, "mappings.csv"), index=False)
     print(f"Saved {len(mappings)} mappings.")

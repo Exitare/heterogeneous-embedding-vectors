@@ -36,13 +36,15 @@ if __name__ == '__main__':
     # load embeddings
     summed_embeddings = pd.read_csv(Path(load_folder, "summed_embeddings.csv"))
     # split data into train and test using sklearn
-    train, test = train_test_split(summed_embeddings, test_size=0.2)
+    train, test = train_test_split(summed_embeddings, test_size=0.2, stratify=summed_embeddings["cancer"])
 
-    X_train = train.drop(columns=["submitter_id", "cancer"])
+    X_train = train.drop(columns=["patient_id", "cancer"])
     y_train = train["cancer"]
 
-    X_test = test.drop(columns=["submitter_id", "cancer"])
+    X_test = test.drop(columns=["patient_id", "cancer"])
     y_test = test["cancer"]
+
+    available_cancers = summed_embeddings["cancer"].unique()
 
     # convert y_train and y_test numbers using sklearn
     label_encoder = LabelEncoder()
@@ -78,11 +80,27 @@ if __name__ == '__main__':
 
     y_hat = model.predict(X_test).argmax(axis=1)
     # calculate f1, precision and recall using sklearn
-    f1_score = f1_score(y_test, y_hat, average='weighted')
-    precision = precision_score(y_test, y_hat, average='weighted')
-    recall = recall_score(y_test, y_hat, average='weighted')
+    complete_f1_score = f1_score(y_test, y_hat, average='weighted')
+    complete_precision = precision_score(y_test, y_hat, average='weighted')
+    complete_recall = recall_score(y_test, y_hat, average='weighted')
 
-    print(f"Loss: {loss}, Accuracy: {accuracy}, F1: {f1_score}, Precision: {precision}, Recall: {recall}")
+    encoded_selected_cancers = label_encoder.transform(available_cancers)
+    results = []
+    # calculate scores by cancer
+    for cancer in encoded_selected_cancers:
+        y_test_cancer = y_test[y_test == cancer]
+        y_hat_cancer = y_hat[y_test == cancer]
+        decoded_cancer = label_encoder.inverse_transform([cancer])[0]
+        f1_score_cancer = f1_score(y_test_cancer, y_hat_cancer, average='weighted')
+        precision_cancer = precision_score(y_test_cancer, y_hat_cancer, average='weighted')
+        recall_cancer = recall_score(y_test_cancer, y_hat_cancer, average='weighted')
+        print(f"{decoded_cancer} - F1: {f1_score_cancer}, Precision: {precision_cancer}, Recall: {recall_cancer}")
+        results.append(
+            {"loss": loss, "accuracy": accuracy, "f1": f1_score_cancer, "precision": precision_cancer,
+             "recall": recall_cancer, "iteration": iteration, "cancer": decoded_cancer})
+
+    print(
+        f"Loss: {loss}, Accuracy: {accuracy}, F1: {complete_f1_score}, Precision: {complete_precision}, Recall: {complete_recall}")
 
     # save history
     history_df = pd.DataFrame(history.history)
@@ -90,9 +108,12 @@ if __name__ == '__main__':
     print("History saved.")
 
     # create df with loss and accuracy
-    results = pd.DataFrame(
-        {"loss": [loss], "accuracy": [accuracy], "f1": [f1_score], "precision": [precision], "recall": [recall],
-         "iteration": [iteration]})
+    results.append(
+        {"loss": loss, "accuracy": accuracy, "f1": complete_f1_score, "precision": complete_precision,
+         "recall": complete_recall,
+         "iteration": iteration, "cancer": "All"})
+
+    results = pd.DataFrame(results)
     results.to_csv(Path(iteration_save_folder, "results.csv"), index=False)
     print("Results saved.")
 
