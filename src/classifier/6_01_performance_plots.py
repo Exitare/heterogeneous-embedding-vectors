@@ -4,7 +4,11 @@ import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+save_folder = Path("figures", "classifier")
+
 if __name__ == '__main__':
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
@@ -37,4 +41,6 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots(figsize=(10, 5))
     sns.barplot(data=results, y="accuracy", ax=ax)
-    plt.show()
+    ax.set_title("Accuracy of classifier")
+    ax.set_ylabel("Accuracy")
+    plt.savefig(Path(save_folder, f"{cancers}_accuracy.png"), dpi=300)
