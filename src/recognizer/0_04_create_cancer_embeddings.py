@@ -93,9 +93,11 @@ if __name__ == '__main__':
             data[column] = data[column].astype(float)
 
     cancer_types = data["Cancer"]
+    patient_ids = data["Patient"]
 
     # drop the cancer column
     data.drop(columns=["Cancer"], inplace=True)
+    data.drop(columns=["Patient"], inplace=True)
 
     # scale the data
     data = pd.DataFrame(MinMaxScaler().fit_transform(data), columns=data.columns)
@@ -159,9 +161,14 @@ if __name__ == '__main__':
 
     # assign cancer types to latent space
     latent_space["Cancer"] = cancer_types
+    latent_space["Patient"] = patient_ids
 
     # iterate through all cancer types and the save the subset of the latent space
     for cancer in selected_cancers:
         subset = latent_space[latent_space["Cancer"] == cancer].copy()
         subset.drop(columns=["Cancer"], inplace=True)
+        subset.drop(columns=["Patient"], inplace=True)
+        # assert that cancer and patient columns are not present
+        assert "Cancer" not in subset.columns, "Cancer column should not be present"
+        assert "Patient" not in subset.columns, "Patient column should not be present"
         subset.to_csv(Path(save_folder, f"{cancer.lower()}_embeddings.csv"), index=False)
