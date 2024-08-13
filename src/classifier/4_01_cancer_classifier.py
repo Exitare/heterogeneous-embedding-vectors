@@ -91,12 +91,13 @@ if __name__ == '__main__':
         y_test_cancer = y_test[y_test == cancer]
         y_hat_cancer = y_hat[y_test == cancer]
         decoded_cancer = label_encoder.inverse_transform([cancer])[0]
+        accuracy_cancer = model.evaluate(X_test[y_test == cancer], y_test_cancer)[1]
         f1_score_cancer = f1_score(y_test_cancer, y_hat_cancer, average='weighted')
         precision_cancer = precision_score(y_test_cancer, y_hat_cancer, average='weighted')
         recall_cancer = recall_score(y_test_cancer, y_hat_cancer, average='weighted')
         print(f"{decoded_cancer} - F1: {f1_score_cancer}, Precision: {precision_cancer}, Recall: {recall_cancer}")
         results.append(
-            {"loss": loss, "accuracy": accuracy, "f1": f1_score_cancer, "precision": precision_cancer,
+            {"loss": loss, "accuracy": accuracy_cancer, "f1": f1_score_cancer, "precision": precision_cancer,
              "recall": recall_cancer, "iteration": iteration, "cancer": decoded_cancer})
 
     print(

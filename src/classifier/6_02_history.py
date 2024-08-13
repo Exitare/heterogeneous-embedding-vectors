@@ -27,7 +27,11 @@ if __name__ == '__main__':
 
         print(run)
         try:
-            df = pd.read_csv(Path(run, "results.csv"))
+            df = pd.read_csv(Path(run, "history.csv"))
+            # reset index
+            df = df.reset_index()
+            # rename to epoch
+            df = df.rename(columns={"index": "epoch"})
             # load the results from the run
             results.append(df)
         except FileNotFoundError:
@@ -35,24 +39,17 @@ if __name__ == '__main__':
 
     # concatenate all results
     results = pd.concat(results)
-    print(results)
+    #print(results)
+    # calculate the mean
+    mean_results = results.groupby("epoch").mean().reset_index()
+    print(mean_results)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(data=results, x="cancer", y="accuracy", hue="cancer", ax=ax)
-    ax.set_title("Accuracy of classifier")
-    ax.set_ylabel("Accuracy")
-    ax.set_xlabel("Cancer")
-    plt.tight_layout()
-    plt.savefig(Path(save_folder, f"accuracy.png"), dpi=300)
-    plt.close('all')
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(data=results, x="cancer", y="f1", hue="cancer", ax=ax)
-    ax.set_title("Accuracy of classifier")
-    ax.set_ylabel("Accuracy")
-    ax.set_xlabel("Cancer")
+    # plot mean results for all training epochs
+    fig = plt.figure(figsize=(10, 5), dpi=150)
+    sns.lineplot(data=mean_results, x="epoch", y="loss", label="Loss")
+    sns.lineplot(data=mean_results, x="epoch", y="accuracy", label="Accuracy")
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"f1_score.png"), dpi=300)
-    plt.close('all')
+    plt.savefig(Path(save_folder, f"history.png"), dpi=300)
 
 
