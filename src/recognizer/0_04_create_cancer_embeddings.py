@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     cancer_df = []
     for cancer in selected_cancers:
-        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0, nrows=1)
+        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0)
         df["Cancer"] = cancer
         cancer_df.append(df)
 
