@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 # sbatch ./src/recognizer/0_05_create_rna_embeddings.sh
