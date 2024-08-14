@@ -2,7 +2,6 @@ import pandas as pd
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.decomposition import PCA
 from pathlib import Path
 from argparse import ArgumentParser
 import umap
@@ -26,49 +25,55 @@ if __name__ == '__main__':
 
     cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
 
-    # load embeddings
+    # Load embeddings
     loaded_cancer_embeddings = {}
     for cancer in selected_cancers:
         try:
             temp_df = pd.read_csv(Path(cancer_embedding_load_folder, f"{cancer.lower()}_embeddings.csv"))
-            # remove patient column if exist
+            # Remove patient column if exist
             if "Patient" in temp_df.columns:
                 temp_df.drop(columns=["Patient"], inplace=True)
-            cancer_type = cancer
             temp_df["cancer"] = cancer
-            loaded_cancer_embeddings[cancer_type] = temp_df
+            loaded_cancer_embeddings[cancer] = temp_df
 
-        except:
-            print(f"Could not load {cancer} embedding...")
+        except Exception as e:
+            print(f"Could not load {cancer} embedding... {e}")
             raise
 
     loaded_cancer_embeddings = pd.concat(loaded_cancer_embeddings.values(), axis=0)
+    loaded_cancer_embeddings.drop(columns=["submitter_id", "patient"], inplace=True)
+    loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
 
+    # assert that all selected cancers are in the cancer column of the loaded_cancer_embeddings
+    assert all([cancer in loaded_cancer_embeddings["cancer"].unique() for cancer in
+                selected_cancers]), "All selected cancers should be in the cancer column"
+
+    # Apply KMeans
+    print(f"Using {len(selected_cancers)} clusters...")
     kmeans = KMeans(n_clusters=len(selected_cancers), random_state=42)
     loaded_cancer_embeddings['cluster'] = kmeans.fit_predict(loaded_cancer_embeddings.drop('cancer', axis=1))
 
-    # Determine the majority class in each cluster
-    majority_labels = loaded_cancer_embeddings.groupby('cluster')['cancer'].agg(lambda x: x.value_counts().index[0])
-    loaded_cancer_embeddings['majority_label'] = loaded_cancer_embeddings['cluster'].map(majority_labels)
+    # Map clusters back to cancer names
+    cluster_to_cancer = dict(enumerate(selected_cancers))
+    loaded_cancer_embeddings['cluster_name'] = loaded_cancer_embeddings['cluster'].map(cluster_to_cancer)
 
-    # Reduce to 2D for visualization
+    # Ensure only numeric data is passed to UMAP
+    numeric_df = loaded_cancer_embeddings.drop(columns=['cluster', 'cancer', 'cluster_name'])
+
     # Apply UMAP to reduce dimensions to 2D for visualization
     umap_reducer = umap.UMAP(random_state=42)
-    df_umap = umap_reducer.fit_transform(loaded_cancer_embeddings.drop(['cluster', 'cancer', 'majority_label'], axis=1))
+    df_umap = umap_reducer.fit_transform(numeric_df)
 
     # Convert to DataFrame for easier plotting
     df_plot = pd.DataFrame(df_umap, columns=['UMAP1', 'UMAP2'])
-    df_plot['cluster'] = loaded_cancer_embeddings['cluster']
-    df_plot['majority_label'] = loaded_cancer_embeddings['majority_label']
+    df_plot['cluster_name'] = loaded_cancer_embeddings['cluster_name']
 
     plt.figure(figsize=(12, 10))
-    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cluster', palette='Set1', data=df_plot, s=100)
+    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cluster_name', palette='Set1', data=df_plot, s=100)
+    plt.legend(title='Cancer', loc='upper left')
 
-    # Annotate the majority label on the plot
-    for i in range(len(df_plot)):
-        plt.text(df_plot['UMAP1'][i], df_plot['UMAP2'][i], df_plot['majority_label'][i],
-                 fontsize=9, ha='center')
+    plt.title('UMAP with Named Clusters')
+    plt.tight_layout()
+    plt.savefig(Path(fig_save_folder, 'cancer_embeddings.png'), dpi=150)
+    plt.close()
 
-    plt.title('UMAP with Clusters and Majority Labels')
-    plt.show()
-    plt.savefig(Path(fig_save_folder, 'cancer_embeddings_cluster.png'), dpi=150)
