@@ -8,3 +8,4 @@ scikit-learn==1.4.2
 gripql==0.7.0
 networkx
 node2vec
+umap-learn
