@@ -1,10 +1,9 @@
 #!/bin/bash
-cancer_embedding_files=$1 # the data files
-# ./src/recognizer/1_02_schedule_multi_sum_embeddings.sh "./results/recognizer/embeddings/cancer/brca_embeddings.csv ./results/recognizer/embeddings/cancer/laml_embeddings.csv ./results/recognizer/embeddings/cancer/stad_embeddings.csv ./results/recognizer/embeddings/cancer/blca_embeddings.csv ./results/recognizer/embeddings/cancer/coad_embeddings.csv ./results/recognizer/embeddings/cancer/thca_embeddings.csv"
-
+selected_cancers=$1 # the data files
+# ./src/recognizer/1_02_schedule_multi_sum_embeddings.sh "BRCA LAML STAD BLCA COAD THCA"
 
 # iterate through 2 to 10
 for i in $(seq 2 10)
 do
-  sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${cancer_embedding_files}"
+  sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${selected_cancers}"
 done

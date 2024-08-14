@@ -13,6 +13,6 @@
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 total_embeddings=$1
-cancer_embeddings=$2
+selected_cancers=$2
 
-python3 src/recognizer/1_02_create_multi_cancer_sum_embeddings.py  -i 1000000 -e "${total_embeddings}" -c ${cancer_embeddings}
+python3 src/recognizer/1_02_create_multi_cancer_sum_embeddings.py  -i 1000000 -e "${total_embeddings}" -c ${selected_cancers}

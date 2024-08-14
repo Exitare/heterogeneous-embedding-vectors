@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 load_folder = Path("results", "recognizer", "embeddings")
+cancer_embedding_load_folder = Path(load_folder, "cancer")
 save_folder = Path("results", "recognizer", "summed_embeddings", "multi")
 
 
@@ -28,33 +29,36 @@ def random_sum_embeddings(embeddings, max_count):
 if __name__ == '__main__':
     # example call: python3 src/embedding_aggregation/create_multi_cancer_sum_embeddings.py -e 10 -i 100 -c ./results/embeddings/cancer/blca_embeddings.csv ./results/embeddings/cancer/brca_embeddings.csv
     parser = ArgumentParser(description='Sum embeddings from different sources')
-    parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum")
+    parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum", required=True)
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
-    parser.add_argument("--cancer_embeddings", "-c", nargs="+", required=True, help="Folder containing the embeddings")
+    parser.add_argument("--selected_cancers", "-c", nargs="+", required=True,
+                        help="The selected cancer embeddings to sum")
     args = parser.parse_args()
 
     iterations = args.iterations
     total_embeddings = args.embeddings
-    cancer_embeddings = args.cancer_embeddings
+    selected_cancers = args.selected_cancers
 
     loaded_cancer_embeddings = {}
-    for cancer_embedding in cancer_embeddings:
+    for cancer in selected_cancers:
         try:
-            temp_df = pd.read_csv(Path(cancer_embedding))
+            temp_df = pd.read_csv(Path(cancer_embedding_load_folder, f"{cancer.lower()}_embeddings.csv"))
             # remove patient column if exist
             if "Patient" in temp_df.columns:
                 temp_df.drop(columns=["Patient"], inplace=True)
-            cancer_type = Path(cancer_embedding).stem.split("_")[0]
+            cancer_type = cancer
             loaded_cancer_embeddings[cancer_type] = temp_df
         except:
-            print(f"Could not load {cancer_embedding}")
+            print(f"Could not load {cancer} embedding...")
             raise
 
-            # combine cancer types
+    # combine cancer types
     cancer_types = "_".join([cancer_type for cancer_type in loaded_cancer_embeddings.keys()])
     save_folder = Path(save_folder, cancer_types)
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
+
+    print(f"Using save folder: {save_folder}")
 
     # Load embeddings
     sentence_embeddings, image_embeddings = load_noise_embeddings()
