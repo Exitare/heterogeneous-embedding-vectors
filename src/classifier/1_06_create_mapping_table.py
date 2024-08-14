@@ -11,8 +11,8 @@ if __name__ == '__main__':
     # Load data
     brca_data = pd.read_csv(Path("data", "rna", "BRCA", "data.csv"), index_col=0)
     brca_data["Cancer"] = "BRCA"
-    laml_data = pd.read_csv(Path("data", "rna", "LAML", "data.csv"), index_col=0)
-    laml_data["Cancer"] = "LAML"
+    laml_data = pd.read_csv(Path("data", "rna", "LUAD", "data.csv"), index_col=0)
+    laml_data["Cancer"] = "LUAD"
     coad_data = pd.read_csv(Path("data", "rna", "COAD", "data.csv"), index_col=0)
     coad_data["Cancer"] = "COAD"
     blca_data = pd.read_csv(Path("data", "rna", "BLCA", "data.csv"), index_col=0)

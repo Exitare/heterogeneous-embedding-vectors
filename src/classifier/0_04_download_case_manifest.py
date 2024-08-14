@@ -89,7 +89,7 @@ def scrapeFiles(outfile):
                         "value": [
                             "TCGA-BRCA",
                             "TCGA-BLCA",
-                            "TCGA-LAML",
+                            "TCGA-LUAD",
                             "TCGA-STAD",
                             "TCGA-THCA",
                             "TCGA-COAD"

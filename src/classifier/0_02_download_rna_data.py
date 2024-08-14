@@ -8,7 +8,7 @@ save_folder = Path("data")
 if __name__ == '__main__':
     parser = ArgumentParser(description='Download rna bmeg data')
     parser.add_argument("--creds", "-c", type=Path)
-    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "LAML", "COAD"], required=True)
+    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "COAD", "LUAD"], required=True)
 
     args = parser.parse_args()
     credentials = args.creds
@@ -41,6 +41,11 @@ if __name__ == '__main__':
             data[submitter_id][gene] = value
 
     samples = pd.DataFrame.from_dict(data, orient='index').fillna(0.0)
+    if samples.empty:
+        # remove the folder
+        save_folder.rmdir()
+        print("No data found.")
+        exit(1)
     samples.reset_index(drop=False, inplace=True)
     # rename index column to patient
     samples.rename(columns={"index": "Patient"}, inplace=True)

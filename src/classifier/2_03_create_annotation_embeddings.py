@@ -8,7 +8,7 @@ save_folder = Path("results", "classifier", "embeddings")
 load_folder = Path("data", "annotations")
 
 
-def sample_words_multiple_times(sentence, num_words, num_samples):
+def sample_words_multiple_times(sentence, num_words, num_samples, submitter_id):
     if sentence is None:
         return
     # Split the sentence into a list of words
@@ -16,8 +16,7 @@ def sample_words_multiple_times(sentence, num_words, num_samples):
 
     # Ensure we do not sample more words than are available
     if num_words > len(words):
-        print(sentence)
-        raise ValueError("The number of words to sample exceeds the number of words in the sentence.")
+        words = ["No", "annotations", "available", "for", submitter_id]
 
     # Perform the sampling multiple times
     sampled_words_list = []
@@ -45,11 +44,10 @@ if __name__ == '__main__':
         # assert that text does not only consists of whitespace
         assert not text.isspace(), "Text should not only consist of whitespace."
 
-        texts = []
         if num_of_dots == 0:
-            num_words_to_sample = 10
+            num_words_to_sample = 5
             num_samples = 7
-            texts = sample_words_multiple_times(text, num_words_to_sample, num_samples)
+            texts = sample_words_multiple_times(text, num_words_to_sample, num_samples, submitter_id=submitter_id)
 
             # convert each list to a string
             texts = [" ".join(text) for text in texts]
@@ -62,6 +60,10 @@ if __name__ == '__main__':
                 "submitter_id": submitter_id,
                 "text": text
             })
+
+    if len(text_annotations) == 0:
+        print("No text annotations found.")
+        exit(0)
 
     text_annotations = pd.DataFrame(text_annotations)
     # create a list from the text column
