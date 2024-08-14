@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=bmeg_vae
+#SBATCH --job-name=c_emb
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
@@ -12,7 +12,7 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-# sbatch ./src/classifier/2_01_run_rna_vae.sh "BRCA BLCA LAML STAD THCA COAD"
+# sbatch ./src/classifier/2_01_create_cancer_embeddings.sh "BRCA BLCA LUAD STAD THCA COAD"
 
 cancer_types=$1
 
