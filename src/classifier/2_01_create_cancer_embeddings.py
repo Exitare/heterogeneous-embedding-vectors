@@ -11,6 +11,10 @@ import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 
+cancer_load_path = Path("data", "rna")
+mappings_load_path = Path("results", "classifier", "mappings")
+save_path = Path("results", "classifier", "embeddings", "annotated_cancer")
+
 
 def compute_latent(x):
     mu, sigma = x
@@ -71,11 +75,9 @@ if __name__ == '__main__':
 
     cancers = "_".join(selected_cancers)
 
-    embedding_save_path = Path("results", "classifier", "embeddings", "annotated_cancer", cancers)
+    embedding_save_path = Path(save_path, cancers)
     if not embedding_save_path.exists():
         embedding_save_path.mkdir(parents=True)
-
-    cancer_load_path = Path("data", "bmeg", "v_2")
 
     cancer_df = []
     for cancer in selected_cancers:
@@ -167,7 +169,7 @@ if __name__ == '__main__':
     latent_space["Cancer"] = cancer_types
 
     # load the patient mapping to retrieve the submitter id
-    patient_mapping = pd.read_csv(Path("results", "realistic_recognizer", "mappings", "realistic_mappings.csv"))
+    patient_mapping = pd.read_csv(Path(mappings_load_path, "mappings.csv"))
 
     # iterate through all cancer types and the save the subset of the latent space
     for cancer in selected_cancers:
