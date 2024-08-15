@@ -83,15 +83,15 @@ if __name__ == '__main__':
 
     # lower case the cancer types
     selected_cancers = [cancer.lower() for cancer in selected_cancers]
-    cancer_types = "_".join(selected_cancers)
+    cancers = "_".join(selected_cancers)
 
-    save_path = Path(save_path, cancer_types)
+    save_path = Path(save_path, cancers)
 
     print(f"Total embeddings: {total_embeddings}")
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
 
-    load_path = Path(load_path, cancer_types, f"{total_embeddings}_embeddings.csv")
+    load_path = Path(load_path, cancers, f"{total_embeddings}_embeddings.csv")
     print(f"Loading data from {load_path}")
     save_path = Path(save_path, f"{total_embeddings}_embeddings")
 

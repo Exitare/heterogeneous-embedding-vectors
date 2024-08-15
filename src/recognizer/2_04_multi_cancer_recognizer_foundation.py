@@ -102,19 +102,18 @@ if __name__ == '__main__':
 
     # lower case the cancer types
     selected_cancers = [cancer.lower() for cancer in selected_cancers]
-    cancer_types = "_".join(selected_cancers)
+    cancers = "_".join(selected_cancers)
 
-    save_path = Path(save_path, cancer_types)
+    save_path = Path(save_path, cancers)
 
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
 
     data = []
     for embedding_count in embedding_counts:
-        load_path = Path("results", f"summed_embeddings", "multi_cancer", cancer_types,
-                         f"{embedding_count}_embeddings.csv")
-        print(f"Loading data from {load_path}")
-        data.append(pd.read_csv(load_path, nrows=1000))
+        embedding_load_path = Path(load_path, cancers, f"{embedding_count}_embeddings.csv")
+        print(f"Loading data from {embedding_load_path}")
+        data.append(pd.read_csv(embedding_load_path))
 
     data = pd.concat(data, axis=0)
 

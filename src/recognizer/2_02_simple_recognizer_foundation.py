@@ -93,11 +93,10 @@ if __name__ == '__main__':
 
     data = []
     for embedding_count in embedding_counts:
-        load_path = Path(load_path, f"{embedding_count}_embeddings.csv")
-        print(f"Loading data from {load_path}")
+        embedding_load_path = Path(load_path, f"{embedding_count}_embeddings.csv")
+        print(f"Loading data from {embedding_load_path}")
         # only load 10000 entries for demonstration
-        data.append(pd.read_csv(load_path))
-        # data.append(pd.read_csv(load_path))
+        data.append(pd.read_csv(embedding_load_path))
 
     data = pd.concat(data, axis=0)
 
