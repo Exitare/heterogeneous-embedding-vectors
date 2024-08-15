@@ -1,4 +1,4 @@
-# ./src/recognizer/schedule_multi_recognizer_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
+# ./src/recognizer/2_03_schedule_multi_recognizer_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
 cancer_types=$1
 
 # if cancer_types is not provided, then exit
