@@ -20,10 +20,10 @@ if __name__ == '__main__':
         save_folder.mkdir(parents=True)
 
     # load mappings
-    mappings = pd.read_csv(Path("results", "classifier", "mappings", "mappings.csv"))
+    mappings = pd.read_csv(Path("results", "classifier", "mappings", cancers, "mappings.csv"))
     # load embeddings
     text_annotation_embeddings = pd.read_csv(
-        Path("results", "classifier", "embeddings", "annotations_embeddings.csv"))
+        Path("results", "classifier", "embeddings", "annotations", cancers, "embeddings.csv"))
 
     # load mutation embeddings
     mutation_embeddings = pd.read_csv(

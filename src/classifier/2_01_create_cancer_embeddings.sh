@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 # sbatch ./src/classifier/2_01_create_cancer_embeddings.sh "BRCA BLCA LUAD STAD THCA COAD"

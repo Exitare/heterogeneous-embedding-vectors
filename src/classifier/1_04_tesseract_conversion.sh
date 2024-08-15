@@ -1,30 +1,46 @@
 #!/bin/bash
 
-# Hardcoded CSV file path
-csv_file="./data/annotations/empty_txts.csv"
+selected_cancers=$1
 
-# Base directory for PDFs and output
-base_dir="./data/annotations"
-output_base_dir="./data/annotations/output"
+# Check if the selected cancers are provided
+if [ -z "$selected_cancers" ]; then
+    echo "Please provide the selected cancers as an argument."
+    exit 1
+fi
 
-# Check if the file exists
+# Combine selected cancers by _
+cancers=$(echo $selected_cancers | tr ' ' '_')
+echo $cancers
+
+# CSV file path, appended with cancers
+csv_file="./data/annotations/${cancers}/empty_txts.csv"
+echo $csv_file
+
+# Check if the CSV file exists
 if [ ! -f "$csv_file" ]; then
     echo "CSV file not found!"
     exit 1
 fi
 
+# Base directory for PDFs and output
+base_dir="./data/annotations"
+output_base_dir="./data/annotations/${cancers}/output"
+
 # Ensure the output base directory exists
 mkdir -p "$output_base_dir"
 
-# Read and process each value from the first column
-while IFS=, read -r first_column _; do
-    echo "Processing: $first_column"
+# Read and process each value from the first and second columns
+while IFS=, read -r first_column cancer_subdir; do
+    echo "Processing: $first_column in subdir $cancer_subdir"
+
+    # Adjust the base_dir with the cancer subdirectory specified in the CSV
+    adjusted_base_dir="${base_dir}/${cancer_subdir}"
 
     # Find the PDF file that includes the first_column in the file name
-    pdf_file=$(find "$base_dir" -type f -name "*${first_column}*.pdf")
+    pdf_file=$(find "$adjusted_base_dir" -type f -name "*${first_column}*.pdf")
 
     if [ -z "$pdf_file" ]; then
-        echo "No PDF file found for $first_column"
+        echo "No PDF file found for $first_column in $adjusted_base_dir"
         continue
     fi
 
@@ -51,8 +67,8 @@ while IFS=, read -r first_column _; do
         combined_text+="$text\n"
     done
 
-    # Save the combined text to a file in the annotations directory
-    output_text_file="${base_dir}/${pdf_filename%.pdf}.txt"
+    # Save the combined text to a file in the same directory as the PDF
+    output_text_file="${adjusted_base_dir}/${pdf_filename%.pdf}.txt"
     echo -e "$combined_text" > "$output_text_file"
 
     echo "Text extracted and saved to $output_text_file"

@@ -2,9 +2,10 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import pandas as pd
 import random
+import argparse
 
 model = SentenceTransformer("all-mpnet-base-v2")
-save_folder = Path("results", "classifier", "embeddings")
+save_folder = Path("results", "classifier", "embeddings","annotations")
 load_folder = Path("data", "annotations")
 
 
@@ -28,6 +29,18 @@ def sample_words_multiple_times(sentence, num_words, num_samples, submitter_id):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    args = parser.parse_args()
+
+    selected_cancers = args.cancer
+    print("Selected cancers: ", selected_cancers)
+
+    cancers = "_".join(selected_cancers)
+
+    load_folder = Path(load_folder, cancers)
+    save_folder = Path(save_folder, cancers)
+
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
@@ -78,4 +91,4 @@ if __name__ == '__main__':
     # save embeddings
     embeddings = pd.DataFrame(embeddings)
     embeddings["submitter_id"] = text_annotations["submitter_id"]
-    embeddings.to_csv(Path(save_folder, "annotations_embeddings.csv"), index=False)
+    embeddings.to_csv(Path(save_folder, "embeddings.csv"), index=False)

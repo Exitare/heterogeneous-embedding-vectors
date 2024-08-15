@@ -1,29 +1,34 @@
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
+import argparse
 
 save_folder = Path("results", "classifier", "mappings")
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    args = parser.parse_args()
+
+    selected_cancers = args.cancer
+    print("Selected cancers: ", selected_cancers)
+
+    cancers = "_".join(selected_cancers)
+
+    save_folder = Path(save_folder, cancers)
+
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
-    # Load data
-    brca_data = pd.read_csv(Path("data", "rna", "BRCA", "data.csv"), index_col=0)
-    brca_data["Cancer"] = "BRCA"
-    laml_data = pd.read_csv(Path("data", "rna", "LUAD", "data.csv"), index_col=0)
-    laml_data["Cancer"] = "LUAD"
-    coad_data = pd.read_csv(Path("data", "rna", "COAD", "data.csv"), index_col=0)
-    coad_data["Cancer"] = "COAD"
-    blca_data = pd.read_csv(Path("data", "rna", "BLCA", "data.csv"), index_col=0)
-    blca_data["Cancer"] = "BLCA"
-    stad_data = pd.read_csv(Path("data", "rna", "STAD", "data.csv"), index_col=0)
-    stad_data["Cancer"] = "STAD"
-    thca_data = pd.read_csv(Path("data", "rna", "THCA", "data.csv"), index_col=0)
-    thca_data["Cancer"] = "THCA"
+    data = []
+    for cancer in selected_cancers:
+        print(f"Loading data for {cancer}...")
+        temp_df = pd.read_csv(Path("data", "rna", cancer, "data.csv"), index_col=0)
+        temp_df["Cancer"] = cancer
+        data.append(temp_df)
 
     # Concatenate data
-    tcga_data = pd.concat([brca_data, laml_data, coad_data, blca_data, stad_data, thca_data], axis=0)
+    tcga_data = pd.concat(data, axis=0)
 
     # Load data json
     manifest_file = pd.read_json(Path("data", "annotations", "manifest.json"))
