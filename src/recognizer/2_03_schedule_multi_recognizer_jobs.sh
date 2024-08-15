@@ -1,5 +1,11 @@
-# ./src/recognizer/schedule_multi_recognizer_jobs.sh "brca laml"
+# ./src/recognizer/schedule_multi_recognizer_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
 cancer_types=$1
+
+# if cancer_types is not provided, then exit
+if [ -z "$cancer_types" ]; then
+  echo "No cancer types provided!"
+  exit 1
+fi
 
 for i in $(seq 2 9)
 do
