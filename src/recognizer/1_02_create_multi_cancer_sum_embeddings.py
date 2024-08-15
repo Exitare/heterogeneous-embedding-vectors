@@ -27,17 +27,24 @@ def random_sum_embeddings(embeddings, max_count):
 
 
 if __name__ == '__main__':
-    # example call: python3 src/embedding_aggregation/create_multi_cancer_sum_embeddings.py -e 10 -i 100 -c ./results/embeddings/cancer/blca_embeddings.csv ./results/embeddings/cancer/brca_embeddings.csv
     parser = ArgumentParser(description='Sum embeddings from different sources')
     parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum", required=True)
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
     parser.add_argument("--selected_cancers", "-c", nargs="+", required=True,
-                        help="The selected cancer embeddings to sum")
+                        help="The selected cancer identifier to sum")
     args = parser.parse_args()
 
     iterations = args.iterations
     total_embeddings = args.embeddings
     selected_cancers = args.selected_cancers
+    cancers = "_".join(selected_cancers)
+
+    cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
+    save_folder = Path(save_folder, cancers)
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+
+    print(f"Using save folder: {save_folder}")
 
     loaded_cancer_embeddings = {}
     for cancer in selected_cancers:
@@ -51,14 +58,6 @@ if __name__ == '__main__':
         except:
             print(f"Could not load {cancer} embedding...")
             raise
-
-    # combine cancer types
-    cancer_types = "_".join([cancer_type for cancer_type in loaded_cancer_embeddings.keys()])
-    save_folder = Path(save_folder, cancer_types)
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
-
-    print(f"Using save folder: {save_folder}")
 
     # Load embeddings
     sentence_embeddings, image_embeddings = load_noise_embeddings()

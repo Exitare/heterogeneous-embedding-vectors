@@ -73,6 +73,9 @@ if __name__ == '__main__':
     fine_tune_epochs = args.fine_tune_epochs
     selected_cancers = args.cancer
 
+    cancers = "_".join(selected_cancers)
+    save_folder = Path(save_folder, cancers)
+
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 

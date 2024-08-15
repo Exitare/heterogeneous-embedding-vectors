@@ -84,8 +84,6 @@ def build_model(input_dim, cancer_list: []):
 
 if __name__ == '__main__':
     # python3 src/recognizer/multi_cancer_recognizer_foundation.py -c blca brca
-    if not save_path.exists():
-        save_path.mkdir(parents=True)
 
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
@@ -97,17 +95,15 @@ if __name__ == '__main__':
     batch_size = args.batch_size
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
-
-    print("Selected cancers: ", selected_cancers)
-
-    # lower case the cancer types
-    selected_cancers = [cancer.lower() for cancer in selected_cancers]
     cancers = "_".join(selected_cancers)
 
-    save_path = Path(save_path, cancers)
-
+    print("Selected cancers: ", selected_cancers)
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
+
+    save_path = Path(save_path, cancers)
+    if not save_path.exists():
+        save_path.mkdir(parents=True)
 
     data = []
     for embedding_count in embedding_counts:
