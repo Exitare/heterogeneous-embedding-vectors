@@ -1,4 +1,4 @@
-# ./src/recognizer/schedule_multi_recognizer_foundation_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
+# ./src/recognizer/2_04_schedule_multi_recognizer_foundation_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
 
 cancer_types=$1
 
