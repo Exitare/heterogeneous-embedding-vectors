@@ -58,24 +58,26 @@ if __name__ == '__main__':
     # Convert intra_distances to DataFrame
     intra_df = pd.DataFrame({
         'Cancer': np.repeat(list(intra_distances.keys()), [len(d) for d in intra_distances.values()]),
-        'Distance': np.concatenate(list(intra_distances.values()))
+        'Distance': np.concatenate(list(intra_distances.values())),
+        "Type": "Intra Cluster"
     })
 
     # Convert inter_distances to DataFrame
     inter_df = pd.DataFrame({
-        'Cancer_Pair': np.repeat([f"{k[0]}-{k[1]}" for k in inter_distances.keys()],
+        'Cancer': np.repeat([f"{k[0]}-{k[1]}" for k in inter_distances.keys()],
                                  [len(v) for v in inter_distances.values()]),
-        'Distance': np.concatenate(list(inter_distances.values()))
+        'Distance': np.concatenate(list(inter_distances.values())),
+        "Type": "Inter Cluster"
     })
 
     # only keep one of the cancer pair e.g. BRCA-STAD and STAD-BRCA, only keep one
-    inter_df = inter_df[inter_df['Cancer_Pair'].apply(lambda x: x.split('-')[0] < x.split('-')[1])]
+    inter_df = inter_df[inter_df['Cancer'].apply(lambda x: x.split('-')[0] < x.split('-')[1])]
 
     # Plotting the distances both inter and intra, create two axes
     fig, ax = plt.subplots(1, 2, figsize=(15, 5))
     # create hist plot for intra-cluster distances with a hue
     sns.histplot(intra_df, x='Distance', hue='Cancer', kde=True, ax=ax[0])
-    sns.histplot(inter_df, x='Distance', kde=True, hue="Cancer_Pair", ax=ax[1])
+    sns.histplot(inter_df, x='Distance', kde=True, hue="Cancer", ax=ax[1])
     ax[0].set_title('Intra-cluster Distances')
     ax[1].set_title('Inter-cluster Distances')
     plt.xlabel('Cancer Pair')
@@ -86,13 +88,32 @@ if __name__ == '__main__':
     # create bar plot
     fig, ax = plt.subplots(1, 2, figsize=(15, 5))
     sns.barplot(data=intra_df, x='Cancer', y='Distance', ax=ax[0])
-    sns.barplot(data=inter_df, x='Cancer_Pair', y='Distance', ax=ax[1])
+    sns.barplot(data=inter_df, x='Cancer', y='Distance', ax=ax[1])
     ax[0].set_title('Intra-cluster Distances')
     ax[1].set_title('Inter-cluster Distances')
     plt.xlabel('Cancer Pair')
     plt.ylabel('Euclidean Distance')
     # rotate x axis
     plt.xticks(rotation=45)
+    ax[0].set_ylim(0, 21)
+    ax[1].set_ylim(0, 21)
+
     plt.tight_layout()
     plt.savefig(Path(fig_save_folder, "euclidean_bar_plot.png"), dpi=150)
     plt.close('all')
+
+    combined_df = pd.concat([intra_df, inter_df], axis=0)
+
+    fig, ax = plt.subplots(1, 1, figsize=(15, 5))
+    sns.barplot(data=combined_df, x='Cancer', y='Distance', hue="Type", ax=ax)
+    ax.set_title('Euclidean Distance for cancer pairs')
+    plt.xlabel('Cancer Pair')
+    ax.set_ylabel('Distance')
+    # set y scale
+    ax.set_ylim(0, 21)
+    # rotate x axis
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(Path(fig_save_folder, "combined_euclidean_bar_plot.png"), dpi=150)
+    plt.close('all')
+

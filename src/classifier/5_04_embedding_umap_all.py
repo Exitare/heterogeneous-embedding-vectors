@@ -45,7 +45,8 @@ if __name__ == '__main__':
     loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
 
     # load annotations
-    annotations = pd.read_csv(Path("results", "classifier", "embeddings", "annotations_embeddings.csv"))
+    annotations = pd.read_csv(
+        Path("results", "classifier", "embeddings", "annotations", cancers, "embeddings.csv"))
     # reset index
     annotations.reset_index(drop=True, inplace=True)
     mutations = pd.read_csv(Path("results", "classifier", "embeddings", "mutation_embeddings.csv"))
@@ -62,6 +63,10 @@ if __name__ == '__main__':
     loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
     # remove all rows that have nan values
     loaded_cancer_embeddings.dropna(inplace=True)
+
+    # assert that submitter id, patient is not in columns
+    assert "submitter_id" not in loaded_cancer_embeddings.columns, "submitter_id should not be in the columns"
+    assert "patient" not in loaded_cancer_embeddings.columns, "patient should not be in the columns"
 
     # Apply KMeans
     print(f"Using {len(selected_cancers)} clusters...")
@@ -84,7 +89,7 @@ if __name__ == '__main__':
     df_plot['cluster_name'] = loaded_cancer_embeddings['cluster_name']
 
     plt.figure(figsize=(12, 10))
-    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cluster_name', palette='Set1', data=df_plot, s=100)
+    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cluster_name', palette='Set1', data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
     plt.title('UMAP with Named Clusters')
