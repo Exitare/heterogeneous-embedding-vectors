@@ -97,7 +97,7 @@ if __name__ == '__main__':
     ax[0].set_title('Intra-cluster Distances')
     ax[1].set_title('Inter-cluster Distances')
     plt.xlabel('Cancer Pair')
-    plt.ylabel('Cosine Distance')
+    plt.ylabel('Cosine Similarity')
 
     ax[0].set_ylim(0, 1)
     ax[1].set_ylim(0, 1)
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     sns.barplot(data=combined_df, x='Cancer', y='Distance', hue="Type", ax=ax)
     ax.set_title('Cosine Similarity for cancer pairs')
     plt.xlabel('Cancer Pair')
-    ax.set_ylabel('Distance')
+    ax.set_ylabel('Similarity')
     # set y scale
     ax.set_ylim(0, 1)
     # rotate x axis

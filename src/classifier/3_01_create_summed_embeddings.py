@@ -2,20 +2,95 @@ import pandas as pd
 from pathlib import Path
 import argparse
 import numpy as np
+from matplotlib.style import available
 
 save_folder = Path("results", "classifier", "summed_embeddings")
+
+
+# Function to perform a random walk and select embeddings
+def random_walk_selection(patient_id, patient_cancer_embedding, patient_annotations, patient_mutations, walk_distance):
+    # Initialize the selected embeddings dictionary
+    selected_embeddings = {
+        'cancer': [],
+        'text': [],
+        'mutation': []
+    }
+
+    # Create a dictionary of available embeddings, which are not empty
+    available_nodes = {}
+    if not patient_cancer_embedding.empty:
+        available_nodes['cancer'] = patient_cancer_embedding
+    if not patient_annotations.empty:
+        available_nodes['text'] = patient_annotations
+    if not patient_mutations.empty:
+        available_nodes['mutation'] = patient_mutations
+
+    selected_count = 0
+
+    # Perform the random walk until the exact number of embeddings is selected
+    while selected_count < walk_distance:
+        # Randomly choose a type of node to visit
+        chosen_type = np.random.choice(list(available_nodes.keys()))
+        available_embeddings = available_nodes[chosen_type]
+
+        # If there are any embeddings of the chosen type left to select
+        if not available_embeddings.empty:
+            # Select a random embedding and add it to the selected embeddings
+            selected_embedding = available_embeddings.sample(n=1)
+            selected_embeddings[chosen_type].append(selected_embedding)
+
+            # Increment the count of selected embeddings
+            selected_count += 1
+
+    # Convert lists of embeddings into dataframes
+    for key in selected_embeddings.keys():
+        if selected_embeddings[key]:  # If there are any embeddings selected
+            selected_embeddings[key] = pd.concat(selected_embeddings[key])
+        else:  # If no embeddings were selected
+            selected_embeddings[key] = pd.DataFrame()
+
+    return selected_embeddings
+
+
+def sum_embeddings(selected_embeddings):
+    # Initialize a sum_embedding DataFrame with the same columns as the embeddings, filled with zeros
+    # This assumes that all embeddings have the same set of columns
+    embedding_sum = None
+
+    for modality, embeddings in selected_embeddings.items():
+        if not embeddings.empty:
+            if embedding_sum is None:
+                # Initialize the sum_embedding DataFrame on the first encounter of non-empty embeddings
+                embedding_sum = embeddings.sum()
+            else:
+                # Sum embeddings of the current modality
+                embedding_sum += embeddings.sum()
+
+    # Convert the summed embeddings to a DataFrame, if not already done
+    if embedding_sum is not None:
+        embedding_sum = pd.DataFrame(embedding_sum).transpose()
+
+    return embedding_sum
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
+                        choices=[3, 4, 5], default=3)
+    parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
+                        choices=[3, 4, 5], default=3)
     args = parser.parse_args()
 
     selected_cancers = args.cancer
+    walk_distance = args.walk_distance
+    amount_of_walks = args.amount_of_walks
     print("Selected cancers: ", selected_cancers)
+    print(f"Using walk distance of {walk_distance} and {amount_of_walks} walks.")
 
     cancers = "_".join(selected_cancers)
 
-    save_folder = Path(save_folder, cancers)
+    save_folder = Path(save_folder, cancers, f"{walk_distance}_{amount_of_walks}")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
@@ -54,12 +129,6 @@ if __name__ == '__main__':
     print("Creating summed embeddings...")
     for patient_id in mappings["patient"]:
         row = mappings[mappings["patient"] == patient_id]
-        # check if either mutation id or submitter id is Na
-        if row.empty or (row['mutation_id'].isna().values[0] and row['submitter_id'].isna().values[0]):
-            print(f"Skipping patient {patient_id} with no mutation or submitter id.")
-            continue
-
-        concatenated_summed_embeddings = []
 
         patient_mutation_id = row["mutation_id"].values[0]
         # load patient mutations
@@ -78,44 +147,18 @@ if __name__ == '__main__':
 
         # Get the cancer embedding
         cancer_specific_embeddings = cancer_embeddings[cancer_type]
-        cancer_embedding = cancer_specific_embeddings[cancer_specific_embeddings["patient"] == patient_id]
+        patient_cancer_embedding = cancer_specific_embeddings[cancer_specific_embeddings["patient"] == patient_id]
         # drop submitter and patient from cancer_embedding
-        cancer_embedding = cancer_embedding.drop(columns=["submitter_id", "patient"])
+        patient_cancer_embedding = patient_cancer_embedding.drop(columns=["submitter_id", "patient"])
 
-        for walk in range(3):
-            # if more than one cancer embeddings is found, randomly select one
-            if cancer_embedding.shape[0] > 1:
-                cancer_embedding = cancer_embedding.sample(n=1)
+        concatenated_summed_embeddings = []
+        for walk in range(amount_of_walks):
+            # Call the function with the provided data
+            selected_embeddings = random_walk_selection(patient_id, patient_cancer_embedding, patient_annotations,
+                                                        patient_mutations, walk_distance)
 
-            # cancer embedding should only have one row
-            assert cancer_embedding.shape[0] == 1, (
-                f"Cancer embedding should only have one row, {cancer_embedding.shape}, {patient_id}")
-
-            # select max text embeddings or 4
-            max_text_embeddings = 4
-            if len(patient_annotations) < 4:
-                max_text_embeddings = len(patient_annotations)
-
-            num_text_embeddings = np.random.randint(1, max_text_embeddings)
-            text_embeddings = patient_annotations.sample(n=num_text_embeddings)
-
-            if len(patient_mutations) != 0:
-                patient_mutations = patient_mutations.sample(n=1)
-
-            assert "submitter_id" not in text_embeddings.columns, (
-                f"Submitter id should not be in text embeddings, {text_embeddings.columns}")
-            assert "submitter_id" not in cancer_embedding.columns, (
-                f"Submitter id should not be in cancer embedding, {cancer_embedding.columns}")
-            assert "patient" not in cancer_embedding.columns, (
-                f"Patient should not be in cancer embedding, {cancer_embedding.columns}")
-            assert "submitter_id" not in patient_mutations.columns, (
-                f"Submitter id should not be in patient mutations, {patient_mutations.columns}")
-
-            # Sum all embeddings
-            if len(patient_mutations) == 0:
-                summed_embedding = cancer_embedding.values + text_embeddings.sum().values
-            else:
-                summed_embedding = cancer_embedding.values + text_embeddings.sum().values + patient_mutations.sum().values
+            # Summing all embeddings
+            summed_embedding = sum_embeddings(selected_embeddings)
 
             # assert that shape is 768 columns
             assert summed_embedding.shape[
@@ -124,24 +167,23 @@ if __name__ == '__main__':
             assert summed_embedding.shape[
                        0] == 1, f"Shape of summed embedding should be 1 row, {summed_embedding.shape}, {patient_id}"
 
-            # Flatten the summed embedding to a long vector and add to the list for concatenation
-            concatenated_summed_embeddings.append(summed_embedding.flatten())
+            concatenated_summed_embeddings.append(summed_embedding)
 
         # assert that length of concatenated_summed_embeddings is 3
-        assert len(concatenated_summed_embeddings) == 3, (
+        assert len(concatenated_summed_embeddings) == amount_of_walks, (
             f"The length of the concatenated summed embeddings should be 3, {len(concatenated_summed_embeddings)}")
 
         # assert that each element in the concatenated_summed_embeddings is a numpy array with 768 columns
         for element in concatenated_summed_embeddings:
-            assert element.shape[0] == 768, (
+            assert element.shape[1] == 768, (
                 f"Each element in the concatenated summed embeddings should have 768 columns, {element.shape}")
 
         # Concatenate all three summed embeddings to form a long vector of length 2304
-        concatenated_summed_embeddings = np.concatenate(concatenated_summed_embeddings)
+        concatenated_summed_embeddings = np.concatenate(concatenated_summed_embeddings).flatten()
 
         # assert that length of concatenated_summed_embeddings is 2306
         assert len(
-            concatenated_summed_embeddings) == 2304, (
+            concatenated_summed_embeddings) == 768 * amount_of_walks, (
             f"The length of the concatenated summed embedding should be 2304, "
             f"{len(concatenated_summed_embeddings)}")
 
@@ -150,11 +192,12 @@ if __name__ == '__main__':
         concatenated_embedding_df['patient_id'] = patient_id
         concatenated_embedding_df['cancer'] = cancer_type
 
+        # assert that length of concatenated_embedding_df is 2306
+        assert concatenated_embedding_df.shape[
+                   1] == 768 * amount_of_walks + 2, f"The length of the concatenated embedding should be {768 * amount_of_walks + 2}, but is {concatenated_embedding_df.shape}"
+
         # convert the concatenated_embedding_df to a dictionary
         concatenated_embedding_df = concatenated_embedding_df.to_dict(orient="records")[0]
-        # assert that length of concatenated_embedding_df is 2306
-        assert len(
-            concatenated_embedding_df) == 2306, f"The length of the concatenated embedding should be 2306, {concatenated_embedding_df}"
 
         # Append the concatenated summed embedding DataFrame to the list
         summed_embeddings.append(concatenated_embedding_df)

@@ -14,17 +14,24 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--iteration", "-i", type=int, required=True, help="The iteration number.")
+    parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.", choices=[3, 4, 5], default=3)
+    parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
+                        choices=[3, 4, 5], default=3)
     args = parser.parse_args()
 
     selected_cancers = args.cancer
     iteration = args.iteration
+    walk_distance = args.walk_distance
+    amount_of_walks = args.amount_of_walks
     print("Selected cancers: ", selected_cancers)
     print(f"Using {len(selected_cancers)} output nodes for classifier.")
 
     cancers = "_".join(selected_cancers)
 
-    load_folder = Path(load_folder, cancers)
+    load_folder = Path(load_folder, cancers, f"{walk_distance}_{amount_of_walks}")
+    print(f"Loading embeddings from {load_folder} ...")
     cancer_save_folder = Path(save_folder, cancers)
+    cancer_save_folder = Path(cancer_save_folder, f"{walk_distance}_{amount_of_walks}")
     iteration_save_folder = Path(cancer_save_folder, str(iteration))
 
     if not cancer_save_folder.exists():
@@ -98,7 +105,8 @@ if __name__ == '__main__':
         print(f"{decoded_cancer} - F1: {f1_score_cancer}, Precision: {precision_cancer}, Recall: {recall_cancer}")
         results.append(
             {"loss": loss, "accuracy": accuracy_cancer, "f1": f1_score_cancer, "precision": precision_cancer,
-             "recall": recall_cancer, "iteration": iteration, "cancer": decoded_cancer})
+             "recall": recall_cancer, "iteration": iteration, "cancer": decoded_cancer, "walk_distance": walk_distance,
+             "amount_of_walks": amount_of_walks})
 
     print(
         f"Loss: {loss}, Accuracy: {accuracy}, F1: {complete_f1_score}, Precision: {complete_precision}, Recall: {complete_recall}")
@@ -112,7 +120,7 @@ if __name__ == '__main__':
     results.append(
         {"loss": loss, "accuracy": accuracy, "f1": complete_f1_score, "precision": complete_precision,
          "recall": complete_recall,
-         "iteration": iteration, "cancer": "All"})
+         "iteration": iteration, "cancer": "All", "walk_distance": walk_distance, "amount_of_walks": amount_of_walks})
 
     results = pd.DataFrame(results)
     results.to_csv(Path(iteration_save_folder, "results.csv"), index=False)
