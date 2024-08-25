@@ -73,8 +73,14 @@ if __name__ == '__main__':
     kmeans = KMeans(n_clusters=len(selected_cancers), random_state=42)
     loaded_cancer_embeddings['cluster'] = kmeans.fit_predict(loaded_cancer_embeddings.drop('cancer', axis=1))
 
-    # Map clusters back to cancer names
-    cluster_to_cancer = dict(enumerate(selected_cancers))
+    # Determine the dominant cancer type in each cluster
+    cluster_cancer_counts = loaded_cancer_embeddings.groupby(['cluster', 'cancer']).size().reset_index(name='count')
+    dominant_cancer_per_cluster = cluster_cancer_counts.loc[cluster_cancer_counts.groupby('cluster')['count'].idxmax()]
+
+    # Create a mapping from cluster to the dominant cancer type
+    cluster_to_cancer = dict(zip(dominant_cancer_per_cluster['cluster'], dominant_cancer_per_cluster['cancer']))
+
+    # Apply the corrected mapping to create a 'cluster_name' column
     loaded_cancer_embeddings['cluster_name'] = loaded_cancer_embeddings['cluster'].map(cluster_to_cancer)
 
     # Ensure only numeric data is passed to UMAP
