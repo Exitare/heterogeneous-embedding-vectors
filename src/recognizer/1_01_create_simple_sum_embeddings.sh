@@ -12,6 +12,6 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-total_embeddings=$1
+walk_distance=$1
 
-python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i 1000000 -e "${total_embeddings}"
+python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i 1000000 -w "${walk_distance}"

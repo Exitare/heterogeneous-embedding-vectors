@@ -28,14 +28,14 @@ def random_sum_embeddings(embeddings, max_count):
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Sum embeddings from different sources')
-    parser.add_argument("--embeddings", "-e", type=int, help="Number of embeddings to sum", required=True)
+    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum", required=True)
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
     parser.add_argument("--selected_cancers", "-c", nargs="+", required=True,
                         help="The selected cancer identifier to sum")
     args = parser.parse_args()
 
     iterations = args.iterations
-    total_embeddings = args.embeddings
+    walk_distance = args.walk_distance
     selected_cancers = args.selected_cancers
     cancers = "_".join(selected_cancers)
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
         random.shuffle(embeddings_list)
 
         combined_sum = pd.Series(np.zeros_like(embeddings_list[0][0].iloc[0]), index=embeddings_list[0][0].columns)
-        remaining_embeddings = total_embeddings
+        remaining_embeddings = walk_distance
         combination_counts = {}
 
         for embeddings, name in embeddings_list:
@@ -112,4 +112,4 @@ if __name__ == '__main__':
     # convert all columns to int
     combined_df = combined_df.astype(float)
     print("Saving combined embeddings to CSV...")
-    combined_df.to_csv(Path(save_folder, f"{total_embeddings}_embeddings.csv"), index=False)
+    combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
