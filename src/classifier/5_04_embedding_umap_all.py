@@ -93,9 +93,10 @@ if __name__ == '__main__':
     # Convert to DataFrame for easier plotting
     df_plot = pd.DataFrame(df_umap, columns=['UMAP1', 'UMAP2'])
     df_plot['cluster_name'] = loaded_cancer_embeddings['cluster_name']
+    df_plot['cancer'] = loaded_cancer_embeddings['cancer']
 
     plt.figure(figsize=(12, 10))
-    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cluster_name', palette='Set1', data=df_plot, s=25)
+    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cancer', palette='Set1', data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
     plt.title('UMAP with Named Clusters')

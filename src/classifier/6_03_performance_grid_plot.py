@@ -8,8 +8,7 @@ import numpy as np
 save_folder = Path("figures", "classifier")
 
 if __name__ == '__main__':
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
+
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
@@ -18,7 +17,11 @@ if __name__ == '__main__':
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
 
-    # load all runs from results/classifier/classification
+    save_folder = Path(save_folder, cancers)
+
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+
     results = []
     # iterate over all subfolders
     cancer_folder = Path("results", "classifier", "classification", cancers)
@@ -99,5 +102,5 @@ if __name__ == '__main__':
 
     # Adjust layout and display the plot
     plt.tight_layout()
-    plt.show()
+    plt.savefig(Path(save_folder, f"grid_performance.png"), dpi=150)
 

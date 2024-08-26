@@ -99,7 +99,7 @@ if __name__ == '__main__':
     ax[1].set_ylim(0, 21)
 
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "euclidean_bar_plot.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "cancer_euclidean_bar_plot.png"), dpi=150)
     plt.close('all')
 
     combined_df = pd.concat([intra_df, inter_df], axis=0)
@@ -114,6 +114,6 @@ if __name__ == '__main__':
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "combined_euclidean_bar_plot.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "combined_cancer_euclidean_bar_plot.png"), dpi=150)
     plt.close('all')
 

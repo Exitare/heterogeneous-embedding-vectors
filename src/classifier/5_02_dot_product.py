@@ -115,7 +115,7 @@ if __name__ == '__main__':
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "dot_bar_plot.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "cancer_dot_bar_plot.png"), dpi=150)
     plt.close('all')
 
     combined_df = pd.concat([intra_df, inter_df], axis=0)
@@ -130,5 +130,5 @@ if __name__ == '__main__':
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "combined_dot_bar_plot.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "combined_cancer_dot_bar_plot.png"), dpi=150)
     plt.close('all')
