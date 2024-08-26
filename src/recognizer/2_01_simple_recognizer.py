@@ -14,7 +14,7 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer", "simple")
-load_path = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
+load_path = Path("results", "recognizer", "summed_embeddings", "simple")
 
 
 def build_model(input_dim, num_outputs=3):

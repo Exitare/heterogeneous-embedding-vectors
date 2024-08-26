@@ -5,7 +5,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import numpy as np
 
-save_folder = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
+save_folder = Path("results", "recognizer", "summed_embeddings", "simple")
 load_folder = Path("results", "recognizer", "embeddings")
 
 

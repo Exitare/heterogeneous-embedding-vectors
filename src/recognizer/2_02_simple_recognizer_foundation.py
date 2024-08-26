@@ -14,7 +14,7 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer", "simple_foundation")
-load_path = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
+load_path = Path("results", "recognizer", "summed_embeddings", "simple")
 walk_distances = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
