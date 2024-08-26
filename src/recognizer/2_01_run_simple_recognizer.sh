@@ -12,7 +12,7 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-total_embeddings=$1
+walk_distance=$1
 run_iteration=$2
 
-python3 src/recognizer/2_01_simple_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}"
+python3 src/recognizer/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}"

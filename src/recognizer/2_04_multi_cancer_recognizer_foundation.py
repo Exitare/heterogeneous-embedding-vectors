@@ -11,7 +11,6 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 from sklearn.model_selection import StratifiedShuffleSplit
-from collections import Counter
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer", "multi_foundation")
@@ -58,10 +57,10 @@ def build_model(input_dim, cancer_list: []):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=max_walk_distance), name='output_text')(text_x)
 
     # Less complex paths for image output
-    image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_walk_distance), name='output_image')(x)
 
     # Path for RNA embeddings, including subtype classification
     rna_x = Dense(128, activation='relu', name='rna_dense_1')(x)
@@ -70,9 +69,9 @@ def build_model(input_dim, cancer_list: []):
     rna_x = BatchNormalization()(rna_x)
     rna_x = Dropout(0.2)(rna_x)
     rna_x = Dense(32, activation='relu', name='rna_dense_3')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(rna_x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_walk_distance), name='output_rna')(rna_x)
 
-    cancer_outputs = [Dense(1, activation=ReLU(max_value=total_embeddings), name=f'output_cancer_{cancer_type}')(x) for
+    cancer_outputs = [Dense(1, activation=ReLU(max_value=max_walk_distance), name=f'output_cancer_{cancer_type}')(x) for
                       cancer_type in cancer_list]
 
     # Combine all outputs
@@ -118,9 +117,11 @@ if __name__ == '__main__':
     max_image = data["Image"].max().max()
     max_rna = data["RNA"].max().max()
 
-    # find max of max_text, max_image, and max_rna
-    total_embeddings = max(max_text, max_image, max_rna)
-    print(f"Detected max embeddings: {total_embeddings}")
+    # Calculate the sum of each row for the selected columns
+    row_sums = data[["Text", "Image", "RNA"]].sum(axis=1)
+
+    # Find the maximum sum across all rows
+    max_walk_distance = row_sums.max()
 
     run_name = f"run_{run_iteration}"
     save_path = Path(save_path, run_name)
@@ -275,7 +276,7 @@ if __name__ == '__main__':
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         metrics.append({
-            "embeddings": total_embeddings,
+            "walk_distance": max_walk_distance,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -321,7 +322,7 @@ if __name__ == '__main__':
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         binary_metrics.append({
-            'embeddings': total_embeddings,
+            'walk_distance': max_walk_distance,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -331,13 +332,6 @@ if __name__ == '__main__':
 
     binary_metrics_df = pd.DataFrame(binary_metrics)
     binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
-
-    complete_test_df = pd.DataFrame(X_test)
-    # add the y_test columns
-    for i, embedding in enumerate(embeddings):
-        complete_test_df[embedding] = y_test[:, i]
-
-    complete_test_df["Total Embedding Count"] = np.sum(y_test, axis=1)
 
     # reset index of y_test and y_pred_round
     y_test_int = pd.DataFrame(y_test_int)
@@ -349,8 +343,8 @@ if __name__ == '__main__':
 
     columns = ["Text", "Image", "RNA"] + selected_cancers
     y_test_int.columns = columns
-    # clauclate total embeddings by only using Text Image and RNa columns
-    y_test_int["Total Embeddings"] = y_test_int[["Text", "Image", "RNA"]].sum(axis=1)
+    # calculate total embeddings by only using Text Image and RNa columns
+    y_test_int["Walk Distance"] = y_test_int[["Text", "Image", "RNA"]].sum(axis=1)
     y_pred_rounded.columns = columns
     split_metrics = []  #
 
@@ -359,9 +353,9 @@ if __name__ == '__main__':
         y_pred_sub = y_pred_rounded[embedding]
 
         # iterate over all total embeddings from y_test_int
-        for total_embeddings in y_test_int["Total Embeddings"].unique():
-            y_test_sub_total = y_test_sub[y_test_int["Total Embeddings"] == total_embeddings]
-            y_pred_sub_total = y_pred_sub[y_test_int["Total Embeddings"] == total_embeddings]
+        for walk_distance in y_test_int["Walk Distance"].unique():
+            y_test_sub_total = y_test_sub[y_test_int["Walk Distance"] == walk_distance]
+            y_pred_sub_total = y_pred_sub[y_test_int["Walk Distance"] == walk_distance]
 
             # convert to int
             y_test_sub_total = y_test_sub_total.astype(int)
@@ -373,7 +367,7 @@ if __name__ == '__main__':
             f1 = f1_score(y_test_sub_total, y_pred_sub_total, average='macro')
 
             split_metrics.append({
-                'embeddings': total_embeddings,
+                'walk_distance': max_walk_distance,
                 'embedding': embedding,
                 'accuracy': accuracy,
                 'precision': precision,

@@ -7,7 +7,7 @@ if [ -z "$cancer_types" ]; then
   exit 1
 fi
 
-for i in $(seq 2 9)
+for i in $(seq 2 10)
 do
   # run it 30 times
   for j in $(seq 1 30)

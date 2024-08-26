@@ -15,10 +15,8 @@ import os
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer", "simple_foundation")
 load_path = Path("results", "recognizer", "summed_embeddings", "simple_embeddings")
-embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
+walk_distances = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-
-# embedding_counts = [2, 3]
 
 
 # Function to create stratified splits for multi-label data
@@ -59,11 +57,11 @@ def build_model(input_dim, num_outputs=3):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=max_text), name='output_text')(text_x)
 
     # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_image), name='output_image')(x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_rna), name='output_rna')(x)
 
     # Separate output layers for each count
     outputs = [text_output, image_output, rna_output]
@@ -91,11 +89,11 @@ if __name__ == '__main__':
     print(f"Run iteration: {run_iteration}")
 
     data = []
-    for embedding_count in embedding_counts:
-        embedding_load_path = Path(load_path, f"{embedding_count}_embeddings.csv")
-        print(f"Loading data from {embedding_load_path}")
+    for walk_distance in walk_distances:
+        distance_load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
+        print(f"Loading data from {distance_load_path}")
         # only load 10000 entries for demonstration
-        data.append(pd.read_csv(embedding_load_path))
+        data.append(pd.read_csv(distance_load_path))
 
     data = pd.concat(data, axis=0)
 
@@ -122,9 +120,7 @@ if __name__ == '__main__':
     max_image = data["Image"].max().max()
     max_rna = data["RNA"].max().max()
 
-    total_embeddings = max(max_text, max_image, max_rna)
 
-    print(f"Detected max embeddings: {total_embeddings}")
 
     X = data.drop(columns=["Text", "Image", "RNA"]).values
     assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
@@ -246,10 +242,18 @@ if __name__ == '__main__':
     # calculate auc for each output
     # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
 
+    # find max value of sum of text, image and rna embedding columns
+
+    # Calculate the sum of each row for the selected columns
+    row_sums = data[["Text", "Image", "RNA"]].sum(axis=1)
+
+    # Find the maximum sum across all rows
+    max_walk_distance = row_sums.max()
+
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         metrics.append({
-            "embeddings": total_embeddings,
+            "walk_distance": max_walk_distance,
             "iteration": i,
             'embedding': embedding,
             'accuracy': accuracy[i],
@@ -316,8 +320,8 @@ if __name__ == '__main__':
     y_pred_rounded.reset_index(drop=True, inplace=True)
 
     y_test_int.columns = embeddings
-    # clauclate total embeddings by only using Text Image and RNa columns
-    y_test_int["Total Embeddings"] = y_test_int[embeddings].sum(axis=1)
+    # calculate total walk distance by only using Text Image and RNa columns
+    y_test_int["Walk Distance"] = y_test_int[embeddings].sum(axis=1)
     y_pred_rounded.columns = embeddings
     split_metrics = []  #
 
@@ -326,9 +330,9 @@ if __name__ == '__main__':
         y_pred_sub = y_pred_rounded[embedding]
 
         # iterate over all total embeddings from y_test_int
-        for total_embeddings in y_test_int["Total Embeddings"].unique():
-            y_test_sub_total = y_test_sub[y_test_int["Total Embeddings"] == total_embeddings]
-            y_pred_sub_total = y_pred_sub[y_test_int["Total Embeddings"] == total_embeddings]
+        for walk_distance in y_test_int["Walk Distance"].unique():
+            y_test_sub_total = y_test_sub[y_test_int["Walk Distance"] == walk_distance]
+            y_pred_sub_total = y_pred_sub[y_test_int["Walk Distance"] == walk_distance]
 
             # convert to int
             y_test_sub_total = y_test_sub_total.astype(int)
@@ -340,7 +344,7 @@ if __name__ == '__main__':
             f1 = f1_score(y_test_sub_total, y_pred_sub_total, average='macro')
 
             split_metrics.append({
-                'embeddings': total_embeddings,
+                'walk_distance': walk_distance,
                 'embedding': embedding,
                 'accuracy': accuracy,
                 'precision': precision,

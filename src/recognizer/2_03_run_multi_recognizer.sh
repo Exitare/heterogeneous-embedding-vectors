@@ -12,8 +12,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-total_embeddings=$1
+walk_distance=$1
 run_iteration=$2
 cancer_types=$3
 
-python3 src/recognizer/2_03_multi_cancer_recognizer.py -e "${total_embeddings}" -ri "${run_iteration}" -c ${cancer_types}
+python3 src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types}

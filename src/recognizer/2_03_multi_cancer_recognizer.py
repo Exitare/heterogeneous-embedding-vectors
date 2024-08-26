@@ -37,10 +37,10 @@ def build_model(input_dim, cancer_list: []):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_text')(text_x)
 
     # Less complex paths for image output
-    image_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_image')(x)
+    image_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_image')(x)
 
     # Path for RNA embeddings, including subtype classification
     rna_x = Dense(128, activation='relu', name='rna_dense_1')(x)
@@ -49,9 +49,9 @@ def build_model(input_dim, cancer_list: []):
     rna_x = BatchNormalization()(rna_x)
     rna_x = Dropout(0.2)(rna_x)
     rna_x = Dense(32, activation='relu', name='rna_dense_3')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=total_embeddings), name='output_rna')(rna_x)
+    rna_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_rna')(rna_x)
 
-    cancer_outputs = [Dense(1, activation=ReLU(max_value=total_embeddings), name=f'output_cancer_{cancer_type}')(x) for
+    cancer_outputs = [Dense(1, activation=ReLU(max_value=walk_distance), name=f'output_cancer_{cancer_type}')(x) for
                       cancer_type in cancer_list]
 
     # Combine all outputs
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     # python3 src/recognizer/multi_cancer_recognizer.py -e 5 -c blca brca
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
-    parser.add_argument('--embeddings', "-e", type=int, required=True, help='The number of embeddings to work with.')
+    parser.add_argument('--walk_distance', "-w", type=int, required=True, help='The number of the walk distance to work with.')
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
@@ -74,26 +74,26 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     batch_size = args.batch_size
-    total_embeddings = args.embeddings
+    walk_distance = args.walk_distance
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
 
     print("Selected cancers: ", selected_cancers)
-    print(f"Total embeddings: {total_embeddings}")
+    print(f"Total walk distance: {walk_distance}")
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
     run_name = f"run_{run_iteration}"
 
     save_path = Path(save_path, cancers)
-    save_path = Path(save_path, f"{total_embeddings}_embeddings")
+    save_path = Path(save_path, f"{walk_distance}_embeddings")
     save_path = Path(save_path, run_name)
     print(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    load_path = Path(load_path, cancers, f"{total_embeddings}_embeddings.csv")
+    load_path = Path(load_path, cancers, f"{walk_distance}_embeddings.csv")
     print(f"Loading data from {load_path}")
 
     # load data
@@ -239,7 +239,7 @@ if __name__ == '__main__':
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         metrics.append({
-            "embeddings": total_embeddings,
+            "walk_distance": walk_distance,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
@@ -285,7 +285,7 @@ if __name__ == '__main__':
     # for each output, store the metrics
     for i, embedding in enumerate(embeddings):
         binary_metrics.append({
-            'embeddings': total_embeddings,
+            'walk_distance': walk_distance,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
