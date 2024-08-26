@@ -81,7 +81,6 @@ if __name__ == '__main__':
 
     # Adjust layout and display the plot
     plt.tight_layout()
-    plt.show()
 
     # Create figure with two subplots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 16))
@@ -103,4 +102,28 @@ if __name__ == '__main__':
     # Adjust layout and display the plot
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"grid_performance.png"), dpi=150)
+    plt.close('all')
 
+    # Create a new column to differentiate the type of plot
+    results_walk_distance = results.copy()
+    results_walk_distance['type'] = 'Walk Distance'
+    results_walk_distance.rename(columns={'walk_distance': 'x_value'}, inplace=True)
+
+    results_amount_of_walks = results.copy()
+    results_amount_of_walks['type'] = 'Amount of Walks'
+    results_amount_of_walks.rename(columns={'amount_of_walks': 'x_value'}, inplace=True)
+
+    # Combine the two DataFrames
+    combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'cancer', 'type']],
+                                  results_amount_of_walks[['x_value', 'accuracy', 'cancer', 'type']]])
+
+    # Plot
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='cancer', style='type', markers=True)
+
+    plt.title('Accuracy vs Walk Distance and Amount of Walks')
+    plt.xlabel('Value')
+    plt.ylabel('Accuracy')
+    plt.legend(title='Cancer Type and Walk Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=150)
