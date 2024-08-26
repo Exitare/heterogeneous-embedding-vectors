@@ -5,6 +5,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.preprocessing import MinMaxScaler
 
 fig_save_folder = Path("results", "recognizer", "distance_plots")
 
@@ -22,6 +23,10 @@ if __name__ == '__main__':
 
     summed_embeddings = pd.read_csv(
         Path("results", "recognizer", "summed_embeddings", "multi", cancers, f"{walk_distance}_embeddings.csv"))
+
+    # normalize the embeddings with min max scaler, except the last 9 columns
+    scaler = MinMaxScaler()
+    summed_embeddings.iloc[:, :-9] = scaler.fit_transform(summed_embeddings.iloc[:, :-9])
 
     fig_save_folder = Path(fig_save_folder, cancers,
                            f"{walk_distance}_walk_distance_{len(summed_embeddings)}_walk_amount")
@@ -97,7 +102,7 @@ if __name__ == '__main__':
     plt.xlabel('Cancer Pair')
     ax.set_ylabel('Distance')
     # set y scale
-    ax.set_ylim(0, 45)
+    ax.set_ylim(0, 10)
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
