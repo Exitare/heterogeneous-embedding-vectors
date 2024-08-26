@@ -3,7 +3,7 @@
 #SBATCH --job-name=m_r_f
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=exacloud
-#SBATCH --qos=very_long_jobs
+#SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
 #SBATCH --mem=384000
 #SBATCH --cpus-per-task=32
