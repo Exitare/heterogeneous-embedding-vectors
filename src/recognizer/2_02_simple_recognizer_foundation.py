@@ -254,7 +254,6 @@ if __name__ == '__main__':
     for i, embedding in enumerate(embeddings):
         metrics.append({
             "walk_distance": max_walk_distance,
-            "iteration": i,
             'embedding': embedding,
             'accuracy': accuracy[i],
             'precision': precision[i],
