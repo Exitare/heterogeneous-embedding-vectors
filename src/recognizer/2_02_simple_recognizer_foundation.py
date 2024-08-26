@@ -1,7 +1,6 @@
 import tensorflow as tf
 import pandas as pd
 from pathlib import Path
-from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import Input, Dense, BatchNormalization, Dropout, ReLU
 from tensorflow.keras.models import Model
 import numpy as np

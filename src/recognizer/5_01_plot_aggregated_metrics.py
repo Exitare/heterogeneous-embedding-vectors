@@ -23,11 +23,10 @@ if __name__ == '__main__':
     cancers: [] = args.cancer
     foundation: bool = args.foundation
 
-    selected_cancers = '_'.join(cancers)
-
     print(f"Loading data for multi: {multi}, cancers: {cancers}, foundation: {foundation}")
 
     if multi:
+        selected_cancers = '_'.join(cancers)
         if foundation:
             load_folder = Path(load_folder, "multi_recognizer_foundation", selected_cancers)
             file = Path(load_folder, "split_metrics.csv")
@@ -36,17 +35,14 @@ if __name__ == '__main__':
             file = Path(load_folder, "metrics.csv")
     else:
         if foundation:
-            load_folder = Path(load_folder, "single_recognizer_foundation")
-            file = Path(load_folder, "metrics.csv")
+            load_folder = Path(load_folder, "srf")
+            file = Path(load_folder, "split_metrics.csv")
         else:
-            load_folder = Path(load_folder, "single_recognizer")
+            load_folder = Path(load_folder, "sr")
             file = Path(load_folder, "metrics.csv")
-
 
     print(f"Loading file {file}...")
     df = pd.read_csv(file)
-
-
 
     # calculate mean of embeddings
     df = df.groupby(["embeddings", "embedding"]).mean(numeric_only=True)
