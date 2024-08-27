@@ -76,6 +76,11 @@ if __name__ == '__main__':
         for cancer_type, cancer_embedding in loaded_cancer_embeddings.items():
             embeddings_list.append((cancer_embedding, cancer_type))
 
+        embeddings_list.append((sentence_embeddings, 'Text'))
+        embeddings_list.append((sentence_embeddings, 'Text'))
+        embeddings_list.append((image_embeddings, 'Image'))
+        embeddings_list.append((image_embeddings, 'Image'))
+
         random.shuffle(embeddings_list)
 
         # Initialize combined sum and remaining embeddings counter
@@ -105,7 +110,10 @@ if __name__ == '__main__':
             remaining_embeddings -= count
 
             # Update the combination counts
-            combination_counts[name] = count
+            if name in combination_counts:
+                combination_counts[name] += count
+            else:
+                combination_counts[name] = count
 
             # Check if the remaining_embeddings goes negative, which shouldn't happen
             if remaining_embeddings < 0:
