@@ -17,13 +17,12 @@ def load_embeddings():
     return rna_embeddings, sentence_embeddings, image_embeddings
 
 
-def random_sum_embeddings(embeddings, max_count):
-    # Randomly choose embeddings up to max_count
-    n = random.randint(1, max_count)  # Ensure at least one is selected
-    chosen_indices = random.sample(range(len(embeddings)), n)
+def random_sum_embeddings(embeddings, count):
+    # Randomly choose the specified number of embeddings
+    chosen_indices = random.sample(range(len(embeddings)), count)
     chosen_embeddings = embeddings.iloc[chosen_indices]
     summed_embeddings = chosen_embeddings.sum(axis=0)
-    return summed_embeddings, n
+    return summed_embeddings, count
 
 
 if __name__ == '__main__':
@@ -53,21 +52,23 @@ if __name__ == '__main__':
         remaining_embeddings = walk_distance
         combination_counts = {}
 
-        for embeddings, name in embeddings_list:
-            if remaining_embeddings > 0:
-                current_sum, count = random_sum_embeddings(embeddings, remaining_embeddings)
-                combined_sum += current_sum
-                remaining_embeddings -= count
-                combination_counts[name] = count
-            else:
-                combination_counts[name] = 0
+        for i, (embeddings, name) in enumerate(embeddings_list):
+            # Calculate the maximum number of embeddings that can be selected
+            max_embeddings_for_type = remaining_embeddings - (len(embeddings_list) - i - 1)
 
-        # Ensure there is at least one embedding selected in total (avoid all-zero entries)
-        if all(v == 0 for v in combination_counts.values()):
-            embeddings, name = random.choice(embeddings_list)
-            current_sum, count = random_sum_embeddings(embeddings, 1)  # Force at least one selection
+            if i < len(embeddings_list) - 1:  # Not the last type
+                count = random.randint(1, max(max_embeddings_for_type, 1))
+            else:  # Last type must take all remaining embeddings
+                count = remaining_embeddings
+
+            current_sum, count = random_sum_embeddings(embeddings, count)
             combined_sum += current_sum
+            remaining_embeddings -= count
             combination_counts[name] = count
+
+        # Ensure the total number of selected embeddings equals walk_distance
+        total_selected = sum(combination_counts.values())
+        assert total_selected == walk_distance, f"Total embeddings selected ({total_selected}) does not match walk_distance ({walk_distance})"
 
         # Combine combined_sum and the combination_counts
         combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],
@@ -76,7 +77,9 @@ if __name__ == '__main__':
     # Save the data to CSV
     column_names = list(embeddings_list[0][0].columns) + ["Text", "Image", "RNA"]
     combined_df = pd.DataFrame(combined_data, columns=column_names)
-    # convert all columns to int
+    # Convert all columns to float
     combined_df = combined_df.astype(float)
+
+    # Print a message and save the combined embeddings to CSV
     print("Saving combined embeddings to CSV...")
     combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
