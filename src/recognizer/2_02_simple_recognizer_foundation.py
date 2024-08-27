@@ -92,7 +92,6 @@ if __name__ == '__main__':
     for walk_distance in walk_distances:
         distance_load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {distance_load_path}")
-        # only load 10000 entries for demonstration
         data.append(pd.read_csv(distance_load_path))
 
     data = pd.concat(data, axis=0)
