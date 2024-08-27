@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --job-name=s_e_g
 #SBATCH --time=9-00:00:00
-#SBATCH --partition=accessexacloud
+#SBATCH --partition=exacloud
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
 #SBATCH --mem=64000
