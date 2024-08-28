@@ -1,7 +1,5 @@
 import pandas as pd
 import random
-
-from Cython.Compiler.TypeSlots import lenfunc
 from tqdm import tqdm
 from pathlib import Path
 from argparse import ArgumentParser
