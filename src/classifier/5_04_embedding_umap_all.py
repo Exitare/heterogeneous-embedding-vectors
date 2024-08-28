@@ -99,7 +99,7 @@ if __name__ == '__main__':
     sns.scatterplot(x='UMAP1', y='UMAP2', hue='cancer', palette='Set1', data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
-    plt.title('UMAP Visualization of Cancer Embeddings')
+    plt.title('UMAP Visualization of Summed Embeddings')
     plt.tight_layout()
     plt.savefig(Path(fig_save_folder, 'all_embeddings.png'), dpi=150)
     plt.close()

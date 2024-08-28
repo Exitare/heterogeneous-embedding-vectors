@@ -38,10 +38,6 @@ if __name__ == '__main__':
         Path("results", "classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}",
              "summed_embeddings.csv"))
 
-    # Normalize the embeddings with min max scaler, except the last 2 columns
-    #min_max_scaler = MinMaxScaler()
-    #summed_embeddings.iloc[:, :-2] = min_max_scaler.fit_transform(summed_embeddings.iloc[:, :-2])
-
     fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distance}_{walk_amount}")
 
     if not fig_save_folder.exists():

@@ -9,7 +9,6 @@ save_folder = Path("figures", "classifier")
 
 if __name__ == '__main__':
 
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     args = parser.parse_args()
@@ -39,8 +38,6 @@ if __name__ == '__main__':
                 results.append(df)
             except FileNotFoundError:
                 continue
-
-
 
     # concatenate all results
     results = pd.concat(results)
@@ -113,6 +110,30 @@ if __name__ == '__main__':
     results_amount_of_walks['type'] = 'Amount of Walks'
     results_amount_of_walks.rename(columns={'amount_of_walks': 'x_value'}, inplace=True)
 
+    # Set up the FacetGrid
+    g = sns.FacetGrid(results, col="walk_distance", row="amount_of_walks", hue="cancer", margin_titles=True,
+                      palette="tab10")
+
+
+    # Map the scatter plot to the grid
+    g.map(sns.barplot, "cancer", "accuracy", alpha=.7)
+
+    # Rotate x-axis labels for each subplot
+    for ax in g.axes.flat:
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+
+    # Add legends and adjust layout
+    g.add_legend()
+    plt.subplots_adjust(top=0.9)
+    # rename walk_distance to Walk Distance in facet grid
+    g.set_axis_labels("Cancer Type", "Accuracy")
+    # rename amount_of_walks to Amount of Walks in facet grid
+    g.set_titles(col_template="Walk Distance: {col_name}", row_template="Amount of Walks: {row_name}")
+
+    g.fig.suptitle('Model Accuracy Across Different Walk Distances and Amount of Walks')
+
+    plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=150)
+
     # Combine the two DataFrames
     combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'cancer', 'type']],
                                   results_amount_of_walks[['x_value', 'accuracy', 'cancer', 'type']]])
@@ -125,5 +146,7 @@ if __name__ == '__main__':
     plt.xlabel('Value')
     plt.ylabel('Accuracy')
     plt.legend(title='Cancer Type and Walk Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    # set x axis ticks to 3,4 and 5
+    plt.xticks([3, 4, 5])
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=150)
