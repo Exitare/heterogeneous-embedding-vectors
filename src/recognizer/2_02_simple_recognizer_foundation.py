@@ -18,7 +18,6 @@ load_path = Path("results", "recognizer", "summed_embeddings", "simple")
 walk_distances = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 
-
 # Function to create stratified splits for multi-label data
 def multilabel_stratified_split(X, y, test_size=0.2, random_state=None):
     n_samples, n_labels = y.shape
@@ -119,8 +118,6 @@ if __name__ == '__main__':
     max_image = data["Image"].max().max()
     max_rna = data["RNA"].max().max()
 
-
-
     X = data.drop(columns=["Text", "Image", "RNA"]).values
     assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
@@ -218,16 +215,20 @@ if __name__ == '__main__':
     # save y_test_int numpy array
     np.save(Path(save_path, "y_test.npy"), y_test_int)
 
-    # save predictions for all outputs
+    # Combined loop to create a single DataFrame for both predictions and true values for each output
     for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_pred_rounded[i]).to_csv(Path(save_path, f"predictions_{embedding}_output.csv"),
-                                               index=False)
+        embedding = embedding.lower()
+        # Create a DataFrame with both predictions and true values
+        df_combined = pd.DataFrame({
+            f'predicted_{embedding}': y_pred_rounded[i].flatten(),
+            f'true_{embedding}': y_test_int[:, i]
+        })
 
-    # save y_test for all outputs
-    for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_test_int[:, i]).to_csv(Path(save_path, f"true_{embedding}_output.csv"),
-                                              index=False)
+        # convert f"predicted_{embedding}" to int
+        df_combined[f'predicted_{embedding}'] = df_combined[f'predicted_{embedding}'].astype(int)
 
+        # Save the combined DataFrame to a CSV file
+        df_combined.to_csv(Path(save_path, f"combined_{embedding}_output.csv"), index=False)
     metrics = []
     # Calculate accuracy for each output
     accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
@@ -240,8 +241,6 @@ if __name__ == '__main__':
     recall = [recall_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
     # calculate auc for each output
     # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_int.T, y_pred_rounded)]
-
-    # find max value of sum of text, image and rna embedding columns
 
     # Calculate the sum of each row for the selected columns
     row_sums = data[["Text", "Image", "RNA"]].sum(axis=1)
@@ -262,52 +261,6 @@ if __name__ == '__main__':
 
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-
-    # Convert predictions to binary
-    y_pred_binary = [np.where(pred > 0.5, 1, 0) for pred in y_pred]  # Adjust 0.5 based on your thresholding needs
-    # save numpy array
-    np.save(Path(save_path, "y_pred_binary.npy"), y_pred_binary)
-
-    # Convert true values to binary
-    y_test_binary = [np.where(true > 0, 1, 0) for true in y_test.T]
-    # save numpy array
-    np.save(Path(save_path, "y_test_binary.npy"), y_test_binary)
-
-    # save binary predictions for all outputs
-    for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_pred_binary[i]).to_csv(Path(save_path, f"binary_predictions_{embedding}_output.csv"),
-                                              index=False)
-
-    # save binary true values for all outputs
-    for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_test_binary[i]).to_csv(Path(save_path, f"binary_true_{embedding}_output.csv"),
-                                              index=False)
-
-    binary_metrics = []
-    # calculate accuracy
-    accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate precision
-    precision = [precision_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate recall
-    recall = [recall_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate f1 score
-    f1 = [f1_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate auc
-    # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-
-    # for each output, store the metrics
-    for i, embedding in enumerate(embeddings):
-        binary_metrics.append({
-            'iteration': i,
-            'embedding': embedding,
-            'accuracy': accuracy[i],
-            'precision': precision[i],
-            'recall': recall[i],
-            'f1': f1[i]
-        })
-
-    binary_metrics_df = pd.DataFrame(binary_metrics)
-    binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
 
     # reset index of y_test and y_pred_round
     y_test_int = pd.DataFrame(y_test_int)
