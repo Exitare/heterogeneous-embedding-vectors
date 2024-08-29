@@ -287,52 +287,6 @@ if __name__ == '__main__':
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
 
-    # Convert predictions to binary
-    y_pred_binary = [np.where(pred > 0.5, 1, 0) for pred in y_pred]  # Adjust 0.5 based on your thresholding needs
-    # save numpy array
-    np.save(Path(save_path, "y_pred_binary.npy"), y_pred_binary)
-
-    # Convert true values to binary
-    y_test_binary = [np.where(true > 0, 1, 0) for true in y_test.T]
-    # save numpy array
-    np.save(Path(save_path, "y_test_binary.npy"), y_test_binary)
-
-    # save binary predictions for all outputs
-    for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_pred_binary[i]).to_csv(Path(save_path, f"binary_predictions_{embedding}_output.csv"),
-                                              index=False)
-
-    # save binary true values for all outputs
-    for i, embedding in enumerate(embeddings):
-        pd.DataFrame(y_test_binary[i]).to_csv(Path(save_path, f"binary_true_{embedding}_output.csv"),
-                                              index=False)
-
-    binary_metrics = []
-    # calculate accuracy
-    accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate precision
-    precision = [precision_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate recall
-    recall = [recall_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate f1 score
-    f1 = [f1_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-    # calculate auc
-    # auc = [roc_auc_score(y_true, y_pred) for y_true, y_pred in zip(y_test_binary, y_pred_binary)]
-
-    # for each output, store the metrics
-    for i, embedding in enumerate(embeddings):
-        binary_metrics.append({
-            'walk_distance': max_walk_distance,
-            'embedding': embedding,
-            'accuracy': accuracy[i],
-            'precision': precision[i],
-            'recall': recall[i],
-            'f1': f1[i]
-        })
-
-    binary_metrics_df = pd.DataFrame(binary_metrics)
-    binary_metrics_df.to_csv(Path(save_path, "binary_metrics.csv"), index=False)
-
     # reset index of y_test and y_pred_round
     y_test_int = pd.DataFrame(y_test_int)
     # concat y_pred_rounded
@@ -367,7 +321,7 @@ if __name__ == '__main__':
             f1 = f1_score(y_test_sub_total, y_pred_sub_total, average='macro')
 
             split_metrics.append({
-                'walk_distance': max_walk_distance,
+                'walk_distance': walk_distance,
                 'embedding': embedding,
                 'accuracy': accuracy,
                 'precision': precision,
