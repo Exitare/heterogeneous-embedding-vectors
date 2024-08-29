@@ -15,4 +15,5 @@
 walk_distance=$1
 run_iteration=$2
 
+
 python3 src/recognizer/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}"

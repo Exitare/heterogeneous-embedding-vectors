@@ -16,4 +16,5 @@ walk_distance=$1
 run_iteration=$2
 cancer_types=$3
 
-python3 src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types}
+#echo src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types}
+python3 src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types} -uwd "${upper_walk_distance}"

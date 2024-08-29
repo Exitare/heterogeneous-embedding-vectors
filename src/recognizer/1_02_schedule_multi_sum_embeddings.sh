@@ -1,5 +1,7 @@
 #!/bin/bash
 selected_cancers=$1 # the data files
+lower_bound=$2
+upper_bound=$3
 # ./src/recognizer/1_02_schedule_multi_sum_embeddings.sh "BRCA LUAD STAD BLCA COAD THCA"
 
 # if selected_cancers is not provided, then exit
@@ -8,8 +10,22 @@ if [ -z "$selected_cancers" ]; then
   exit 1
 fi
 
-# iterate through 2 to 10
-for i in $(seq 2 10)
+# if lower bound not set, set to 2
+if [ -z "$lower_bound" ]
+then
+  echo "Lower bound not set, setting to 2"
+  lower_bound=2
+fi
+
+# if upper bound not set, set to 10
+if [ -z "$upper_bound" ]
+then
+  echo "Upper bound not set, setting to 10"
+  upper_bound=10
+fi
+
+# iterate through lower_bound to upper_bound
+for i in $(seq $lower_bound $upper_bound)
 do
   sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${selected_cancers}"
 done

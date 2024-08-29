@@ -15,4 +15,4 @@
 walk_distance=$1
 selected_cancers=$2
 
-python3 src/recognizer/1_02_create_multi_cancer_sum_embeddings.py  -i 1000000 -w "${walk_distance}" -c ${selected_cancers}
+python3 src/recognizer/1_02_create_multi_cancer_sum_embeddings.py  -i 100000 -w "${walk_distance}" -c ${selected_cancers}

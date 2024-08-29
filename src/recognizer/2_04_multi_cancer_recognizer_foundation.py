@@ -15,8 +15,6 @@ from sklearn.model_selection import StratifiedShuffleSplit
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "recognizer", "multi_foundation")
 load_path = Path("results", "recognizer", "summed_embeddings", "multi")
-
-embedding_counts = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 epochs = 100
 
 
@@ -89,24 +87,30 @@ if __name__ == '__main__':
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--upper_walk_distance", "-uwd", type=int, required=False, default=10)
     args = parser.parse_args()
 
     batch_size = args.batch_size
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
+    upper_walk_distance = args.upper_walk_distance
+
+    walk_distances = range(2, upper_walk_distance + 1)
 
     print("Selected cancers: ", selected_cancers)
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
+    print(f"Upper walk distance: {upper_walk_distance}")
+    print(f"Walk distances: {walk_distances}")
 
     save_path = Path(save_path, cancers)
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
     data = []
-    for embedding_count in embedding_counts:
-        embedding_load_path = Path(load_path, cancers, f"{embedding_count}_embeddings.csv")
+    for walk_distance in walk_distances:
+        embedding_load_path = Path(load_path, cancers, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {embedding_load_path}")
         data.append(pd.read_csv(embedding_load_path))
 
