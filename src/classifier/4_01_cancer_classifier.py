@@ -67,7 +67,7 @@ if __name__ == '__main__':
     input_layer = tf.keras.layers.Input(shape=(X_train.shape[1],))
     x = tf.keras.layers.Dense(256, activation='relu', name="Dense_1")(input_layer)
     x = tf.keras.layers.Dense(128, activation='relu', name="Dense_2")(x)
-    output = tf.keras.layers.Dense(len(selected_cancers), activation='sigmoid')(x)
+    output = tf.keras.layers.Dense(len(selected_cancers), activation='softmax')(x)
 
     # add early stopping
     early_stopping = tf.keras.callbacks.EarlyStopping(
