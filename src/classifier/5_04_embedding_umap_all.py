@@ -26,7 +26,7 @@ if __name__ == '__main__':
     cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
 
     # Load embeddings
-    loaded_cancer_embeddings = {}
+    cancer_embeddings = {}
     for cancer in selected_cancers:
         try:
             temp_df = pd.read_csv(Path(cancer_embedding_load_folder, f"{cancer.lower()}_embeddings.csv"))
@@ -34,19 +34,20 @@ if __name__ == '__main__':
             if "Patient" in temp_df.columns:
                 temp_df.drop(columns=["Patient"], inplace=True)
             temp_df["cancer"] = cancer
-            loaded_cancer_embeddings[cancer] = temp_df
+            cancer_embeddings[cancer] = temp_df
 
         except Exception as e:
             print(f"Could not load {cancer} embedding... {e}")
             raise
 
-    loaded_cancer_embeddings = pd.concat(loaded_cancer_embeddings.values(), axis=0)
+    cancer_embeddings = pd.concat(cancer_embeddings.values(), axis=0)
     # reset index
-    loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
+    cancer_embeddings.reset_index(drop=True, inplace=True)
 
     # load annotations
     annotations = pd.read_csv(
         Path("results", "classifier", "embeddings", "annotations", cancers, "embeddings.csv"))
+
     # reset index
     annotations.reset_index(drop=True, inplace=True)
     mutations = pd.read_csv(Path("results", "classifier", "embeddings", "mutation_embeddings.csv"))
@@ -54,11 +55,28 @@ if __name__ == '__main__':
     mutations.reset_index(drop=True, inplace=True)
 
     # assert that all selected cancers are in the cancer column of the loaded_cancer_embeddings
-    assert all([cancer in loaded_cancer_embeddings["cancer"].unique() for cancer in
+    assert all([cancer in cancer_embeddings["cancer"].unique() for cancer in
                 selected_cancers]), "All selected cancers should be in the cancer column"
 
+    # Transform the 'submitter_id' column
+    mutations['submitter_id'] = mutations['submitter_id'].apply(lambda x: '-'.join(x.split('-')[:3]))
+
+    print(cancer_embeddings)
+    print(annotations)
+    print(mutations)
+    input()
+    # Merge df1 and df2 on 'submitter_id'
+    merged_df = pd.merge(cancer_embeddings, annotations, on='submitter_id', how='inner')
+
+    # Merge the resulting DataFrame with df3 on 'submitter_id'
+    loaded_cancer_embeddings = pd.merge(merged_df, mutations, on='submitter_id', how='inner')
+
+    print(loaded_cancer_embeddings)
+    input()
+
     # combine cancer embeddings, annotations and mutations
-    loaded_cancer_embeddings = pd.concat([loaded_cancer_embeddings, annotations, mutations], axis=1)
+    #loaded_cancer_embeddings = pd.concat([cancer_embeddings, annotations, mutations], axis=1)
+
     loaded_cancer_embeddings.drop(columns=["submitter_id", "patient"], inplace=True)
     loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
     # remove all rows that have nan values
@@ -86,6 +104,8 @@ if __name__ == '__main__':
     # Ensure only numeric data is passed to UMAP
     numeric_df = loaded_cancer_embeddings.drop(columns=['cluster', 'cancer', 'cluster_name'])
 
+    print(numeric_df)
+
     # Apply UMAP to reduce dimensions to 2D for visualization
     umap_reducer = umap.UMAP(random_state=42)
     df_umap = umap_reducer.fit_transform(numeric_df)
@@ -96,7 +116,9 @@ if __name__ == '__main__':
     df_plot['cancer'] = loaded_cancer_embeddings['cancer']
 
     plt.figure(figsize=(12, 10))
-    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cancer', palette='Set1', data=df_plot, s=25)
+    sns.scatterplot(x='UMAP1', y='UMAP2', hue='cancer',
+                    palette={"BRCA": "red", "BLCA": "blue", "LUAD": "green", "STAD": "purple", "THCA": "orange",
+                             "COAD": "yellow"}, data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
     plt.title('UMAP Visualization of Summed Embeddings')

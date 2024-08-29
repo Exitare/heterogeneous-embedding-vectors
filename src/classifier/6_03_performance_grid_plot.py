@@ -114,7 +114,6 @@ if __name__ == '__main__':
     g = sns.FacetGrid(results, col="walk_distance", row="amount_of_walks", hue="cancer", margin_titles=True,
                       palette="tab10")
 
-
     # Map the scatter plot to the grid
     g.map(sns.barplot, "cancer", "accuracy", alpha=.7)
 
@@ -140,7 +139,9 @@ if __name__ == '__main__':
 
     # Plot
     plt.figure(figsize=(10, 6))
-    sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='cancer', style='type', markers=True)
+    sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='cancer', style='type',
+                 palette={"BRCA": "red", "BLCA": "blue", "LUAD": "green", "STAD": "purple", "THCA": "orange",
+                          "COAD": "yellow" , "All": "pink"}, markers=True)
 
     plt.title('Accuracy vs Walk Distance and Amount of Walks')
     plt.xlabel('Value')
