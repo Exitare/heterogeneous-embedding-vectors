@@ -28,7 +28,7 @@ if __name__ == '__main__':
     fig, axes = plt.subplots(1, len(columns_to_plot), figsize=(15, 5))
 
     for i, column in enumerate(columns_to_plot):
-        axes[i].hist(summed_embeddings[column], bins=30, edgecolor='black')
+        axes[i].hist(summed_embeddings[column], bins=walk_distance, edgecolor='black')
         axes[i].set_title(f'Histogram of {column}')
         axes[i].set_xlabel(column)
         axes[i].set_ylabel('Frequency')
