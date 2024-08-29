@@ -61,21 +61,19 @@ if __name__ == '__main__':
     # Transform the 'submitter_id' column
     mutations['submitter_id'] = mutations['submitter_id'].apply(lambda x: '-'.join(x.split('-')[:3]))
 
-    print(cancer_embeddings)
-    print(annotations)
-    print(mutations)
-    input()
-    # Merge df1 and df2 on 'submitter_id'
-    merged_df = pd.merge(cancer_embeddings, annotations, on='submitter_id', how='inner')
 
-    # Merge the resulting DataFrame with df3 on 'submitter_id'
-    loaded_cancer_embeddings = pd.merge(merged_df, mutations, on='submitter_id', how='inner')
-
-    print(loaded_cancer_embeddings)
-    input()
 
     # combine cancer embeddings, annotations and mutations
-    #loaded_cancer_embeddings = pd.concat([cancer_embeddings, annotations, mutations], axis=1)
+    loaded_cancer_embeddings = pd.concat([cancer_embeddings, annotations, mutations], axis=1)
+
+    # Get boolean mask where rows have no NaN values
+    mask_no_nan = loaded_cancer_embeddings["submitter_id"].notna().all(axis=1)
+
+    # Get the indices where the mask is True (i.e., no NaN values in the row)
+    indices_no_nan = loaded_cancer_embeddings[mask_no_nan].index.tolist()
+
+    loaded_cancer_embeddings = loaded_cancer_embeddings.loc[indices_no_nan]
+    print(loaded_cancer_embeddings)
 
     loaded_cancer_embeddings.drop(columns=["submitter_id", "patient"], inplace=True)
     loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
