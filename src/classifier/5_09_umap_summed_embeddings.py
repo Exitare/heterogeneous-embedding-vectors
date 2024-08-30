@@ -62,7 +62,7 @@ if __name__ == '__main__':
                              "COAD": "yellow"}, data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
-    plt.title('UMAP Visualization of Summed Embeddings')
+    plt.title(f'UMAP Visualization of Summed Embeddings\n WD: {walk_distance}, AW: {amount_of_walks}')
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, 'summed_embeddings.png'), dpi=150)
+    plt.savefig(Path(fig_save_folder, f'{walk_distance}_{amount_of_walks}_summed_embeddings.png'), dpi=150)
     plt.close()

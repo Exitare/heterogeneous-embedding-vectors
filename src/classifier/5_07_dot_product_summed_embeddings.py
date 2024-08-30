@@ -59,6 +59,7 @@ if __name__ == '__main__':
         cancer_dfs[cancer] = cancer_rows
 
     intra_distances = {}
+    y_lim = 0
     for cancer, df in cancer_dfs.items():
         intra_distance = dot_product_distance(df)
         intra_distance = intra_distance[np.triu_indices_from(intra_distance, k=1)]
@@ -75,10 +76,14 @@ if __name__ == '__main__':
 
     # Output the average distances
     for cancer, distances in intra_distances.items():
+        if y_lim > np.mean(distances):
+            y_lim = np.mean(distances)
         print(f"Average intra-cancer distance for {cancer}: {np.mean(distances)}")
 
     # output the average inter distances
     for (cancer1, cancer2), distances in inter_distances.items():
+        if y_lim > np.mean(distances):
+            y_lim = np.mean(distances)
         print(f"Average inter-cancer distance for {cancer1} and {cancer2}: {np.mean(distances)}")
 
     # Convert intra_distances to DataFrame
@@ -108,8 +113,8 @@ if __name__ == '__main__':
     ax[0].set_title('Intra-cluster Distances')
     ax[1].set_title('Inter-cluster Distances')
     # set y scale
-    ax[0].set_xlim(-350, 0)
-    ax[1].set_xlim(-350, 0)
+    ax[0].set_xlim(y_lim, 0)
+    ax[1].set_xlim(y_lim, 0)
 
     plt.xlabel('Dot Product Distance')
     plt.ylabel('Frequency')
@@ -126,8 +131,8 @@ if __name__ == '__main__':
     ax[0].set_ylabel('Distance')
     ax[1].set_ylabel('Distance')
     # set y scale
-    ax[0].set_ylim(-300, 0)
-    ax[1].set_ylim(-300, 0)
+    ax[0].set_ylim(y_lim, 0)
+    ax[1].set_ylim(y_lim, 0)
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -142,9 +147,9 @@ if __name__ == '__main__':
     plt.xlabel('Cancer Pair')
     ax.set_ylabel('Distance')
     # set y scale
-    ax.set_ylim(-800, 0)
+    ax.set_ylim(y_lim - 20, 0)
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "combined_cancer_dot_bar_plot.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "combined_dot_bar_plot.png"), dpi=150)
     plt.close('all')

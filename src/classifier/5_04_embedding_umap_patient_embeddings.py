@@ -61,8 +61,6 @@ if __name__ == '__main__':
     # Transform the 'submitter_id' column
     mutations['submitter_id'] = mutations['submitter_id'].apply(lambda x: '-'.join(x.split('-')[:3]))
 
-
-
     # combine cancer embeddings, annotations and mutations
     loaded_cancer_embeddings = pd.concat([cancer_embeddings, annotations, mutations], axis=1)
 
@@ -73,7 +71,6 @@ if __name__ == '__main__':
     indices_no_nan = loaded_cancer_embeddings[mask_no_nan].index.tolist()
 
     loaded_cancer_embeddings = loaded_cancer_embeddings.loc[indices_no_nan]
-    print(loaded_cancer_embeddings)
 
     loaded_cancer_embeddings.drop(columns=["submitter_id", "patient"], inplace=True)
     loaded_cancer_embeddings.reset_index(drop=True, inplace=True)
@@ -102,8 +99,6 @@ if __name__ == '__main__':
     # Ensure only numeric data is passed to UMAP
     numeric_df = loaded_cancer_embeddings.drop(columns=['cluster', 'cancer', 'cluster_name'])
 
-    print(numeric_df)
-
     # Apply UMAP to reduce dimensions to 2D for visualization
     umap_reducer = umap.UMAP(random_state=42)
     df_umap = umap_reducer.fit_transform(numeric_df)
@@ -119,7 +114,7 @@ if __name__ == '__main__':
                              "COAD": "yellow"}, data=df_plot, s=25)
     plt.legend(title='Cancer', loc='upper left')
 
-    plt.title('UMAP Visualization of Summed Embeddings')
+    plt.title('UMAP Visualization of combined Patient embeddings')
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, 'all_embeddings.png'), dpi=150)
+    plt.savefig(Path(fig_save_folder, 'patient_embeddings.png'), dpi=150)
     plt.close()
