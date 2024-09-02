@@ -10,12 +10,17 @@ if __name__ == '__main__':
     parser.add_argument("--data_folder", "-d", type=Path, required=True,
                         help="Folder containing the recognizer results")
     parser.add_argument("--type", "-t", type=str, choices=["sr", "srf", "mr", "mrf"], required=True)
+    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     args = parser.parse_args()
 
     data_folder: Path = args.data_folder
     recognizer_type: str = args.type
+    cancers: [] = args.cancer
 
     save_folder = Path(save_folder, recognizer_type)
+
+    if type == "mr" or type == "mrf":
+        save_folder = Path(save_folder, "_".join(cancers))
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
