@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
     save_folder = Path(save_folder, recognizer_type)
 
-    if type == "mr" or type == "mrf":
+    if recognizer_type == "mr" or recognizer_type == "mrf":
         save_folder = Path(save_folder, "_".join(cancers))
 
     print(f"Saving to {save_folder}")
