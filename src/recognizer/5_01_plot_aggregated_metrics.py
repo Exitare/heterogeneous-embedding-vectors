@@ -28,10 +28,10 @@ if __name__ == '__main__':
     if multi:
         selected_cancers = '_'.join(cancers)
         if foundation:
-            load_folder = Path(load_folder, "multi_recognizer_foundation", selected_cancers)
+            load_folder = Path(load_folder, "mrf", selected_cancers)
             file = Path(load_folder, "split_metrics.csv")
         else:
-            load_folder = Path(load_folder, "multi_recognizer", selected_cancers)
+            load_folder = Path(load_folder, "mr", selected_cancers)
             file = Path(load_folder, "metrics.csv")
     else:
         if foundation:
@@ -44,8 +44,9 @@ if __name__ == '__main__':
     print(f"Loading file {file}...")
     df = pd.read_csv(file)
 
+    print(df)
     # calculate mean of embeddings
-    df = df.groupby(["embeddings", "embedding"]).mean(numeric_only=True)
+    df = df.groupby(["walk_distance", "embedding"]).mean(numeric_only=True)
     # embeddings,iteration,embedding,accuracy,precision,recall,f1
     # plot the accuracy for each embeddings, hue by embeddings
     df = df.sort_values(by=["accuracy"], ascending=False)
@@ -55,7 +56,7 @@ if __name__ == '__main__':
 
     # print mean accuracy for each embedding
     print(df[["embedding", "accuracy"]].groupby("embedding").mean(numeric_only=True))
-    df_mean = df.groupby("embeddings", as_index=False)["accuracy"].mean()
+    df_mean = df.groupby("walk_distance", as_index=False)["accuracy"].mean()
 
     # upper case all embedding
     df["embedding"] = df["embedding"].str.upper()
@@ -73,10 +74,10 @@ if __name__ == '__main__':
     sns.set_context("paper")
 
     # Plot individual embeddings
-    sns.lineplot(data=df, x="embeddings", y="accuracy", hue="embedding", palette="tab10", alpha=0.6)
+    sns.lineplot(data=df, x="walk_distance", y="accuracy", hue="embedding", palette="tab10", alpha=0.6)
 
     # Plot mean line
-    sns.lineplot(data=df_mean, x="embeddings", y="accuracy", color='black', marker='o', linestyle='--', label='Mean')
+    sns.lineplot(data=df_mean, x="walk_distance", y="accuracy", color='black', marker='o', linestyle='--', label='Mean')
 
     plt.title(title)
     plt.ylabel("Accuracy")
