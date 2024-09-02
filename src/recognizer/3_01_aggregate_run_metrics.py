@@ -22,6 +22,8 @@ if __name__ == '__main__':
     if type == "mr" or type == "mrf":
         save_folder = Path(save_folder, "_".join(cancers))
 
+    print(f"Saving to {save_folder}")
+
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
