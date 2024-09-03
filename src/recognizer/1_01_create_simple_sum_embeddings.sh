@@ -13,5 +13,6 @@
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 walk_distance=$1
+summed_embeddings_count=$2
 
-python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i 1000000 -w "${walk_distance}"
+python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i "${summed_embeddings_count}" -w "${walk_distance}"

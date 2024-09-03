@@ -3,6 +3,7 @@
 # add range of values to iterate through
 lower_bound=$1
 upper_bound=$2
+summed_embeddings_count=$3
 
 # if lower bound not set, set to 2
 if [ -z "$lower_bound" ]
@@ -18,9 +19,17 @@ then
   upper_bound=10
 fi
 
+# if summed embeddings count not set, exit
+if [ -z "$summed_embeddings_count" ]
+then
+  echo "Summed embeddings count not set, stopping."
+  exit 1
+fi
+
+
 
 # iterate through lower_bound to upper_bound
 for i in $(seq $lower_bound $upper_bound)
 do
-  sbatch ./src/recognizer/1_01_create_simple_sum_embeddings.sh $i
+  sbatch ./src/recognizer/1_01_create_simple_sum_embeddings.sh $i $summed_embeddings_count
 done
