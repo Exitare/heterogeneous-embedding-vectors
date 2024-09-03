@@ -78,6 +78,9 @@ if __name__ == '__main__':
     parser.add_argument("--run_iteration", "-ri", type=int, required=False, default=1,
                         help="The iteration number for the run. Used for saving the results and validation.")
     parser.add_argument("--upper_walk_distance", "-uwd", type=int, required=False, default=10)
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The size of the generated summed embeddings count.")
+
     args = parser.parse_args()
 
     batch_size = args.batch_size
@@ -85,13 +88,16 @@ if __name__ == '__main__':
     run_iteration = args.run_iteration
     upper_walk_distance = args.upper_walk_distance
     walk_distances = range(2, upper_walk_distance + 1)
+    summed_embedding_count = args.summed_embedding_count
 
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
     print(f"Upper walk distance: {upper_walk_distance}")
     print(f"Walk distances: {walk_distances}")
+    print(f"Summed embedding count: {summed_embedding_count}")
 
     data = []
+    load_path = Path(load_path, str(summed_embedding_count))
     for walk_distance in walk_distances:
         distance_load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {distance_load_path}")
@@ -100,6 +106,7 @@ if __name__ == '__main__':
     data = pd.concat(data, axis=0)
 
     run_name = f"run_{run_iteration}"
+    save_path = Path(save_path, str(summed_embedding_count))
     save_path = Path(save_path, run_name)
 
     if not save_path.exists():

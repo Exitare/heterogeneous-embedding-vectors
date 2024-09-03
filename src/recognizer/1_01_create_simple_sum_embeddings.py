@@ -34,6 +34,8 @@ if __name__ == '__main__':
     iterations = args.iterations
     walk_distance = args.walk_distance
 
+    save_folder = Path(save_folder, iterations)
+
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 

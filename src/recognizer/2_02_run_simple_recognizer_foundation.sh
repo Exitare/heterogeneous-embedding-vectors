@@ -14,7 +14,8 @@
 
 run_iteration=$1
 upper_walk_distance=$2
+summed_embeddings_count=$3
 
 
 #echo src/recognizer/2_02_simple_recognizer_foundation.py -ri "${run_iteration}" -uwd "${upper_walk_distance}"
-python3 src/recognizer/2_02_simple_recognizer_foundation.py -ri "${run_iteration}" -uwd "${upper_walk_distance}"
+python3 src/recognizer/2_02_simple_recognizer_foundation.py -ri "${run_iteration}" -uwd "${upper_walk_distance}" -sec "${summed_embeddings_count}"

@@ -63,18 +63,25 @@ if __name__ == '__main__':
                         help='The number for the walk distance to work with.')
     parser.add_argument("--run_iteration", "-ri", type=int, required=False, default=1,
                         help="The iteration number for the run. Used for saving the results and validation.")
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The size of the generated summed embeddings count.")
     args = parser.parse_args()
 
     batch_size = args.batch_size
     walk_distance = args.walk_distance
     run_iteration = args.run_iteration
+    summed_embedding_count = args.summed_embedding_count
 
     print(f"Total walk distance: {walk_distance}")
     print(f"Batch size: {batch_size}")
     print(f"Run iteration: {run_iteration}")
+    print(f"Summed embedding count: {summed_embedding_count}")
 
+    load_path = Path(load_path, str(summed_embedding_count))
     load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
     print(f"Loading data from {load_path}")
+
+    save_path = Path(save_path, str(summed_embedding_count))
     save_path = Path(save_path, f"{walk_distance}_embeddings")
 
     run_name = f"run_{run_iteration}"
