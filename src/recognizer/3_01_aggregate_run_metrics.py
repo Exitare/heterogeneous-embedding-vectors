@@ -9,18 +9,13 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
     parser.add_argument("--data_folder", "-d", type=Path, required=True,
                         help="Folder containing the recognizer results")
-    parser.add_argument("--type", "-t", type=str, choices=["sr", "srf", "mr", "mrf"], required=True)
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     args = parser.parse_args()
 
     data_folder: Path = args.data_folder
-    recognizer_type: str = args.type
-    cancers: [] = args.cancer
 
-    save_folder = Path(save_folder, recognizer_type)
-
-    if recognizer_type == "mr" or recognizer_type == "mrf":
-        save_folder = Path(save_folder, "_".join(cancers))
+    # extract last two pieces of data_folder
+    appendix = Path(*data_folder.parts[-2:])
+    save_folder = Path(save_folder, appendix)
 
     print(f"Saving to {save_folder}")
 
