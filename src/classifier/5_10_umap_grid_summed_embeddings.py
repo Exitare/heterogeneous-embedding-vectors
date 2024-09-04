@@ -59,7 +59,8 @@ if __name__ == '__main__':
                             palette={"BRCA": "red", "BLCA": "blue", "LUAD": "green", "STAD": "purple", "THCA": "orange",
                                      "COAD": "yellow"}, data=df_plot, s=25, ax=axes[plot_idx])
             axes[plot_idx].set_title(f'WD: {walk_distance}, AW: {amount_of_walk}')
-            #axes[plot_idx].legend(title='Cancer', loc='upper right')
+            # remove legend
+            axes[plot_idx].get_legend().remove()
             plot_idx += 1
 
     plt.tight_layout()
