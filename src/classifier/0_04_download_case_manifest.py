@@ -75,8 +75,7 @@ def query_gdc(endpoint, params):
                 time.sleep(10)
 
 
-def \
-        scrapeFiles(outfile):
+def scrapeFiles(outfile):
     parameters = {'expand': ",".join(
         ["cases", "cases.aliquot_ids", "cases.project", "cases.samples.portions.analytes.aliquots", "index_files",
          "analysis.metadata.read_groups"]),
