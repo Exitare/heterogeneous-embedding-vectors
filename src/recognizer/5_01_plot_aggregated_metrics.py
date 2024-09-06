@@ -85,6 +85,16 @@ if __name__ == '__main__':
     plt.xticks(rotation=45)
     plt.legend(title="Embedding")
     plt.tight_layout()
+    # set y axis to 0.2 and 1
+    plt.ylim(0.2, 1)
+    # if multi set x ticks starting at 2 to 20
+    if multi:
+        plt.xticks(range(2, 21))
+        plt.xlim(2, 20)
+    else:
+        plt.xticks(range(2, 31))
+        plt.xlim(2, 30)
+
 
     if file_name is None:
         plt.show()
