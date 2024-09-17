@@ -6,7 +6,7 @@
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
 #SBATCH --mem=64000
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=4
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
 #SBATCH --mail-type=FAIL,BEGIN,END
