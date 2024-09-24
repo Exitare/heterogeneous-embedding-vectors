@@ -132,7 +132,7 @@ if __name__ == '__main__':
     plt.xlabel('Cancer Pair')
     ax.set_ylabel('Distance')
     # set y scale
-    ax.set_ylim(0, y_lim + 20)
+    ax.set_ylim(0, 120)
     # rotate x axis
     plt.xticks(rotation=45)
     plt.tight_layout()
