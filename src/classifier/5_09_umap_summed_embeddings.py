@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import umap
 
 load_folder = Path("results", "classifier", "summed_embeddings")
-fig_save_folder = Path("results", "classifier", "umap")
+fig_save_folder = Path("figures", "classifier", "umap")
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Embedding UMAP')

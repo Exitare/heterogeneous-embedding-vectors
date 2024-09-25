@@ -10,6 +10,9 @@ import numpy as np
 walk_distances = [3, 4, 5]
 walk_amounts = [3, 4, 5]
 
+figure_save_folder = Path("figures", "classifier", "distance_plots")
+results_save_folder = Path("results", "classifier", "distances")
+
 
 def create_polar_line_plot(df, distance_type, ax, color_dict, all_combos):
     """
@@ -189,7 +192,7 @@ def main_polar_plots(combined_df):
     handles, labels = axes[0].get_legend_handles_labels()
 
     # Place the legend outside the plots
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=6, title="Cancer Types",
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=6, title="Cancer Types",
                fontsize=12)
 
     # Add a main title
@@ -199,11 +202,16 @@ def main_polar_plots(combined_df):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
     # Save the figure
-    plt.savefig("polar_distance_lineplots_with_legend.png", bbox_inches='tight')
-    plt.show()
+    plt.savefig(Path(figure_save_folder, "polar_performance.png"), bbox_inches='tight', dpi=150)
 
 
 if __name__ == '__main__':
+    if not figure_save_folder.exists():
+        figure_save_folder.mkdir(parents=True)
+
+    if not results_save_folder.exists():
+        results_save_folder.mkdir(parents=True)
+
     # Parse command-line arguments
     parser = ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
@@ -313,7 +321,8 @@ if __name__ == '__main__':
                 "walk_distance": walk_distance,
                 "walk_amount": walk_amount,
                 "cancer": cancer,
-                "distance": distance
+                "distance": distance,
+                "combined_cancer": cancer
             })
     intra_df = pd.DataFrame(intra_records)
 
@@ -328,16 +337,19 @@ if __name__ == '__main__':
                 "walk_amount": walk_amount,
                 "cancer1": cancer1,
                 "cancer2": cancer2,
-                "distance": distance
+                "distance": distance,
+                "combined_cancer": f"{cancer1}-{cancer2}"
             })
     inter_df = pd.DataFrame(inter_records)
 
     # Combine intra and inter distance DataFrames
     combined_df = pd.concat([intra_df, inter_df], ignore_index=True)
 
+
+
     # Save the combined DataFrame
-    combined_df.to_csv("combined_distances.csv", index=False)
-    print("Combined distance DataFrame has been saved to 'combined_distances.csv'.")
+    #combined_df.to_csv(Path(results_save_folder, "euclidean_combined_distances.csv"), index=False)
+    #print("Combined distance DataFrame has been saved to 'combined_distances.csv'.")
 
     # Verify that all 6 cancer types are present
     print("Cancer Types Present:", combined_df['cancer'].unique())

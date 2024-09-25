@@ -8,7 +8,7 @@ import umap
 
 load_folder = Path("results", "classifier", "embeddings")
 cancer_embedding_load_folder = Path(load_folder, "annotated_cancer")
-fig_save_folder = Path("results", "classifier", "umap")
+fig_save_folder = Path("figures", "classifier", "umap")
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Embedding UMAP')

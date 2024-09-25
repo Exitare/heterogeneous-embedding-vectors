@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import umap
 
 load_folder = Path("results", "classifier", "summed_embeddings")
-fig_save_folder = Path("results", "classifier", "umap")
+fig_save_folder = Path("figures", "classifier", "umap")
 
 walk_distances = [3, 4, 5]
 amount_of_walks = [3, 4, 5]

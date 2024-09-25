@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-fig_save_folder = Path("results", "classifier", "distance_plots")
+fig_save_folder = Path("figures", "classifier", "distance_plots")
 load_folder = Path("results", "classifier", "embeddings", "annotated_cancer")
 
 if __name__ == '__main__':
