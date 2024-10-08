@@ -73,6 +73,9 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
     max_distance = merged['distance'].max()
     ax.set_ylim(0, max_distance * 1.1)
 
+    # Add the legend for cancer types
+    ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.0), title="Cancer Type")
+
 
 def main_polar_plots_for_primary_cancers(combined_df):
     """
