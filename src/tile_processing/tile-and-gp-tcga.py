@@ -1,0 +1,116 @@
+#!/usr/bin/env python
+
+from PIL import Image
+import numpy as np
+import pandas as pd
+import os
+from tifffile import imread
+from tiler import Tiler
+from torchvision import transforms
+import torch
+import timm
+import sys
+
+class ImageCropTileFilter():
+    def __init__(self, imageLoc):
+        self.img = imread(imageLoc)
+        self.manual_count = {}
+        self.h, self.w, self.channels = self.img.shape
+        self.total_pixels = self.w*self.h
+        self.filtered_tiles = []
+        self.cancer_type = imageLoc.split("/")[-2]
+        self.image_file_name = imageLoc.split("/")[-1].split(".")[0] + '/'
+        self.subid = self.image_file_name.split("_")[1].split("/")[0]
+        self.temp_tile_save_path = "/home/exacloud/gscratch/CEDAR/sivakuml/ellrott-proj/temp-file.tif"
+
+
+    def crop_and_tile(self):
+        nrows, h_rem = divmod(self.h, 256)
+        ncols, w_rem = divmod(self.w, 256)
+
+        y = int(self.h) - (h_rem)
+        x = int(self.w) - (w_rem)
+
+        self.cropped = self.img[:y, :x, :]
+        self.cropped_h, self.cropped_w, self.cropped_d = self.cropped.shape
+
+        self.tiler = Tiler(data_shape=self.cropped.shape,
+            tile_shape=(256, 256, 3),
+            channel_dimension=None)
+
+    def other_pixel_var(self):
+        self.u, count_unique = np.unique(self.tile, return_counts =True)
+        tile_1d = self.tile.ravel()
+        self.per_5 = np.percentile(tile_1d, 5)
+        self.per_50 = np.percentile(tile_1d, 50)
+
+    def load_gp_tile_encoder(self):
+        os.environ["HF_TOKEN"] = "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"
+
+        # Load gigapath's tile encoder 
+        # Older versions of timm have compatibility issues. Please ensure that you use a newer version by running the following command: pip install timm>=1.0.3.
+        self.tile_encoder = timm.create_model("hf_hub:prov-gigapath/prov-gigapath", pretrained=True)
+
+        self.transform = transforms.Compose(
+            [
+                transforms.Resize(256, interpolation=transforms.InterpolationMode.BICUBIC),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ]
+        )
+
+    def filter_and_save(self):
+        self.load_gp_tile_encoder()
+        self.crop_and_tile()
+        x = -256
+        y = 0
+        for tile_id, self.tile in self.tiler.iterate(self.cropped):
+            x += 256 
+
+            if x > self.cropped_w:
+                x = 256
+                y += 256
+            else:
+                continue
+
+            self.tile_pos = str(x) + "x_" + str(y) + "y"
+            self.other_pixel_var()
+
+            if self.u[0] < 135 and self.u[-1] >= 255 and self.per_5 < 162 and self.per_50 < 225:
+                tile_save = Image.fromarray(self.tile)
+                tile_save.save(self.temp_tile_save_path)
+
+                gp_input = self.transform(Image.open(self.temp_tile_save_path).convert("RGB")).unsqueeze(0)
+
+                self.tile_encoder.eval()
+                with torch.no_grad():
+                    self.model_output = self.tile_encoder(gp_input).squeeze()
+
+                t_np = self.model_output.numpy()      # convert to Numpy array
+                df = pd.DataFrame(t_np)     # convert to a dataframe
+                df_transposed = df.transpose()
+                df_transposed['submitter_id'] = self.subid
+                df_transposed['cancer_type'] = self.cancer_type
+                df_transposed['tile_position'] = self.tile_pos
+                df_transposed.to_csv("/home/exacloud/gscratch/CEDAR/sivakuml/ellrott-proj/trial2.tsv", 
+                        sep="\t",
+                        mode='a', 
+                        index=False, header=False)      # append row to existing tsv
+
+            else:
+                continue
+
+
+if __name__ == "__main__":
+    if (len(sys.argv) != 2):                        # Checks if image was given as cli argument
+        print("error: syntax is 'python main.py /example/image/location.jpg'") # expect directory containing images split into directories of different cancer types i.e. ellrott-proj/data/annotations
+    else:
+        for cancer_type in os.listdir(sys.argv[1]): 
+            cancer_path = os.path.join(sys.argv[1], cancer_type) # path to original cancer type directory
+
+            for image in os.listdir(cancer_path):
+                image_path = os.path.join(cancer_path, image) # path to original tcga wsi
+
+                og_img = ImageCropTileFilter(image_path)
+                og_img.filter_and_save()
