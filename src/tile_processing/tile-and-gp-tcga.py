@@ -16,7 +16,7 @@ import logging
 logging.basicConfig(filename='logfile.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-class ImageCropTileFilter():
+class ImageCropTileFilter:
     def __init__(self, imageLoc, hf_token:str):
         self.img = imread(imageLoc)
         self.manual_count = {}
@@ -132,6 +132,7 @@ if __name__ == "__main__":
     # Process images in the provided directory
     try:
         for cancer_type in os.listdir(args.image_directory):
+            logging.info(f"Processing cancer type: {cancer_type}...")
             cancer_path = os.path.join(args.image_directory, cancer_type)  # path to original cancer type directory
 
             for image in os.listdir(cancer_path):
