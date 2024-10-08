@@ -16,6 +16,7 @@ class ImageCropTileFilter():
         self.img = imread(imageLoc)
         self.manual_count = {}
         self.h, self.w, self.channels = self.img.shape
+        self.hf_token = hf_token
         self.total_pixels = self.w * self.h
         self.filtered_tiles = []
         self.cancer_type = imageLoc.split("/")[-2]
@@ -44,7 +45,7 @@ class ImageCropTileFilter():
         self.per_50 = np.percentile(tile_1d, 50)
 
     def load_gp_tile_encoder(self):
-        os.environ["HF_TOKEN"] =
+        os.environ["HF_TOKEN"] = self.hf_token
 
         # Load gigapath's tile encoder
         # Older versions of timm have compatibility issues. Please ensure that you use a newer version by running the following command: pip install timm>=1.0.3.
