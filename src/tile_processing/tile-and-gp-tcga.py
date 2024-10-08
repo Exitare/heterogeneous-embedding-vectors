@@ -16,14 +16,17 @@ import logging
 logging.basicConfig(filename='logfile.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 class ImageCropTileFilter:
-    def __init__(self, imageLoc, hf_token:str):
+    def __init__(self, imageLoc, hf_token: str):
         self.img = imread(imageLoc)
         self.manual_count = {}
         self.h, self.w, self.channels = self.img.shape
         self.hf_token = hf_token
         self.total_pixels = self.w * self.h
         self.filtered_tiles = []
+        self.tile_encoder = None
+        self.transform = None
         self.cancer_type = imageLoc.split("/")[-2]
         self.image_file_name = imageLoc.split("/")[-1].split(".")[0] + '/'
         self.subid = self.image_file_name.split("_")[1].split("/")[0]
@@ -47,9 +50,9 @@ class ImageCropTileFilter:
 
         logging.info(f"Cropped image: {self.cropped_w}x{self.cropped_h}")
 
-    def other_pixel_var(self):
-        self.u, count_unique = np.unique(self.tile, return_counts=True)
-        tile_1d = self.tile.ravel()
+    def other_pixel_var(self, tile):
+        self.u, count_unique = np.unique(tile, return_counts=True)
+        tile_1d = tile.ravel()
         self.per_5 = np.percentile(tile_1d, 5)
         self.per_50 = np.percentile(tile_1d, 50)
 
@@ -76,7 +79,7 @@ class ImageCropTileFilter:
         self.crop_and_tile()
         x = -256
         y = 0
-        for tile_id, self.tile in self.tiler.iterate(self.cropped):
+        for _, tile in self.tiler.iterate(self.cropped):
             x += 256
 
             if x > self.cropped_w:
@@ -85,43 +88,62 @@ class ImageCropTileFilter:
             else:
                 continue
 
-            self.tile_pos = str(x) + "x_" + str(y) + "y"
-            self.other_pixel_var()
-
+            tile_pos = str(x) + "x_" + str(y) + "y"
+            self.other_pixel_var(tile=tile)
+            logging.info(f"Unique values: {self.u}, per_5: {self.per_5}, per_50: {self.per_50} for tile {tile_pos}.")
             if self.u[0] < 135 and self.u[-1] >= 255 and self.per_5 < 162 and self.per_50 < 225:
                 try:
-                    tile_save = Image.fromarray(self.tile)
-                    tile_save.save(self.temp_tile_save_path)
+                    try:
+                        # Convert the NumPy tile array directly into a PIL Image
+                        tile_image = Image.fromarray(tile)
+                        # Apply the transformations directly on the PIL Image object
+                        gp_input = self.transform(tile_image.convert("RGB")).unsqueeze(0)
+                    except Exception as e:
+                        logging.error(f"Error processing tile {tile_pos} using transformer pipeline: {e}")
+                        continue
 
-                    gp_input = self.transform(Image.open(self.temp_tile_save_path).convert("RGB")).unsqueeze(0)
+                    # tile_save = Image.fromarray(tile)
+                    # tile_save.save(self.temp_tile_save_path)
+                    # gp_input = self.transform(Image.open(self.temp_tile_save_path).convert("RGB")).unsqueeze(0)
 
                     self.tile_encoder.eval()
                     with torch.no_grad():
                         self.model_output = self.tile_encoder(gp_input).squeeze()
+                        if isinstance(self.model_output, torch.Tensor):
+                            logging.info(f"Successfully generated embedding for tile {tile_pos}")
+                        else:
+                            logging.error(f"Failed to generate embedding for tile {tile_pos}")
+                            continue
 
-                    t_np = self.model_output.numpy()  # convert to Numpy array
-                    df = pd.DataFrame(t_np)  # convert to a dataframe
-                    df_transposed = df.transpose()
-                    df_transposed['submitter_id'] = self.subid
-                    df_transposed['cancer_type'] = self.cancer_type
-                    df_transposed['tile_position'] = self.tile_pos
-                    df_transposed.to_csv("/home/exacloud/gscratch/CEDAR/sivakuml/ellrott-proj/trial2.tsv",
-                                         sep="\t",
-                                         mode='a',
-                                         index=False, header=False)  # append row to existing tsv
+                    try:
+                        t_np = self.model_output.numpy()  # convert to Numpy array
+                        df = pd.DataFrame(t_np)  # convert to a dataframe
+                        df_transposed = df.transpose()
+                        df_transposed['submitter_id'] = self.subid
+                        df_transposed['cancer_type'] = self.cancer_type
+                        df_transposed['tile_position'] = tile_pos
+                        df_transposed.to_csv("/home/exacloud/gscratch/CEDAR/sivakuml/ellrott-proj/trial2.tsv",
+                                             sep="\t",
+                                             mode='a',
+                                             index=False, header=False)  # append row to existing tsv
 
-                    logging.info(f"Tile saved successfully: {self.tile_pos}")
+                        logging.info(f"Tile saved successfully: {tile_pos}")
+                    except Exception as e:
+                        logging.error(f"Error saving tile {tile_pos}: {e}")
+                        continue
+
                 except Exception as e:
-                    logging.error(f"Error processing tile {self.tile_pos}: {e}")
+                    logging.error(f"Error processing tile {tile_pos}: {e}")
             else:
-                logging.info(f"Tile filtered out: {self.tile_pos}")
+                logging.info(f"Tile filtered out: {tile_pos}")
                 continue
 
 
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Process images and filter tiles for cancer type.")
-    parser.add_argument('--image_directory',"-id", type=str, help='Path to the directory containing images', required=True)
+    parser.add_argument('--image_directory', "-id", type=str, help='Path to the directory containing images',
+                        required=True)
     parser.add_argument("--hftoken", "-hf", type=str, help="Hugging Face token", required=True)
 
     # Parse arguments
