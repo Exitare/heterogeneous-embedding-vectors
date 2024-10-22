@@ -17,23 +17,21 @@ def load_embeddings():
     return rna_embeddings, sentence_embeddings, image_embeddings
 
 
-def random_sum_embeddings(embeddings, count, add_noise=False, scramble=False):
+def random_sum_embeddings(embeddings, count, add_noise=False):
     if add_noise:
         # Add random noise vectors of the same shape as embeddings
         noise_vectors = pd.DataFrame(np.random.uniform(-1, 1, size=(count, embeddings.shape[1])),
                                      columns=embeddings.columns)
         chosen_embeddings = noise_vectors  # Use noise instead of actual embeddings
+        is_noise_only = True
     else:
         # Randomly choose the specified number of embeddings
         chosen_indices = random.sample(range(len(embeddings)), count)
         chosen_embeddings = embeddings.iloc[chosen_indices]
-
-    if scramble:
-        # Scramble the vectors within the embeddings
-        chosen_embeddings = chosen_embeddings.apply(np.random.permutation)
+        is_noise_only = False
 
     summed_embeddings = chosen_embeddings.sum(axis=0)
-    return summed_embeddings, count
+    return summed_embeddings, count, is_noise_only
 
 
 if __name__ == '__main__':
@@ -41,15 +39,13 @@ if __name__ == '__main__':
     parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum")
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
-    parser.add_argument("--scramble", "-s", action="store_true", help="Whether to scramble the embeddings")
     args = parser.parse_args()
 
     iterations = args.iterations
     walk_distance = args.walk_distance
     noise_ratio = args.noise_ratio
-    scramble = args.scramble
 
-    save_folder = Path(save_folder, str(iterations))
+    save_folder = Path(save_folder, str(iterations), str(noise_ratio))
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
@@ -61,43 +57,47 @@ if __name__ == '__main__':
     combined_data = []
 
     for _ in tqdm(range(iterations)):
-        # Determine random order for processing embeddings
         embeddings_list = [(rna_embeddings, 'RNA'), (sentence_embeddings, 'Text'), (image_embeddings, 'Image')]
         random.shuffle(embeddings_list)
 
         combined_sum = pd.Series(np.zeros_like(embeddings_list[0][0].iloc[0]), index=embeddings_list[0][0].columns)
         remaining_embeddings = walk_distance
-        combination_counts = {}
+        combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0}
+        total_noise = True  # Flag to check if only noise was added
 
         for i, (embeddings, name) in enumerate(embeddings_list):
-            # Calculate the maximum number of embeddings that can be selected
             max_embeddings_for_type = remaining_embeddings - (len(embeddings_list) - i - 1)
 
-            if i < len(embeddings_list) - 1:  # Not the last type
+            if i < len(embeddings_list) - 1:
                 count = random.randint(1, max(max_embeddings_for_type, 1))
-            else:  # Last type must take all remaining embeddings
+            else:
                 count = remaining_embeddings
 
             # Decide if we should add noise
             add_noise = random.random() < noise_ratio
-            current_sum, count = random_sum_embeddings(embeddings, count, add_noise=add_noise, scramble=scramble)
+            current_sum, count, is_noise_only = random_sum_embeddings(embeddings, count, add_noise=add_noise)
+
             combined_sum += current_sum
             remaining_embeddings -= count
-            combination_counts[name] = count
 
-        # Ensure the total number of selected embeddings equals walk_distance
-        total_selected = sum(combination_counts.values())
-        assert total_selected == walk_distance, f"Total embeddings selected ({total_selected}) does not match walk_distance ({walk_distance})"
+            if not is_noise_only:
+                combination_counts[name] = count  # Update only if not noise
+                total_noise = False  # At least one real embedding was used
+
+        # If total noise was added, set all combination counts to 0
+        if total_noise:
+            combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0}
 
         # Combine combined_sum and the combination_counts
         combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],
                                                    combination_counts['RNA']])
 
-    # Save the data to CSV
+    # Define column names
     column_names = list(embeddings_list[0][0].columns) + ["Text", "Image", "RNA"]
+
+    # Create DataFrame
     combined_df = pd.DataFrame(combined_data, columns=column_names)
-    # Convert all columns to float
-    combined_df = combined_df.astype(float)
+    combined_df = combined_df.astype(float)  # Convert all columns to float
 
     # Print a message and save the combined embeddings to CSV
     print("Saving combined embeddings to CSV...")

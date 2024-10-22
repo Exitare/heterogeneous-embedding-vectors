@@ -14,7 +14,8 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "noise_recognizer", "simple")
-load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
+clean_load_path: Path = Path("results", "recognizer", "summed_embeddings", "simple")
+noise_load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
 
 
 def build_model(input_dim, num_outputs=3):
@@ -77,9 +78,9 @@ if __name__ == '__main__':
     print(f"Run iteration: {run_iteration}")
     print(f"Summed embedding count: {summed_embedding_count}")
 
-    load_path = Path(load_path, str(summed_embedding_count))
-    load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
-    print(f"Loading data from {load_path}")
+    clean_load_path = Path(clean_load_path, str(summed_embedding_count))
+    clean_load_path = Path(clean_load_path, f"{walk_distance}_embeddings.csv")
+    print(f"Loading clean data from {clean_load_path}")
 
     save_path = Path(save_path, str(summed_embedding_count))
     save_path = Path(save_path, f"{walk_distance}_embeddings")
@@ -93,19 +94,19 @@ if __name__ == '__main__':
     print(f"Saving results to {save_path}")
 
     # load data
-    data = pd.read_csv(load_path)
+    clean_data = pd.read_csv(clean_load_path)
 
     # Random counts for demonstration; replace with actual data
-    text_counts = data["Text"].values
-    image_counts = data["Image"].values
-    rna_counts = data["RNA"].values
+    text_counts = clean_data["Text"].values
+    image_counts = clean_data["Image"].values
+    rna_counts = clean_data["RNA"].values
 
     # convert counts to int
     text_counts = text_counts.astype(int)
     image_counts = image_counts.astype(int)
     rna_counts = rna_counts.astype(int)
 
-    X = data.drop(columns=embeddings).values
+    X = clean_data.drop(columns=embeddings).values
     assert X.shape[1] == 768, f"Expected 768 features, got {X.shape[1]}"
 
     # Assuming these are the actual labels from your dataset
@@ -231,4 +232,53 @@ if __name__ == '__main__':
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
     print("Metrics saved.")
-    print("Done")
+
+    # Noisy data generation
+    noise_load_path = Path(noise_load_path, str(summed_embedding_count))
+
+    print("Running noise recognition...")
+    noisy_metrics = []
+    # running noise detection
+    for noise_ratio in range(10, 110, 10):
+        noise_ratio = noise_ratio / 100
+
+        current_noise_load_path: Path = Path(noise_load_path, f"{noise_ratio}", f"{walk_distance}_embeddings.csv")
+
+        noisy_data = pd.read_csv(current_noise_load_path)
+
+        noisy_truth = noisy_data[embeddings].values
+        # Predict counts
+        y_noise = model.predict(noisy_data.drop(columns=embeddings).values)
+
+
+
+        # Convert predictions to rounded integers
+        y_noise_rounded = [np.rint(pred) for pred in y_noise]
+
+        print(noisy_truth)
+        print(y_noise_rounded)
+        input()
+
+        noisy_accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate f1 score for each output
+        f1 = [f1_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate precision for each output
+        precision = [precision_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                     zip(noisy_truth.T, y_noise_rounded)]
+        # calculate recall for each output
+        recall = [recall_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                  zip(noisy_truth.T, y_noise_rounded)]
+
+        for i, embedding in enumerate(embeddings):
+            noisy_metrics.append({
+                "walk_distance": walk_distance,
+                'embedding': embedding,
+                'accuracy': noisy_accuracy[i],
+                'precision': precision[i],
+                'recall': recall[i],
+                'f1': f1[i],
+                'noise_ratio': noise_ratio
+            })
+
+    noisy_metrics_df = pd.DataFrame(noisy_metrics)
+    noisy_metrics_df.to_csv(Path(save_path, "noisy_metrics.csv"), index=False)
