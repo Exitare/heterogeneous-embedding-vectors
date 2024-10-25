@@ -17,7 +17,7 @@ def load_noise_embeddings():
     return sentence_embeddings, image_embeddings
 
 
-def random_sum_embeddings(embeddings, count, add_noise=False, scramble=False):
+def random_sum_embeddings(embeddings, count, add_noise=False):
     if add_noise:
         # Add random noise vectors of the same shape as embeddings
         noise_vectors = pd.DataFrame(np.random.uniform(-1, 1, size=(count, embeddings.shape[1])),
@@ -27,10 +27,6 @@ def random_sum_embeddings(embeddings, count, add_noise=False, scramble=False):
         # Randomly choose the specified number of embeddings
         chosen_indices = random.sample(range(len(embeddings)), count)
         chosen_embeddings = embeddings.iloc[chosen_indices]
-
-    if scramble:
-        # Scramble the vectors within the embeddings
-        chosen_embeddings = chosen_embeddings.apply(np.random.permutation)
 
     summed_embeddings = chosen_embeddings.sum(axis=0)
     return summed_embeddings, count
@@ -42,18 +38,18 @@ if __name__ == '__main__':
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
     parser.add_argument("--selected_cancers", "-c", nargs="+", required=True,
                         help="The selected cancer identifier to sum")
-    parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of noise vectors to add (0.0 - 1.0)")
-    parser.add_argument("--scramble", "-s", action="store_true", help="Whether to scramble the embeddings")
+    parser.add_argument("--noise_ratio", "-n", type=float, default=0.1,
+                        help="Ratio of noise vectors to add (0.0 - 1.0)")
     args = parser.parse_args()
 
     iterations = args.iterations
     walk_distance = args.walk_distance
     selected_cancers = args.selected_cancers
     noise_ratio = args.noise_ratio
-    scramble = args.scramble
+
     cancers = "_".join(selected_cancers)
 
-    cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
+    cancer_embedding_load_folder = Path(cancer_embedding_load_folder, str(iterations))
     save_folder = Path(save_folder, cancers)
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
@@ -113,7 +109,7 @@ if __name__ == '__main__':
             add_noise = random.random() < noise_ratio
 
             # Select random sum embedding with noise or scrambling
-            current_sum, count = random_sum_embeddings(embeddings, max_embeddings_for_type, add_noise=add_noise, scramble=scramble)
+            current_sum, count = random_sum_embeddings(embeddings, max_embeddings_for_type, add_noise=add_noise)
 
             # Update the combined sum
             combined_sum += current_sum
@@ -128,7 +124,8 @@ if __name__ == '__main__':
                 combination_counts[name] = count
 
             if remaining_embeddings < 0:
-                raise ValueError("Selected more embeddings than remaining. Check the random_sum_embeddings function or logic.")
+                raise ValueError(
+                    "Selected more embeddings than remaining. Check the random_sum_embeddings function or logic.")
 
         # Validate that total embeddings selected match walk distance
         if sum(combination_counts.values()) != walk_distance:

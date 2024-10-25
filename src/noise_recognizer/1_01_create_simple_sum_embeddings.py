@@ -38,7 +38,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Sum embeddings from different sources')
     parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum")
     parser.add_argument("--iterations", "-i", type=int, default=200000, help="Number of iterations to run")
-    parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
+    parser.add_argument("--noise_ratio", "-n", type=float, default=0.1, help="Ratio of random noise vectors to add")
     args = parser.parse_args()
 
     iterations = args.iterations

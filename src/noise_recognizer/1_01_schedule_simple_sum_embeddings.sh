@@ -30,6 +30,9 @@ fi
 
 # iterate through lower_bound to upper_bound
 for i in $(seq $lower_bound $upper_bound)
-do
-  sbatch ./src/recognizer/1_01_create_simple_sum_embeddings.sh $i $summed_embeddings_count
+  for noise in $(seq 0 0.1 1)
+    do
+      sbatch ./src/noise_recognizer/1_01_create_simple_sum_embeddings.sh $i $summed_embeddings_count $noise
+    done
+  done
 done

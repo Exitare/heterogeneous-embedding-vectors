@@ -26,6 +26,9 @@ fi
 
 # iterate through lower_bound to upper_bound
 for i in $(seq $lower_bound $upper_bound)
-do
-  sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${selected_cancers}"
+  for noise in $(seq 0 0.1 1)
+    do
+      sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${selected_cancers}" $noise
+    done
+  done
 done

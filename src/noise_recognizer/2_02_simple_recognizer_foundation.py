@@ -14,7 +14,8 @@ import os
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "noise_recognizer", "simple_foundation")
-load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
+clean_load_path: Path = Path("results", "recognizer", "summed_embeddings", "simple")
+noise_load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
 
 
 # Function to create stratified splits for multi-label data
@@ -97,7 +98,7 @@ if __name__ == '__main__':
     print(f"Summed embedding count: {summed_embedding_count}")
 
     data = []
-    load_path = Path(load_path, str(summed_embedding_count))
+    load_path = Path(clean_load_path, str(summed_embedding_count))
     for walk_distance in walk_distances:
         distance_load_path = Path(load_path, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {distance_load_path}")
@@ -316,3 +317,59 @@ if __name__ == '__main__':
 
     split_metrics = pd.DataFrame(split_metrics)
     split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+
+    # Noisy data generation
+    noise_load_path = Path(noise_load_path, str(summed_embedding_count))
+
+    noisy_split_metrics = []
+    noisy_metrics = []
+    for noise_ratio in range(10, 110, 10):
+        noise_ratio = noise_ratio / 100
+
+        noisy_data = []
+        for walk_distance in walk_distances:
+            current_noise_load_path = Path(noise_load_path, f"{noise_ratio}", f"{walk_distance}_embeddings.csv")
+            print(f"Loading data from {current_noise_load_path}")
+            tmp_df = pd.read_csv(current_noise_load_path)
+            noisy_data.append(tmp_df)
+
+        noisy_data = pd.concat(noisy_data, axis=0)
+
+        noisy_truth = noisy_data[embeddings].values
+        # Predict counts
+        y_noise = model.predict(noisy_data.drop(columns=embeddings).values)
+
+        # Convert predictions to rounded integers
+        y_noise_rounded = [np.rint(pred) for pred in y_noise]
+
+        noisy_accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate f1 score for each output
+        f1 = [f1_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate precision for each output
+        precision = [precision_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                     zip(noisy_truth.T, y_noise_rounded)]
+        # calculate recall for each output
+        recall = [recall_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                  zip(noisy_truth.T, y_noise_rounded)]
+
+        for i, embedding in enumerate(embeddings):
+            noisy_metrics.append({
+                'embedding': embedding,
+                'accuracy': noisy_accuracy[i],
+                'precision': precision[i],
+                'recall': recall[i],
+                'f1': f1[i],
+                'noise_ratio': noise_ratio
+            })
+
+    noisy_metrics = pd.DataFrame(noisy_metrics)
+
+    noisy_metrics.to_csv(Path(save_path, "noisy_metrics.csv"), index=False)
+
+
+
+
+
+
+
+

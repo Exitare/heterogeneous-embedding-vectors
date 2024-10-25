@@ -13,7 +13,8 @@ from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "noise_recognizer", "multi")
-load_path = Path("results", "noise_recognizer", "summed_embeddings", "multi")
+clean_data_path = Path("results", "recognizer", "summed_embeddings", "multi")
+noisy_data_path = Path("results", "noise_recognizer", "summed_embeddings", "multi")
 
 
 def build_model(input_dim, cancer_list: []):
@@ -72,6 +73,9 @@ if __name__ == '__main__':
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
                         help="The cancer types to work with, e.g. blca brca")
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The size of the generated summed embeddings count. aka the total amount of iterations used when generating the summed embeddings.")
+
     args = parser.parse_args()
 
     batch_size = args.batch_size
@@ -79,6 +83,7 @@ if __name__ == '__main__':
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
+    summed_embedding_count = args.summed_embedding_count
 
     print("Selected cancers: ", selected_cancers)
     print(f"Total walk distance: {walk_distance}")
@@ -86,7 +91,7 @@ if __name__ == '__main__':
     print(f"Run iteration: {run_iteration}")
     run_name = f"run_{run_iteration}"
 
-    save_path = Path(save_path, cancers)
+    save_path = Path(save_path, cancers, str(summed_embedding_count))
     save_path = Path(save_path, f"{walk_distance}_embeddings")
     save_path = Path(save_path, run_name)
     print(f"Saving results to {save_path}")
@@ -94,7 +99,7 @@ if __name__ == '__main__':
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    load_path = Path(load_path, cancers, f"{walk_distance}_embeddings.csv")
+    load_path = Path(clean_data_path, cancers, f"{walk_distance}_embeddings.csv")
     print(f"Loading data from {load_path}")
 
     # load data
@@ -257,4 +262,50 @@ if __name__ == '__main__':
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
 
     print("Metrics saved.")
+
+    # Noisy data recognition
+    noisy_load_path = Path(noisy_data_path,cancers, str(summed_embedding_count))
+
+    print("Running noise recognition...")
+    noisy_metrics = []
+    # running noise detection
+    for noise_ratio in range(10, 110, 10):
+        noise_ratio = noise_ratio / 100
+
+        current_noise_load_path: Path = Path(noisy_load_path, f"{noise_ratio}", f"{walk_distance}_embeddings.csv")
+
+        noisy_data = pd.read_csv(current_noise_load_path)
+
+        noisy_truth = noisy_data[embeddings].values
+        # Predict counts
+        y_noise = model.predict(noisy_data.drop(columns=embeddings).values)
+
+        # Convert predictions to rounded integers
+        y_noise_rounded = [np.rint(pred) for pred in y_noise]
+
+        noisy_accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate f1 score for each output
+        f1 = [f1_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
+        # calculate precision for each output
+        precision = [precision_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                     zip(noisy_truth.T, y_noise_rounded)]
+        # calculate recall for each output
+        recall = [recall_score(y_true, y_pred, average='macro') for y_true, y_pred in
+                  zip(noisy_truth.T, y_noise_rounded)]
+
+        for i, embedding in enumerate(embeddings):
+            noisy_metrics.append({
+                "walk_distance": walk_distance,
+                'embedding': embedding,
+                'accuracy': noisy_accuracy[i],
+                'precision': precision[i],
+                'recall': recall[i],
+                'f1': f1[i],
+                'noise_ratio': noise_ratio
+            })
+
+    noisy_metrics_df = pd.DataFrame(noisy_metrics)
+    noisy_metrics_df.to_csv(Path(save_path, "noisy_metrics.csv"), index=False)
+
+
     print("Done")

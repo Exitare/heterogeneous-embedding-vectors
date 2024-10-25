@@ -17,4 +17,4 @@ run_iteration=$2
 summed_embeddings_count=$3
 
 
-python3 src/recognizer/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -sec "${summed_embeddings_count}"
+python3 src/noise_recognizer/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -sec "${summed_embeddings_count}"

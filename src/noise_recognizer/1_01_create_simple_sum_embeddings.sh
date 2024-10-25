@@ -12,7 +12,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-walk_distance=$1
-summed_embeddings_count=$2
+walk_distance=$1 # the walk distance, aka how many embeddings are summed
+summed_embeddings_count=$2 # how many summed vectors should be created
+noise=$3 # the noise level
 
-python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i "${summed_embeddings_count}" -w "${walk_distance}"
+python3 src/recognizer/1_01_create_simple_sum_embeddings.py -i "${summed_embeddings_count}" -w "${walk_distance}" -n "${noise}"

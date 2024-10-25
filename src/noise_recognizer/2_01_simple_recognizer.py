@@ -255,10 +255,6 @@ if __name__ == '__main__':
         # Convert predictions to rounded integers
         y_noise_rounded = [np.rint(pred) for pred in y_noise]
 
-        print(noisy_truth)
-        print(y_noise_rounded)
-        input()
-
         noisy_accuracy = [accuracy_score(y_true, y_pred) for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
         # calculate f1 score for each output
         f1 = [f1_score(y_true, y_pred, average='macro') for y_true, y_pred in zip(noisy_truth.T, y_noise_rounded)]
@@ -282,3 +278,5 @@ if __name__ == '__main__':
 
     noisy_metrics_df = pd.DataFrame(noisy_metrics)
     noisy_metrics_df.to_csv(Path(save_path, "noisy_metrics.csv"), index=False)
+
+    print("Done")
