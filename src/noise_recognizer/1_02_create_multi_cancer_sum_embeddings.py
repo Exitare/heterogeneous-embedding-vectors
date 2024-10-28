@@ -19,17 +19,21 @@ def load_noise_embeddings():
 
 def random_sum_embeddings(embeddings, count, add_noise=False):
     if add_noise:
-        # Add random noise vectors of the same shape as embeddings
+        # Generate noise vectors to replace embeddings
         noise_vectors = pd.DataFrame(np.random.uniform(-1, 1, size=(count, embeddings.shape[1])),
                                      columns=embeddings.columns)
         chosen_embeddings = noise_vectors
+        real_count = 0  # Noise does not count toward the embeddings
     else:
         # Randomly choose the specified number of embeddings
         chosen_indices = random.sample(range(len(embeddings)), count)
         chosen_embeddings = embeddings.iloc[chosen_indices]
+        real_count = count  # Count of real embeddings used
 
+    # Sum the chosen embeddings or noise vectors
     summed_embeddings = chosen_embeddings.sum(axis=0)
-    return summed_embeddings, count
+
+    return summed_embeddings, real_count
 
 
 if __name__ == '__main__':
@@ -109,28 +113,31 @@ if __name__ == '__main__':
             # Determine if we should add noise based on noise_ratio
             add_noise = random.random() < noise_ratio
 
-            # Select random sum embedding with noise or scrambling
-            current_sum, count = random_sum_embeddings(embeddings, max_embeddings_for_type, add_noise=add_noise)
+            # Select random sum embedding, using noise if specified
+            current_sum, real_count = random_sum_embeddings(embeddings, max_embeddings_for_type, add_noise=add_noise)
 
             # Update the combined sum
             combined_sum += current_sum
 
-            # Update the remaining embeddings
-            remaining_embeddings -= count
+            # If noise was added, reset real_count to 0 (since noise doesn't count)
+            if add_noise:
+                real_count = 0
 
-            # Update the combination counts
-            if name in combination_counts:
-                combination_counts[name] += count
-            else:
-                combination_counts[name] = count
+            # Update the remaining embeddings only by real embeddings used
+            remaining_embeddings -= real_count
+
+            # Update the combination counts only by real embeddings used
+            if real_count > 0:
+                if name in combination_counts:
+                    combination_counts[name] += real_count
+                else:
+                    combination_counts[name] = real_count
 
             if remaining_embeddings < 0:
                 raise ValueError(
-                    "Selected more embeddings than remaining. Check the random_sum_embeddings function or logic.")
+                    "Selected more embeddings than remaining. Check the random_sum_embeddings function or logic."
+                )
 
-        # Validate that total embeddings selected match walk distance
-        if sum(combination_counts.values()) != walk_distance:
-            raise ValueError("Total number of embeddings selected does not match walk distance!")
 
         # Append combined sum and counts for each modality dynamically
         combined_row = list(combined_sum) + [combination_counts[modality] for modality in modality_names]
