@@ -39,7 +39,7 @@ if __name__ == '__main__':
     cancers = "_".join(selected_cancers)
 
     cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
-    save_folder = Path(save_folder, cancers)
+    save_folder = Path(save_folder, str(iterations), cancers)
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 

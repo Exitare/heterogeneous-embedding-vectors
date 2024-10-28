@@ -79,7 +79,7 @@ if __name__ == '__main__':
                         help="The iteration number for the run. Used for saving the results and validation.")
     parser.add_argument("--upper_walk_distance", "-uwd", type=int, required=False, default=10)
     parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
-                        help="The size of the generated summed embeddings count.")
+                        help="The total amount of the generated summed embeddings e.g. 100000 summed embeddings.")
 
     args = parser.parse_args()
 

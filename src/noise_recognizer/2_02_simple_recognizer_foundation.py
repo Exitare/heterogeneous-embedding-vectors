@@ -15,7 +15,7 @@ import os
 embeddings = ['Text', 'Image', 'RNA']
 save_path = Path("results", "noise_recognizer", "simple_foundation")
 clean_load_path: Path = Path("results", "recognizer", "summed_embeddings", "simple")
-noise_load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
+noisy_load_path = Path("results", "noise_recognizer", "summed_embeddings", "simple")
 
 
 # Function to create stratified splits for multi-label data
@@ -319,11 +319,12 @@ if __name__ == '__main__':
     split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
 
     # Noisy data recognition
-    noise_load_path = Path(noise_load_path, str(summed_embedding_count))
+    noise_load_path = Path(noisy_load_path, str(summed_embedding_count))
 
     noisy_test_data = []
     for walk_distance in walk_distances:
         for noise_ratio in range(10, 110, 10):
+            noise_ratio = noise_ratio / 100
             current_noise_load_path = Path(noise_load_path, f"{noise_ratio}", f"{walk_distance}_embeddings.csv")
             print(f"Loading data from {current_noise_load_path}")
             tmp_df = pd.read_csv(current_noise_load_path)

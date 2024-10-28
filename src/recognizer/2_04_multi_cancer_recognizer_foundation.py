@@ -88,6 +88,8 @@ if __name__ == '__main__':
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--upper_walk_distance", "-uwd", type=int, required=False, default=10)
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The total amount of the generated summed embeddings e.g. 100000 summed embeddings.")
     args = parser.parse_args()
 
     batch_size = args.batch_size
@@ -95,6 +97,7 @@ if __name__ == '__main__':
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
     upper_walk_distance = args.upper_walk_distance
+    summed_embedding_count: int = args.summed_embedding_count
 
     walk_distances = range(2, upper_walk_distance + 1)
 
@@ -110,7 +113,7 @@ if __name__ == '__main__':
 
     data = []
     for walk_distance in walk_distances:
-        embedding_load_path = Path(load_path, cancers, f"{walk_distance}_embeddings.csv")
+        embedding_load_path = Path(load_path, summed_embedding_count, cancers, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {embedding_load_path}")
         data.append(pd.read_csv(embedding_load_path))
 
