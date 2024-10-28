@@ -72,12 +72,16 @@ if __name__ == '__main__':
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
                         help="The cancer types to work with, e.g. blca brca")
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The size of the generated summed embeddings count. aka the total amount of iterations used when generating the summed embeddings.")
+
     args = parser.parse_args()
 
     batch_size = args.batch_size
     walk_distance = args.walk_distance
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
+    summed_embedding_count = args.summed_embedding_count
     cancers = "_".join(selected_cancers)
 
     print("Selected cancers: ", selected_cancers)
@@ -94,7 +98,7 @@ if __name__ == '__main__':
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    load_path = Path(load_path, cancers, f"{walk_distance}_embeddings.csv")
+    load_path = Path(load_path, str(summed_embedding_count), cancers, f"{walk_distance}_embeddings.csv")
     print(f"Loading data from {load_path}")
 
     # load data

@@ -99,7 +99,7 @@ if __name__ == '__main__':
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    load_path = Path(clean_data_path, cancers, f"{walk_distance}_embeddings.csv")
+    load_path = Path(clean_data_path, str(summed_embedding_count), cancers, f"{walk_distance}_embeddings.csv")
     print(f"Loading data from {load_path}")
 
     # load data
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     print("Metrics saved.")
 
     # Noisy data recognition
-    noisy_load_path = Path(noisy_data_path,cancers, str(summed_embedding_count))
+    noisy_load_path = Path(noisy_data_path, cancers, str(summed_embedding_count))
 
     print("Running noise recognition...")
     noisy_metrics = []
@@ -306,6 +306,5 @@ if __name__ == '__main__':
 
     noisy_metrics_df = pd.DataFrame(noisy_metrics)
     noisy_metrics_df.to_csv(Path(save_path, "noisy_metrics.csv"), index=False)
-
 
     print("Done")

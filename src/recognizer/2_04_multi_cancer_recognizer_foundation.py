@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     data = []
     for walk_distance in walk_distances:
-        embedding_load_path = Path(load_path, summed_embedding_count, cancers, f"{walk_distance}_embeddings.csv")
+        embedding_load_path = Path(load_path, str(summed_embedding_count), cancers, f"{walk_distance}_embeddings.csv")
         print(f"Loading data from {embedding_load_path}")
         data.append(pd.read_csv(embedding_load_path))
 
