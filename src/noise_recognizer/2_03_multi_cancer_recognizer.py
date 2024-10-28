@@ -264,7 +264,7 @@ if __name__ == '__main__':
     print("Metrics saved.")
 
     # Noisy data recognition
-    noisy_load_path = Path(noisy_data_path, cancers, str(summed_embedding_count))
+    noisy_load_path = Path(noisy_data_path, str(summed_embedding_count), cancers)
 
     print("Running noise recognition...")
     noisy_metrics = []

@@ -89,6 +89,8 @@ if __name__ == '__main__':
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--upper_walk_distance", "-uwd", type=int, required=False, default=10)
+    parser.add_argument("--summed_embedding_count", "-sec", type=int, required=True,
+                        help="The size of the generated summed embeddings count.")
     args = parser.parse_args()
 
     batch_size = args.batch_size
@@ -96,6 +98,7 @@ if __name__ == '__main__':
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
     upper_walk_distance = args.upper_walk_distance
+    summed_embedding_count = args.summed_embedding_count
 
     walk_distances = range(2, upper_walk_distance + 1)
 
@@ -338,7 +341,7 @@ if __name__ == '__main__':
     split_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
 
     # Noisy data recognition
-    noise_load_path = Path(noisy_load_path, str(summed_embedding_count))
+    noise_load_path = Path(noisy_load_path, str(summed_embedding_count), cancers)
 
     noisy_test_data = []
     for walk_distance in walk_distances:

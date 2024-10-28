@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     cancer_embedding_load_folder = Path(cancer_embedding_load_folder, cancers)
     print("Loading embeddings from:", cancer_embedding_load_folder)
-    save_folder = Path(save_folder, cancers)
+    save_folder = Path(save_folder, str(iterations), cancers, str(noise_ratio))
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
@@ -137,7 +137,6 @@ if __name__ == '__main__':
                 raise ValueError(
                     "Selected more embeddings than remaining. Check the random_sum_embeddings function or logic."
                 )
-
 
         # Append combined sum and counts for each modality dynamically
         combined_row = list(combined_sum) + [combination_counts[modality] for modality in modality_names]
