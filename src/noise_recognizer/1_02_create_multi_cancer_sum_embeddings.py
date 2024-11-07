@@ -5,7 +5,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import numpy as np
 
-load_folder = Path("results", "embeddings")
+load_folder = Path("results", "recognizer_embeddings")
 cancer_embedding_load_folder = Path(load_folder, "cancer")
 save_folder = Path("results", "noise_recognizer", "summed_embeddings", "multi")
 
@@ -79,6 +79,9 @@ if __name__ == '__main__':
 
     # Load noise embeddings
     sentence_embeddings, image_embeddings = load_noise_embeddings()
+
+    # drop submitter_id	cancer_type	tile_pos columns from image_embeddings
+    image_embeddings.drop(columns=["submitter_id", "cancer_type", "tile_pos"], inplace=True)
 
     # Prepare a list of all available modalities dynamically
     modality_names = ['Text', 'Image'] + list(loaded_cancer_embeddings.keys())

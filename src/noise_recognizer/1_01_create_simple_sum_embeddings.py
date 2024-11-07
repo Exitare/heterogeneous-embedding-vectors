@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 save_folder = Path("results", "noise_recognizer", "summed_embeddings", "simple")
-load_folder = Path("results", "embeddings")
+load_folder = Path("results", "recognizer_embeddings")
 
 
 def load_embeddings():
@@ -52,6 +52,9 @@ if __name__ == '__main__':
 
     # Load embeddings
     rna_embeddings, sentence_embeddings, image_embeddings = load_embeddings()
+
+    # drop submitter_id	cancer_type	tile_pos columns
+    image_embeddings.drop(columns=["submitter_id", "cancer_type", "tile_pos"], inplace=True)
 
     # List to hold all combined embeddings and their indices
     combined_data = []
