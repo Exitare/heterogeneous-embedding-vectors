@@ -1,0 +1,4 @@
+# config.yaml
+credentials_file: "../bmeg_credentials.json"
+cancers: "BRCA BLCA LUAD STAD THCA COAD"
+mutation_data: "path/to/mutation_data.csv"

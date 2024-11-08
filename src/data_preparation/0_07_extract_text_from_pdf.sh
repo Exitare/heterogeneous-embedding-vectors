@@ -25,3 +25,8 @@ for file in data/annotations/**/*.pdf; do
         echo "Failed to extract text from $file"
     fi
 done
+
+# create a new file for snakemake indicating success
+touch data/annotations/extracted_text_success.txt
+# add success to the file
+echo "success" > data/annotations/extracted_text_success.txt

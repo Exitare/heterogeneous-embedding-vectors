@@ -5,7 +5,7 @@ import random
 import argparse
 
 model = SentenceTransformer("all-mpnet-base-v2")
-save_folder = Path("results", "embeddings")
+save_folder = Path("results", "embeddings", "annotations")
 load_folder = Path("data", "annotations")
 
 
@@ -90,4 +90,5 @@ if __name__ == '__main__':
     print("Saving embeddings...")
     # save embeddings
     embeddings = pd.DataFrame(embeddings)
-    embeddings.to_csv(Path(save_folder, "sentence_embeddings.csv"), index=False)
+    embeddings["submitter_id"] = text_annotations["submitter_id"]
+    embeddings.to_csv(Path(save_folder, "embeddings.csv"), index=False)

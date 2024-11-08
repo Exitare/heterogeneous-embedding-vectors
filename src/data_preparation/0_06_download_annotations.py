@@ -68,6 +68,12 @@ def main():
         for future in tqdm(as_completed(futures), total=len(case_ids)):
             future.result()  # Will raise an exception if the download failed
 
+    # after downloading all files, print the number of files downloaded
+    print(f"Downloaded {len(case_ids)} files.")
+    # create a successful download file for snakemake
+    with open(Path("data", "annotations", "success.txt"), "w") as file:
+        file.write("Downloaded all files.")
+
 
 if __name__ == "__main__":
     main()

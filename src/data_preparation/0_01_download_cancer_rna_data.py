@@ -7,12 +7,13 @@ save_folder = Path("data", "rna")
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Download rna bmeg data')
-    parser.add_argument("--creds", "-c", type=Path)
-    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "LUAD", "COAD"], required=True)
+    parser.add_argument("--credentials", "-c", type=Path)
+    parser.add_argument("--cancer", type=str, choices=["BRCA", "BLCA", "THCA", "STAD", "LUAD", "COAD"],
+                        required=True)
 
     args = parser.parse_args()
 
-    credentials = args.creds
+    credentials = args.credentials
     cancer = args.cancer
 
     save_folder = Path(save_folder, cancer)

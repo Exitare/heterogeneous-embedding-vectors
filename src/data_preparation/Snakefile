@@ -1,0 +1,91 @@
+# Snakefile
+
+configfile: "./config.yaml"
+
+rule all:
+    input:
+        "results/embeddings/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/blca_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/brca_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/coad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/luad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/stad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/thca_embeddings.csv",
+
+
+# Rule for the first download step with a credentials file path
+rule download_step1:
+    output:
+        protected("data/rna/BLCA/data.csv")
+    shell:
+        "python ./src/data_preparation/0_01_download_cancer_rna_data.py --cancer BLCA --credentials {config[credentials_file]} > {output}"
+
+rule download_step2:
+    output:
+        protected("data/rna/COAD/data.csv")
+    shell:
+        "python ./src/data_preparation/0_01_download_cancer_rna_data.py --cancer COAD --credentials {config[credentials_file]} > {output}"
+
+rule download_step3:
+    output:
+        protected("data/rna/LUAD/data.csv")
+    shell:
+        "python ./src/data_preparation/0_01_download_cancer_rna_data.py --cancer LUAD --credentials {config[credentials_file]} > {output}"
+
+rule download_step4:
+    output:
+        protected("data/rna/STAD/data.csv")
+    shell:
+        "python ./src/data_preparation/0_01_download_cancer_rna_data.py --cancer STAD --credentials {config[credentials_file]} > {output}"
+
+rule download_step5:
+    output:
+        protected("data/rna/BRCA/data.csv")
+    shell:
+        "python ./src/data_preparation/0_01_download_cancer_rna_data.py --cancer BRCA --credentials {config[credentials_file]} > {output}"
+
+rule download_mutations_data:
+    output:
+        "data/mutations/mutations.csv"
+    shell:
+        "python ./src/data_preparation/0_05_download_mutations.py --credentials {config[credentials_file]} > {output}"
+
+
+rule create_rna_embeddings:
+    input:
+        "data/rna/BLCA/data.csv",
+        "data/rna/COAD/data.csv",
+        "data/rna/LUAD/data.csv",
+        "data/rna/STAD/data.csv",
+        "data/rna/BRCA/data.csv"
+    output:
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/blca_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/brca_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/coad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/luad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/stad_embeddings.csv",
+        "results/embeddings/cancer/BRCA_LUAD_STAD_BLCA_COAD_THCA/thca_embeddings.csv"
+    shell:
+        "python ./src/data_preparation/0_04_create_cancer_embeddings.py -c {config[cancers]}"
+
+
+rule create_mutation_embeddings:
+    input:
+        "data/mutations/mutations.csv"
+    output:
+        "results/embeddings/mutation_embeddings.csv"
+    shell:
+        "python ./src/data_preparation/0_13_create_mutation_embeddings.py -d {config[mutation_data]}"
+
+
+rule download_case_manifest:
+    output:
+        "data/annotations/case_manifest.json"
+    shell:
+        "python ./src/data_preparation/0_03_download_case_manifest.py -d data/annotations/ > {output}"
+
+rule download_annotations:
+    output:
+        "data/annotations/success.txt"
+    shell:
+        "python ./src/data_preparation/0_02_download_annotations.py -d data/annotations/ > {output}"
