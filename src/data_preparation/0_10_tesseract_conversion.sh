@@ -78,3 +78,6 @@ done < "$csv_file"
 # Remove the output directory after processing all files
 rm -rf "$output_base_dir"
 echo "Output directory $output_base_dir deleted."
+
+# create new file tesseract_conversion_success.txt
+touch "./data/annotations/${cancers}/tesseract_conversion_success.txt"

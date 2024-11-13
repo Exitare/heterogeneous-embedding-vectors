@@ -11,7 +11,7 @@ import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
 
-save_folder = Path("results", "embeddings", "cancer")
+save_folder = Path("results", "embeddings", "rna")
 cancer_load_path = Path("data", "rna")
 latent_dim = 768
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     cancer_df = []
     for cancer in selected_cancers:
-        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0)
+        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0, nrows=1000)
         df["Cancer"] = cancer
         cancer_df.append(df)
 
@@ -167,15 +167,10 @@ if __name__ == '__main__':
     latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
 
     # assign cancer types to latent space
-    latent_space["Cancer"] = cancer_types
-    latent_space["Patient"] = patient_ids
+    latent_space["cancer"] = cancer_types
+    latent_space["submitter_id"] = patient_ids
 
     # iterate through all cancer types and the save the subset of the latent space
     for cancer in selected_cancers:
-        subset = latent_space[latent_space["Cancer"] == cancer].copy()
-        subset.drop(columns=["Cancer"], inplace=True)
-        subset.drop(columns=["Patient"], inplace=True)
-        # assert that cancer and patient columns are not present
-        assert "Cancer" not in subset.columns, "Cancer column should not be present"
-        assert "Patient" not in subset.columns, "Patient column should not be present"
+        subset = latent_space[latent_space["cancer"] == cancer].copy()
         subset.to_csv(Path(save_folder, f"{cancer.lower()}_embeddings.csv"), index=False)

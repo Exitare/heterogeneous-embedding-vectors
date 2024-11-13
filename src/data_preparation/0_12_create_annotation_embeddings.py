@@ -34,7 +34,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     selected_cancers = args.cancer
-    print("Selected cancers: ", selected_cancers)
+    # print("Selected cancers: ", selected_cancers)
 
     cancers = "_".join(selected_cancers)
 
@@ -81,13 +81,13 @@ if __name__ == '__main__':
     text_annotations = pd.DataFrame(text_annotations)
     # create a list from the text column
     sentences = [sentence for sentence in text_annotations["text"]]
-    print(f"Number of sentences: {len(sentences)}")
+    # print(f"Number of sentences: {len(sentences)}")
 
-    print("Encoding sentences...")
+    # print("Encoding sentences...")
     # Sentences are encoded by calling model.encode()
     embeddings = model.encode(sentences)
 
-    print("Saving embeddings...")
+    # print("Saving embeddings...")
     # save embeddings
     embeddings = pd.DataFrame(embeddings)
     embeddings["submitter_id"] = text_annotations["submitter_id"]

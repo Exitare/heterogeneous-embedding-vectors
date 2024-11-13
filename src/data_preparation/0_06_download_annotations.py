@@ -71,7 +71,7 @@ def main():
     # after downloading all files, print the number of files downloaded
     print(f"Downloaded {len(case_ids)} files.")
     # create a successful download file for snakemake
-    with open(Path("data", "annotations", "success.txt"), "w") as file:
+    with open(Path("data", "annotations", "download_complete.txt"), "w") as file:
         file.write("Downloaded all files.")
 
 
