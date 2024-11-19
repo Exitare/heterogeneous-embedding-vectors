@@ -29,21 +29,21 @@ def load_embeddings(cancers: []):
     return sentence_embeddings, image_embeddings, mutations_embeddings
 
 
-def random_sum_embeddings(embeddings, count, add_noise=False):
-    if add_noise:
-        # Add random noise vectors of the same shape as embeddings
-        noise_vectors = pd.DataFrame(np.random.uniform(-1, 1, size=(count, embeddings.shape[1])),
-                                     columns=embeddings.columns)
-        chosen_embeddings = noise_vectors  # Use noise instead of actual embeddings
-        is_noise_only = True
-    else:
-        # Randomly choose the specified number of embeddings
-        chosen_indices = random.sample(range(len(embeddings)), count)
-        chosen_embeddings = embeddings.iloc[chosen_indices]
-        is_noise_only = False
-
-    summed_embeddings = chosen_embeddings.sum(axis=0)
-    return summed_embeddings, count, is_noise_only
+def add_random_or_real_embedding(embeddings, add_noise, count):
+    """
+    Adds either random Gaussian noise or real embeddings based on add_noise flag.
+    """
+    combined_sum = pd.Series(np.zeros_like(embeddings.iloc[0]), index=embeddings.columns)
+    for _ in range(count):
+        if add_noise:
+            # Generate random Gaussian noise embedding
+            noise_embedding = pd.Series(np.random.normal(0, 1, size=embeddings.shape[1]), index=embeddings.columns)
+            combined_sum += noise_embedding
+        else:
+            # Select a random real embedding
+            chosen_index = random.randint(0, len(embeddings) - 1)
+            combined_sum += embeddings.iloc[chosen_index]
+    return combined_sum
 
 
 if __name__ == '__main__':
@@ -69,13 +69,10 @@ if __name__ == '__main__':
     rna_embeddings = load_rna_embeddings(cancers=cancers)
     sentence_embeddings, image_embeddings, mutation_embeddings = load_embeddings(cancers=cancers)
 
-    # drop submitter_id	cancer_type	tile_pos columns from image_embeddings
+    # drop unnecessary columns
     image_embeddings.drop(columns=["submitter_id", "cancer_type", "tile_pos"], inplace=True)
-    # drop submitter_id column from sentence_embeddings
     sentence_embeddings.drop(columns=["submitter_id"], inplace=True)
-    # drop submitter_id and cancer column from rna_embedding
     rna_embeddings.drop(columns=["submitter_id", "cancer"], inplace=True)
-    # drop submitter_id column from mutation_embeddings
     mutation_embeddings.drop(columns=["submitter_id"], inplace=True)
 
     # List to hold all combined embeddings and their indices
@@ -85,7 +82,6 @@ if __name__ == '__main__':
         combined_sum = pd.Series(np.zeros_like(rna_embeddings.iloc[0]), index=rna_embeddings.columns)
         modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
         combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
-        total_noise = True  # Flag to check if only noise was added
 
         # Randomly allocate the walk_distance across modalities
         modality_counts = dict.fromkeys(modality_choices, 0)
@@ -108,18 +104,19 @@ if __name__ == '__main__':
             elif modality == 'Mutation':
                 embeddings = mutation_embeddings
 
-            # Decide if we should add noise
-            add_noise = random.random() < noise_ratio
-            current_sum, actual_count, is_noise_only = random_sum_embeddings(embeddings, count, add_noise=add_noise)
-
-            combined_sum += current_sum
-            combination_counts[modality] += actual_count
-            if not is_noise_only:
-                total_noise = False  # At least one real embedding was used
-
-        # If total noise was added, set all combination counts to 0
-        if total_noise:
-            combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
+            # Decide whether to add noise or real embeddings
+            for _ in range(count):
+                add_noise = random.random() < noise_ratio
+                if add_noise:
+                    # Generate random Gaussian noise embedding
+                    noise_embedding = pd.Series(np.random.normal(0, 1, size=embeddings.shape[1]),
+                                                index=embeddings.columns)
+                    combined_sum += noise_embedding
+                else:
+                    # Select a random real embedding
+                    chosen_index = random.randint(0, len(embeddings) - 1)
+                    combined_sum += embeddings.iloc[chosen_index]
+                    combination_counts[modality] += 1  # Only count real embeddings
 
         # Combine combined_sum and the combination_counts
         combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],

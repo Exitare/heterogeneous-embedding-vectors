@@ -1,0 +1,89 @@
+configfile: "./config.yaml"
+
+all_cancers = ' '.join(config['cancers'])
+joined_cancers = '_'.join(config['cancers'])
+amount_of_summed_embeddings = config['amount_of_summed_embeddings']
+multi_cancer_max_walk = config['multi_cancer_max_walk']
+simple_cancer_max_walk = config['simple_cancer_max_walk']
+max_run_iterations = config['run_iterations']
+noise_ratios = config['noise_ratios']
+
+rule all:
+     input:
+        expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            i=range(3, simple_cancer_max_walk+1),
+            amount=amount_of_summed_embeddings,
+            noise_ratio=noise_ratios
+        ),
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            i=range(3, multi_cancer_max_walk + 1),
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings,
+            noise_ratio=noise_ratios
+        )
+
+
+rule create_single_sum_embeddings:
+   input:
+        expand(
+            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            cancers=joined_cancers
+        ),
+        expand(
+            "results/embeddings/mutation_embeddings.csv"
+        ),
+        expand(
+            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
+            cancers=joined_cancers,
+            cancer=config['cancers']
+        )
+   output:
+        expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            i=range(3, simple_cancer_max_walk+1),
+            amount=amount_of_summed_embeddings,
+            noise_ratio=noise_ratios
+        )
+   run:
+        amount=amount_of_summed_embeddings
+        cancers=all_cancers
+        for walk_distance in range(3, simple_cancer_max_walk+1):
+            for noise_ratio in noise_ratios:
+                shell(f"python ./src/recognizer/summed_embeddings_generation/1_01_create_simple_sum_embeddings.py -a {{amount}} -w {{walk_distance}} -c {{cancers}} -n {{noise_ratio}}")
+
+
+
+rule create_multi_sum_embeddings:
+     input:
+        expand(
+            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            cancers=joined_cancers
+        ),
+        expand(
+            "results/embeddings/mutation_embeddings.csv"
+        ),
+        expand(
+            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
+            cancers=joined_cancers,
+            cancer=config['cancers']
+        )
+     output:
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            i=range(3, multi_cancer_max_walk + 1),
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings,
+            noise_ratio=noise_ratios
+        )
+
+     run:
+        # Set the values from config
+        amount = amount_of_summed_embeddings
+        cancers = all_cancers
+
+        # Python loop for control
+        for walk_distance in range(3, multi_cancer_max_walk + 1):
+            for noise_ratio in noise_ratios:
+                shell(f"python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py -a {amount} -w {walk_distance} -c {cancers} -n {noise_ratio}")
