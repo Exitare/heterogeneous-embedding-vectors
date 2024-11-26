@@ -7,7 +7,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 load_file = Path("embedding_data.h5")
-save_folder = Path("results", "recognizer", "summed_embeddings", "test")
+save_folder = Path("results", "recognizer", "summed_embeddings", "multi")
 dims = 767
 
 def get_total_rows_and_columns(file_path, group):
@@ -141,9 +141,15 @@ if __name__ == '__main__':
     for cancer in cancer_indices.keys():
         combined_df[cancer] = combined_df[cancer].astype(int)
 
-    combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
-    print(f"Saved combined embeddings to {save_folder}.")
-
     if debug:
         # Print only the modalities columns, which are the last columns
         print(combined_df[modality_names].head())
+
+    for col in combined_df.columns:
+        try:
+            combined_df[col] = combined_df[col].astype(float)
+        except Exception as e:
+            print(f"Error converting column {col} to float: {e}")
+
+    combined_df.to_hdf(Path(save_folder, f"{walk_distance}_embeddings.h5"), key="embeddings", mode="w", format="table")
+    print(f"Saved combined embeddings to {save_folder}.")

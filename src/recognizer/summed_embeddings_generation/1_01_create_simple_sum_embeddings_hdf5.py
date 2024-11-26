@@ -6,7 +6,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 import numpy as np
 
-save_folder = Path("results", "recognizer", "summed_embeddings", "test")
+save_folder = Path("results", "recognizer", "summed_embeddings", "simple")
 load_file = Path("embedding_data.h5")
 
 
@@ -131,5 +131,8 @@ if __name__ == '__main__':
     combined_df = combined_df.astype(float)  # Convert all columns to float
 
     # Print a message and save the combined embeddings to CSV
-    print("Saving combined embeddings to CSV...")
-    combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
+    #print("Saving combined embeddings to CSV...")
+    #combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
+
+    print("Saving combined embeddings to HDF5...")
+    combined_df.to_hdf(Path(save_folder, f"{walk_distance}_embeddings.h5"), key='embeddings', mode='w', format='table')
