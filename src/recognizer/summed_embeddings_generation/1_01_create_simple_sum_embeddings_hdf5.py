@@ -8,6 +8,7 @@ import numpy as np
 
 save_folder = Path("results", "recognizer", "summed_embeddings", "simple")
 load_file = Path("embedding_data.h5")
+latent_space_dim = 767
 
 
 def get_total_rows_and_columns(file_path, group):
@@ -17,20 +18,20 @@ def get_total_rows_and_columns(file_path, group):
     with h5py.File(file_path, 'r') as f:
         dataset = f[group]["embeddings"]
         total_rows = dataset.shape[0]
-        total_columns = min(len(dataset.dtype), 767)  # Limit to 767 columns
+        total_columns = min(len(dataset.dtype), latent_space_dim)  # Limit to latent_space_dims
     return total_rows, total_columns
 
 
 def get_random_row_from_hdf5(file_path, group, num_rows):
     """
-    Efficiently retrieves a random row from a specific group in the HDF5 file and slices to 767 columns.
+    Efficiently retrieves a random row from a specific group in the HDF5 file and slices to latent_space_dims.
     """
     random_idx = random.randint(0, num_rows - 1)
     with h5py.File(file_path, 'r') as f:
         dataset = f[group]["embeddings"]
         row = dataset[random_idx]
-        # Convert structured row to a dict, then a pandas Series, and ensure only the first 767 columns are used
-        row_as_dict = {name: row[name] for name in row.dtype.names[:767]}  # Use only first 767 columns
+        # Convert structured row to a dict, then a pandas Series, and ensure only the first latent_space_dim are used
+        row_as_dict = {name: row[name] for name in row.dtype.names[:latent_space_dim]}  # Use only first latent_space_dim
     return pd.Series(row_as_dict).astype(float)  # Convert to numeric
 
 
@@ -50,10 +51,10 @@ def add_random_or_real_embedding(group_name, total_rows, num_columns, add_noise)
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Sum embeddings from different sources')
-    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum")
-    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=200000,
+    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum" , required=True)
+    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=1000,
                         help="Amount of summed embeddings to generate")
-    parser.add_argument("--noise_ratio", "-n", type=float, default=0.1, help="Ratio of random noise vectors to add")
+    parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
     args = parser.parse_args()
 
     amount_of_summed_embeddings = args.amount_of_summed_embeddings
@@ -71,15 +72,16 @@ if __name__ == '__main__':
     annotation_total_rows, annotation_columns = get_total_rows_and_columns(load_file, "annotations")
 
     # Ensure all modalities have the same column dimensions
-    assert rna_columns == image_columns == mutation_columns == annotation_columns == 767, \
-        "All modalities must have exactly 767 usable columns for summation"
+    assert rna_columns == image_columns == mutation_columns == annotation_columns == latent_space_dim, \
+        f"All modalities must have exactly {latent_space_dim} usable columns for summation"
 
     # List to hold all combined embeddings and their indices
     combined_data = []
+    labels_data = {label: [] for label in ["Text", "Image", "RNA", "Mutation"]}
 
     for _ in tqdm(range(amount_of_summed_embeddings)):
         # Initialize the combined sum with zeros for the embedding dimensions
-        combined_sum = pd.Series(np.zeros(767))  # Assuming all modalities share the same dimensions
+        combined_sum = pd.Series(np.zeros(latent_space_dim))  # Assuming all modalities share the same dimensions
         modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
         combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
 
@@ -119,20 +121,21 @@ if __name__ == '__main__':
                 if not add_noise:
                     combination_counts[modality] += 1
 
-        # Combine combined_sum and the combination_counts
-        combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],
-                                                   combination_counts['RNA'], combination_counts['Mutation']])
+        # Append combined sum to the data list
+        combined_data.append(combined_sum.tolist())
 
-    # Define column names using the dimensions from one of the embeddings
-    column_names = [f"dim_{i}" for i in range(767)] + ["Text", "Image", "RNA", "Mutation"]
+        # Append the label counts for each modality
+        for label, count in combination_counts.items():
+            labels_data[label].append(count)
 
-    # Create DataFrame after the loop
-    combined_df = pd.DataFrame(combined_data, columns=column_names)
-    combined_df = combined_df.astype(float)  # Convert all columns to float
+    # Save the data to an HDF5 file
+    hdf5_path = Path(save_folder, f"{walk_distance}_embeddings.h5")
+    with h5py.File(hdf5_path, "w") as f:
+        # Save combined embeddings
+        f.create_dataset("X", data=np.array(combined_data, dtype=np.float32))
 
-    # Print a message and save the combined embeddings to CSV
-    #print("Saving combined embeddings to CSV...")
-    #combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
+        # Save labels
+        for label, data in labels_data.items():
+            f.create_dataset(label, data=np.array(data, dtype=np.int32))
 
-    print("Saving combined embeddings to HDF5...")
-    combined_df.to_hdf(Path(save_folder, f"{walk_distance}_embeddings.h5"), key='embeddings', mode='w', format='table')
+    print(f"Saved HDF5 file to {hdf5_path}")
