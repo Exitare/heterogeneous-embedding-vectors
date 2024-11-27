@@ -39,12 +39,12 @@ def build_model(input_dim):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_text')(text_x)
 
     # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_rna')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_mutation')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_image')(x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_rna')(x)
+    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_mutation')(x)
 
     # Separate output layers for each count
     outputs = [text_output, image_output, rna_output, mutation_output]
@@ -150,10 +150,19 @@ if __name__ == '__main__':
     print(f"Summed embedding count: {amount_of_summed_embeddings}")
     print(f"Noise ratio: {noise_ratio}")
 
-    hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings.h5")
+    if walk_distance == -1:
+        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
+    else:
+        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings.h5")
+
     print(f"Loading data from {hdf5_file}...")
 
-    save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings")
+    # Prepare save path
+    if walk_distance == -1:
+        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings")
+    else:
+        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings")
+
     run_name = f"run_{run_iteration}"
     save_path = Path(save_path, run_name)
 
@@ -169,6 +178,13 @@ if __name__ == '__main__':
         label_keys = embeddings
 
     print(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
+
+    if walk_distance != -1:
+        max_embedding = walk_distance
+    else:
+        with h5py.File(hdf5_file, "r") as f:
+            max_embedding = f["meta_information"].attrs["max_embedding"]
+            print(f"Max embedding: {max_embedding}")
 
     # Calculate train-test split indices
     train_end = int(0.8 * num_samples)
