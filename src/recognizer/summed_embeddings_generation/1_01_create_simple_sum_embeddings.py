@@ -1,134 +1,226 @@
-import pandas as pd
-import random
+import h5py
+import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from argparse import ArgumentParser
-import numpy as np
+import logging
 
-save_folder = Path("results", "recognizer", "summed_embeddings", "simple")
-load_folder = Path("results", "embeddings")
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
-def load_rna_embeddings(cancers: []):
-    rna_embeddings = []
-    cancer_load_folder = Path(load_folder, "rna", cancers)
-    for file in Path(cancer_load_folder).iterdir():
-        if file.is_file() and file.name.endswith("_embeddings.csv"):
-            rna_embeddings.append(pd.read_csv(file))
-
-    rna_embeddings = pd.concat(rna_embeddings, ignore_index=True)
-    return rna_embeddings
+# Configuration
+SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "simple")
+LOAD_FILE = Path("embedding_data.h5")
+LATENT_SPACE_DIM = 767
+CHUNK_SIZE = 10000  # Number of embeddings per chunk
 
 
-def load_embeddings(cancers: []):
-    # Load the embeddings from CSV files
-    sentence_embeddings = pd.read_csv(Path(load_folder, "annotations", cancers, "embeddings.csv"))
-    image_embeddings = pd.read_csv(Path(load_folder, "image_embeddings.csv"))
-    mutations_embeddings = pd.read_csv(Path(load_folder, "mutation_embeddings.csv"))
-
-    return sentence_embeddings, image_embeddings, mutations_embeddings
-
-
-def add_random_or_real_embedding(embeddings, add_noise, count):
+class EmbeddingBuffer:
     """
-    Adds either random Gaussian noise or real embeddings based on add_noise flag.
+    A buffer to manage chunks of embeddings for a given modality.
+    Handles both structured and unstructured datasets.
     """
-    combined_sum = pd.Series(np.zeros_like(embeddings.iloc[0]), index=embeddings.columns)
-    for _ in range(count):
-        if add_noise:
-            # Generate random Gaussian noise embedding
-            noise_embedding = pd.Series(np.random.normal(0, 1, size=embeddings.shape[1]), index=embeddings.columns)
-            combined_sum += noise_embedding
+
+    def __init__(self, dataset, num_rows, chunk_size, latent_dim):
+        self.dataset = dataset
+        self.num_rows = num_rows
+        self.chunk_size = chunk_size
+        self.latent_dim = latent_dim
+        self.indices = np.random.permutation(num_rows)  # Shuffle indices for randomness
+        self.current_chunk = None
+        self.current_index = 0
+        self.chunk_pointer = 0
+        self.total_chunks = int(np.ceil(num_rows / chunk_size))
+
+        # Determine if the dataset is structured
+        if self.dataset.dtype.names:
+            self.structured = True
+            self.field_names = self.dataset.dtype.names[:self.latent_dim]
+            logging.info(f"Dataset '{self.dataset.name}' is structured.")
         else:
-            # Select a random real embedding
-            chosen_index = random.randint(0, len(embeddings) - 1)
-            combined_sum += embeddings.iloc[chosen_index]
-    return combined_sum
+            self.structured = False
+            logging.info(f"Dataset '{self.dataset.name}' is unstructured.")
+
+    def load_next_chunk(self):
+        """
+        Loads the next chunk of embeddings into the buffer.
+        Sorts indices to comply with h5py's advanced indexing requirements.
+        """
+        if self.chunk_pointer >= self.total_chunks:
+            # Re-shuffle indices when all chunks have been used
+            self.indices = np.random.permutation(self.num_rows)
+            self.chunk_pointer = 0
+            #logging.info("Reshuffled indices for buffer.")
+
+        start = self.chunk_pointer * self.chunk_size
+        end = min(start + self.chunk_size, self.num_rows)
+        chunk_indices = self.indices[start:end]
+
+        # Sort chunk_indices to satisfy h5py's requirement for increasing order
+        sorted_chunk_indices = np.sort(chunk_indices)
+
+        # Select the rows in sorted order
+        try:
+            rows = self.dataset[sorted_chunk_indices]
+        except Exception as e:
+            logging.error(f"Error accessing dataset rows: {e}")
+            raise
+
+        if self.structured:
+            try:
+                # Extract and stack fields across all rows
+                self.current_chunk = np.stack([rows[field] for field in self.field_names], axis=1).astype(np.float32)
+            except IndexError as e:
+                logging.error(f"Structured indexing error: {e}")
+                logging.error(f"Available fields: {self.dataset.dtype.names}")
+                raise
+            except Exception as e:
+                logging.error(f"Error processing structured dataset: {e}")
+                raise
+        else:
+            try:
+                # Assume rows are 2D numeric arrays; slice columns up to latent_dim
+                self.current_chunk = rows[:, :self.latent_dim].astype(np.float32)
+            except IndexError as e:
+                logging.error(f"Unstructured slicing error: {e}")
+                raise
+            except Exception as e:
+                logging.error(f"Error processing unstructured dataset: {e}")
+                raise
+
+        self.chunk_pointer += 1
+        self.current_index = 0
+        logging.debug(f"Loaded chunk {self.chunk_pointer}/{self.total_chunks} for dataset '{self.dataset.name}'.")
+
+    def get_next_embedding(self):
+        """
+        Retrieves the next embedding from the current chunk.
+        Loads a new chunk if the current one is exhausted.
+        """
+        if self.current_chunk is None or self.current_index >= self.current_chunk.shape[0]:
+            self.load_next_chunk()
+
+        embedding = self.current_chunk[self.current_index]
+        self.current_index += 1
+        return embedding
 
 
-if __name__ == '__main__':
+def get_total_rows_and_columns(f, group):
+    """
+    Returns the total number of rows and ensures columns are compatible for summation.
+    """
+    dataset = f[group]["embeddings"]
+    total_rows = dataset.shape[0]
+    total_columns = min(len(dataset.dtype), LATENT_SPACE_DIM)  # Limit to LATENT_SPACE_DIM
+    return total_rows, total_columns
+
+
+def add_random_or_real_embedding(buffer, add_noise, latent_dim):
+    """
+    Adds either random Gaussian noise or a real embedding from the buffer.
+    """
+    if add_noise:
+        return np.random.normal(0, 1, size=latent_dim).astype(np.float32)
+    else:
+        return buffer.get_next_embedding()
+
+
+def main():
+    # Argument Parsing
     parser = ArgumentParser(description='Sum embeddings from different sources')
-    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum")
-    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=200000,
+    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum", required=True)
+    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=1000,
                         help="Amount of summed embeddings to generate")
-    parser.add_argument("--noise_ratio", "-n", type=float, default=0.1, help="Ratio of random noise vectors to add")
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
     args = parser.parse_args()
 
     amount_of_summed_embeddings = args.amount_of_summed_embeddings
     walk_distance = args.walk_distance
     noise_ratio = args.noise_ratio
-    selected_cancers = args.cancer
 
-    cancers = "_".join(selected_cancers)
-    save_folder = Path(save_folder, str(amount_of_summed_embeddings), str(noise_ratio))
+    logging.info(
+        f"Parameters: walk_distance={walk_distance}, amount_of_summed_embeddings={amount_of_summed_embeddings}, noise_ratio={noise_ratio}")
 
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
+    # Prepare Save Directory
+    save_path = SAVE_FOLDER / str(amount_of_summed_embeddings) / str(noise_ratio)
+    save_path.mkdir(parents=True, exist_ok=True)
+    logging.info(f"Save path: {save_path}")
 
-    rna_embeddings = load_rna_embeddings(cancers=cancers)
-    sentence_embeddings, image_embeddings, mutation_embeddings = load_embeddings(cancers=cancers)
+    # Initialize Data Structures
+    combined_data = np.zeros((amount_of_summed_embeddings, LATENT_SPACE_DIM), dtype=np.float32)
+    labels_data = {label: np.zeros(amount_of_summed_embeddings, dtype=np.int32)
+                   for label in ["Text", "Image", "RNA", "Mutation"]}
 
-    # drop unnecessary columns
-    image_embeddings.drop(columns=["submitter_id", "cancer_type", "tile_pos"], inplace=True)
-    sentence_embeddings.drop(columns=["submitter_id"], inplace=True)
-    rna_embeddings.drop(columns=["submitter_id", "cancer"], inplace=True)
-    mutation_embeddings.drop(columns=["submitter_id"], inplace=True)
+    modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
 
-    # List to hold all combined embeddings and their indices
-    combined_data = []
+    with h5py.File(LOAD_FILE, 'r') as f:
+        # Get total rows and columns for each modality
+        rna_total_rows, rna_columns = get_total_rows_and_columns(f, "rna")
+        image_total_rows, image_columns = get_total_rows_and_columns(f, "images")
+        mutation_total_rows, mutation_columns = get_total_rows_and_columns(f, "mutations")
+        annotation_total_rows, annotation_columns = get_total_rows_and_columns(f, "annotations")
 
-    for _ in tqdm(range(amount_of_summed_embeddings)):
-        combined_sum = pd.Series(np.zeros_like(rna_embeddings.iloc[0]), index=rna_embeddings.columns)
-        modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
-        combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
+        # Ensure all modalities have the same column dimensions
+        assert rna_columns == image_columns == mutation_columns == annotation_columns == LATENT_SPACE_DIM, \
+            f"All modalities must have exactly {LATENT_SPACE_DIM} usable columns for summation"
 
-        # Randomly allocate the walk_distance across modalities
-        modality_counts = dict.fromkeys(modality_choices, 0)
-        remaining = walk_distance
-        while remaining > 0:
-            modality = random.choice(modality_choices)
-            modality_counts[modality] += 1
-            remaining -= 1
+        logging.info("All modalities have compatible dimensions.")
 
-        for modality, count in modality_counts.items():
-            if count == 0:
-                continue  # Skip modalities with no allocation
+        # Initialize buffers for each modality
+        buffers = {
+            'RNA': EmbeddingBuffer(f['rna']['embeddings'], rna_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
+            'Text': EmbeddingBuffer(f['annotations']['embeddings'], annotation_total_rows, CHUNK_SIZE,
+                                    LATENT_SPACE_DIM),
+            'Image': EmbeddingBuffer(f['images']['embeddings'], image_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
+            'Mutation': EmbeddingBuffer(f['mutations']['embeddings'], mutation_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM)
+        }
 
-            if modality == 'RNA':
-                embeddings = rna_embeddings
-            elif modality == 'Text':
-                embeddings = sentence_embeddings
-            elif modality == 'Image':
-                embeddings = image_embeddings
-            elif modality == 'Mutation':
-                embeddings = mutation_embeddings
+        # Pre-load the first chunk for each buffer
+        for buffer in buffers.values():
+            buffer.load_next_chunk()
 
-            # Decide whether to add noise or real embeddings
-            for _ in range(count):
-                add_noise = random.random() < noise_ratio
-                if add_noise:
-                    # Generate random Gaussian noise embedding
-                    noise_embedding = pd.Series(np.random.normal(0, 1, size=embeddings.shape[1]),
-                                                index=embeddings.columns)
-                    combined_sum += noise_embedding
-                else:
-                    # Select a random real embedding
-                    chosen_index = random.randint(0, len(embeddings) - 1)
-                    combined_sum += embeddings.iloc[chosen_index]
-                    combination_counts[modality] += 1  # Only count real embeddings
+        for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
+            combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
+            combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
 
-        # Combine combined_sum and the combination_counts
-        combined_data.append(list(combined_sum) + [combination_counts['Text'], combination_counts['Image'],
-                                                   combination_counts['RNA'], combination_counts['Mutation']])
+            # Allocate walk_distance across modalities using vectorized operations
+            random_modalities = np.random.choice(modality_choices, size=walk_distance)
+            unique, counts = np.unique(random_modalities, return_counts=True)
+            modality_counts = dict(zip(unique, counts))
 
-    # Define column names using the columns from one of the embeddings
-    column_names = list(rna_embeddings.columns) + ["Text", "Image", "RNA", "Mutation"]
+            for modality, count in modality_counts.items():
+                buffer = buffers[modality]
+                for _ in range(count):
+                    add_noise = np.random.random() < noise_ratio
+                    try:
+                        embedding = add_random_or_real_embedding(buffer, add_noise, LATENT_SPACE_DIM)
+                        combined_sum += embedding
+                    except IndexError as e:
+                        logging.error(f"IndexError when accessing embedding: {e}")
+                        continue
+                    except Exception as e:
+                        logging.error(f"Unexpected error when accessing embedding: {e}")
+                        continue
 
-    # Create DataFrame after the loop
-    combined_df = pd.DataFrame(combined_data, columns=column_names)
-    combined_df = combined_df.astype(float)  # Convert all columns to float
+                    if not add_noise:
+                        combination_counts[modality] += 1
 
-    # Print a message and save the combined embeddings to CSV
-    print("Saving combined embeddings to CSV...")
-    combined_df.to_csv(Path(save_folder, f"{walk_distance}_embeddings.csv"), index=False)
+            combined_data[i] = combined_sum
+            for label, count in combination_counts.items():
+                labels_data[label][i] = count
+
+    # Save the data to an HDF5 file with compression for efficiency
+    output_file = save_path / f"{walk_distance}_embeddings.h5"
+    with h5py.File(output_file, "w") as f_out:
+        # Save combined embeddings
+        f_out.create_dataset("X", data=combined_data, compression="gzip")
+
+        # Save labels
+        for label, data in labels_data.items():
+            f_out.create_dataset(label, data=data, compression="gzip")
+
+    logging.info(f"Saved HDF5 file to {output_file}")
+
+
+if __name__ == '__main__':
+    main()
