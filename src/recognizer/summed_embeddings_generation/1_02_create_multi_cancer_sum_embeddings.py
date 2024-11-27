@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Configuration Constants
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "multi")
-LOAD_FILE = Path("embedding_data.h5")
+LOAD_PATH = Path("results", "embeddings")
 LATENT_SPACE_DIM = 767
 CHUNK_SIZE = 10000  # Number of embeddings per chunk
 
@@ -228,7 +228,7 @@ def main():
 
     modality_choices_general = ["Text", "Image", "Mutation"]
 
-    with h5py.File(LOAD_FILE, 'r') as f:
+    with h5py.File(Path(LOAD_PATH, f"{cancers}.h5"), 'r') as f:
         # Validate selected cancers and get their indices
         cancer_indices = {}
         rna_dataset = f['rna']['embeddings']

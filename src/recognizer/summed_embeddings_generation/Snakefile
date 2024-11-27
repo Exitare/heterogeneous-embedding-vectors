@@ -11,37 +11,50 @@ noise_ratios = config['noise_ratios']
 rule all:
      input:
         expand(
-            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.h5",
             i=range(3, simple_cancer_max_walk+1),
             amount=amount_of_summed_embeddings,
             noise_ratio=noise_ratios
         ),
         expand(
-            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.h5",
             i=range(3, multi_cancer_max_walk + 1),
             cancers=joined_cancers,
             amount=amount_of_summed_embeddings,
             noise_ratio=noise_ratios
-        )
+        ),
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/combined_embeddings.h5",
+            i=range(3, multi_cancer_max_walk + 1),
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings,
+        ),
+         expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/0.0/{{i}}_embeddings.h5",
+            i=range(3, simple_cancer_max_walk+1),
+            amount=amount_of_summed_embeddings,
+        ),
+
+
 
 
 rule create_single_sum_embeddings:
    input:
         expand(
-            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            "results/embeddings/annotations/{cancers}/embeddings.h5",
             cancers=joined_cancers
         ),
         expand(
-            "results/embeddings/mutation_embeddings.csv"
+            "results/embeddings/mutation_embeddings.h5"
         ),
         expand(
-            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
+            "results/embeddings/rna/{cancers}/{cancer}_embeddings.h5",
             cancers=joined_cancers,
             cancer=config['cancers']
         )
    output:
         expand(
-            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.h5",
             i=range(3, simple_cancer_max_walk+1),
             amount=amount_of_summed_embeddings,
             noise_ratio=noise_ratios
@@ -54,24 +67,42 @@ rule create_single_sum_embeddings:
                 shell(f"python ./src/recognizer/summed_embeddings_generation/1_01_create_simple_sum_embeddings.py -a {{amount}} -w {{walk_distance}} -c {{cancers}} -n {{noise_ratio}}")
 
 
+rule create_single_combined_embeddings:
+    input:
+        expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/0.0/{{i}}_embeddings.h5",
+            i=range(3, simple_cancer_max_walk+1),
+            amount=amount_of_summed_embeddings
+        )
+    output:
+        expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/0.0/combined_embeddings.h5",
+            amount=amount_of_summed_embeddings
+        )
+
+    run:
+        amount=amount_of_summed_embeddings
+        shell(f"python3 src/recognizer/summed_embeddings_generation/combine_summed_embeddings.py -a {{amount}} -n 0.0")
+
+
 
 rule create_multi_sum_embeddings:
      input:
         expand(
-            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            "results/embeddings/annotations/{cancers}/embeddings.h5",
             cancers=joined_cancers
         ),
         expand(
-            "results/embeddings/mutation_embeddings.csv"
+            "results/embeddings/mutation_embeddings.h5"
         ),
         expand(
-            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
+            "results/embeddings/rna/{cancers}/{cancer}_embeddings.h5",
             cancers=joined_cancers,
             cancer=config['cancers']
         )
      output:
         expand(
-            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.csv",
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/{{noise_ratio}}/{{i}}_embeddings.h5",
             i=range(3, multi_cancer_max_walk + 1),
             cancers=joined_cancers,
             amount=amount_of_summed_embeddings,
@@ -87,3 +118,24 @@ rule create_multi_sum_embeddings:
         for walk_distance in range(3, multi_cancer_max_walk + 1):
             for noise_ratio in noise_ratios:
                 shell(f"python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py -a {amount} -w {walk_distance} -c {cancers} -n {noise_ratio}")
+
+
+rule create_multi_combined_embeddings:
+    input:
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/{{i}}_embeddings.h5",
+            i=range(3, multi_cancer_max_walk + 1),
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        )
+    output:
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/combined_embeddings.h5",
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+
+    run:
+        amount=amount_of_summed_embeddings
+        cancers=all_cancers
+        shell(f"python3 src/recognizer/summed_embeddings_generation/combine_summed_embeddings.py -a {{amount}} -n 0.0 -c {{cancers}}")

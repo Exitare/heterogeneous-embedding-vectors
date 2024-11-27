@@ -39,9 +39,6 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
             for name in dataset_names:
                 total_sizes[name] += f[name].shape[0]
 
-
-
-
     # Initialize the output file with extendable datasets
     with h5py.File(output_file, 'w') as f_out:
         for name in dataset_names:
@@ -90,23 +87,31 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
     logging.info(f"Metadata added with max_embedding = {max_embedding}")
 
 
-
 def main():
     parser = ArgumentParser(description='Sum embeddings from different sources')
     parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=1000,
                         help="Amount of summed embeddings to generate")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
+    parser.add_argument("--selected_cancers", "-c", nargs="+", required=False,
+                        help="The selected cancer identifiers to sum")
     args = parser.parse_args()
 
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
+    selected_cancers: [] = args.selected_cancers
 
-    # Define the directory containing the HDF5 files to merge
-    input_dir = Path("results", "recognizer", "summed_embeddings", "simple", str(amount_of_summed_embeddings),
-                     str(noise_ratio))
-
-    # Define the range of walk embedding counts (e.g., 3 to 30)
-    walk_counts = range(3, 31)  # Adjust as needed
+    if selected_cancers is not None:
+        cancers = "_".join(selected_cancers)
+        input_dir = Path("results", "recognizer", "summed_embeddings", "multi", cancers,
+                         str(amount_of_summed_embeddings),
+                         str(noise_ratio))
+        # Define the range of walk embedding counts (e.g., 3 to 30)
+        walk_counts = range(3, 31)  # Adjust as needed
+    else:
+        input_dir = Path("results", "recognizer", "summed_embeddings", "simple", str(amount_of_summed_embeddings),
+                         str(noise_ratio))
+        # Define the range of walk embedding counts (e.g., 3 to 30)
+        walk_counts = range(3, 16)  # Adjust as needed
 
     # Collect all input files based on walk_counts
     input_files = []
@@ -124,8 +129,12 @@ def main():
     # Define the output file path
     output_file = Path(input_dir, "combined_embeddings.h5")
 
-    # Define the dataset names to merge
-    dataset_names = ["X", "Text", "Image", "RNA", "Mutation"]
+    if selected_cancers is not None:
+        # please add the dataset names for the multi-cancer embeddings
+        dataset_names = ["X", "Text", "Image", "RNA", "Mutation"] + selected_cancers
+    else:
+        # Define the dataset names to merge
+        dataset_names = ["X", "Text", "Image", "RNA", "Mutation"]
 
     # Merge the files
     merge_h5_files(input_files, output_file, dataset_names)

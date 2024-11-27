@@ -2,16 +2,15 @@
 
 configfile: "./config.yaml"
 
+all_cancers = config['cancers']
+joined_cancers = '_'.join(config['cancers'])
+
 rule all:
     input:
-        "results/embeddings/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/blca_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/brca_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/coad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/luad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/stad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/thca_embeddings.csv",
-        "results/embeddings/mutation_embeddings.csv"
+        expand(
+            f"results/embeddings/{{cancers}}.h5",
+            cancers=joined_cancers
+        )
 
 
 # Rule for the first download step with a credentials file path
@@ -59,6 +58,7 @@ rule create_rna_embeddings:
         "data/rna/LUAD/data.csv",
         "data/rna/STAD/data.csv",
         "data/rna/BRCA/data.csv"
+        "data/rna/THCA/data.csv"
     output:
         "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/blca_embeddings.csv",
         "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/brca_embeddings.csv",
@@ -147,3 +147,27 @@ rule create_annotation_embeddings:
         "results/embeddings/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv"
     shell:
         "python ./src/data_preparation/0_12_create_annotation_embeddings.py -c BRCA LUAD STAD BLCA COAD THCA > {output} 2>/dev/null"
+
+
+rule create_hdf5:
+    input:
+        expand(
+            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            cancers=joined_cancers
+        ),
+        "results/embeddings/mutation_embeddings.csv",
+        expand(
+            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
+            cancers=joined_cancers,
+            cancer=all_cancers
+        )
+
+    output:
+        expand(
+            f"results/embeddings/{{cancers}}.h5",
+            cancers=joined_cancers
+        )
+
+    run:
+        cancers = all_cancers
+        shell(f"python ./src/data_preparation/0_14_create_hdf5.py -c {{cancers}}")
