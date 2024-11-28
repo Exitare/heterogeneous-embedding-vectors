@@ -10,9 +10,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Configuration
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "simple")
-LOAD_FILE = Path("embedding_data.h5")
 LATENT_SPACE_DIM = 767
 CHUNK_SIZE = 10000  # Number of embeddings per chunk
+LOAD_FOLDER = Path("results", "embeddings")
 
 
 class EmbeddingBuffer:
@@ -50,7 +50,7 @@ class EmbeddingBuffer:
             # Re-shuffle indices when all chunks have been used
             self.indices = np.random.permutation(self.num_rows)
             self.chunk_pointer = 0
-            #logging.info("Reshuffled indices for buffer.")
+            # logging.info("Reshuffled indices for buffer.")
 
         start = self.chunk_pointer * self.chunk_size
         end = min(start + self.chunk_size, self.num_rows)
@@ -132,17 +132,20 @@ def main():
     parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=1000,
                         help="Amount of summed embeddings to generate")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
+    parser.add_argument("--selected_cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
     args = parser.parse_args()
 
-    amount_of_summed_embeddings = args.amount_of_summed_embeddings
-    walk_distance = args.walk_distance
-    noise_ratio = args.noise_ratio
+    amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
+    walk_distance: int = args.walk_distance
+    noise_ratio: float = args.noise_ratio
+    selected_cancers = args.selected_cancers
+    cancers = "_".join(selected_cancers)
 
     logging.info(
         f"Parameters: walk_distance={walk_distance}, amount_of_summed_embeddings={amount_of_summed_embeddings}, noise_ratio={noise_ratio}")
 
     # Prepare Save Directory
-    save_path = SAVE_FOLDER / str(amount_of_summed_embeddings) / str(noise_ratio)
+    save_path = Path(SAVE_FOLDER, str(amount_of_summed_embeddings), str(noise_ratio))
     save_path.mkdir(parents=True, exist_ok=True)
     logging.info(f"Save path: {save_path}")
 
@@ -153,7 +156,7 @@ def main():
 
     modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
 
-    with h5py.File(LOAD_FILE, 'r') as f:
+    with h5py.File(Path(LOAD_FOLDER, f"{cancers}.h5"), 'r') as f:
         # Get total rows and columns for each modality
         rna_total_rows, rna_columns = get_total_rows_and_columns(f, "rna")
         image_total_rows, image_columns = get_total_rows_and_columns(f, "images")

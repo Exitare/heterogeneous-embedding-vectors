@@ -41,16 +41,8 @@ rule all:
 rule create_single_sum_embeddings:
    input:
         expand(
-            "results/embeddings/annotations/{cancers}/embeddings.h5",
+            f"results/embeddings/{{cancers}}.h5",
             cancers=joined_cancers
-        ),
-        expand(
-            "results/embeddings/mutation_embeddings.h5"
-        ),
-        expand(
-            "results/embeddings/rna/{cancers}/{cancer}_embeddings.h5",
-            cancers=joined_cancers,
-            cancer=config['cancers']
         )
    output:
         expand(
@@ -89,16 +81,8 @@ rule create_single_combined_embeddings:
 rule create_multi_sum_embeddings:
      input:
         expand(
-            "results/embeddings/annotations/{cancers}/embeddings.h5",
+            f"results/embeddings/{{cancers}}.h5",
             cancers=joined_cancers
-        ),
-        expand(
-            "results/embeddings/mutation_embeddings.h5"
-        ),
-        expand(
-            "results/embeddings/rna/{cancers}/{cancer}_embeddings.h5",
-            cancers=joined_cancers,
-            cancer=config['cancers']
         )
      output:
         expand(
