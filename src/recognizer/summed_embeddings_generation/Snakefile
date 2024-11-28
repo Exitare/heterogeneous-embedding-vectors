@@ -25,15 +25,13 @@ rule all:
         ),
         expand(
             f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/combined_embeddings.h5",
-            i=range(3, multi_cancer_max_walk + 1),
             cancers=joined_cancers,
             amount=amount_of_summed_embeddings,
         ),
-         expand(
-            f"results/recognizer/summed_embeddings/simple/{{amount}}/0.0/{{i}}_embeddings.h5",
-            i=range(3, simple_cancer_max_walk+1),
-            amount=amount_of_summed_embeddings,
-        ),
+        expand(
+            f"results/recognizer/summed_embeddings/simple/{{amount}}/0.0/combined_embeddings.h5",
+            amount=amount_of_summed_embeddings
+        )
 
 
 

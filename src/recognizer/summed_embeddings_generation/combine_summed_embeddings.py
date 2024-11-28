@@ -77,14 +77,21 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
                         output_dataset.resize(output_dataset.shape[0] + chunk_data.shape[0], axis=0)
                         output_dataset[-chunk_data.shape[0]:] = chunk_data
 
-                # Add a metadata group with the maximum embedding value
-                meta_group = f_out.create_group("meta_information")
-                meta_group.attrs["max_embedding"] = max_embedding
-                meta_group.attrs["description"] = "Metadata about the combined embeddings"
-                meta_group.attrs["num_input_files"] = len(input_files)
+    available_keys = []
+    with h5py.File(output_file, 'a') as f_out:
+        # Add a metadata group with the maximum embedding value
+        meta_group = f_out.create_group("meta_information")
+        meta_group.attrs["max_embedding"] = max_embedding
+        meta_group.attrs["description"] = "Metadata about the combined embeddings"
+        meta_group.attrs["num_input_files"] = len(input_files)
+        available_keys = list(f_out.keys())
 
     logging.info(f"Successfully merged files into {output_file}")
     logging.info(f"Metadata added with max_embedding = {max_embedding}")
+    logging.info(f"Total embeddings per dataset: {total_sizes}")
+    logging.info(f"Output file size: {Path(output_file).stat().st_size / 1e6:.2f} MB")
+    logging.info(f"Available Keys: {available_keys}")
+    logging.info("Merge complete.")
 
 
 def main():
@@ -105,13 +112,11 @@ def main():
         input_dir = Path("results", "recognizer", "summed_embeddings", "multi", cancers,
                          str(amount_of_summed_embeddings),
                          str(noise_ratio))
-        # Define the range of walk embedding counts (e.g., 3 to 30)
-        walk_counts = range(3, 31)  # Adjust as needed
+        walk_counts = range(3, 16)
     else:
         input_dir = Path("results", "recognizer", "summed_embeddings", "simple", str(amount_of_summed_embeddings),
                          str(noise_ratio))
-        # Define the range of walk embedding counts (e.g., 3 to 30)
-        walk_counts = range(3, 16)  # Adjust as needed
+        walk_counts = range(3, 31)
 
     # Collect all input files based on walk_counts
     input_files = []
