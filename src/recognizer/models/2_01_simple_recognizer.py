@@ -152,16 +152,14 @@ if __name__ == '__main__':
 
     if walk_distance == -1:
         hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
+        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings")
     else:
         hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings.h5")
+        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings")
 
     print(f"Loading data from {hdf5_file}...")
 
-    # Prepare save path
-    if walk_distance == -1:
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings")
-    else:
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings")
+
 
     run_name = f"run_{run_iteration}"
     save_path = Path(save_path, run_name)
