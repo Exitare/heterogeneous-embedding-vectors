@@ -19,13 +19,8 @@ then
 fi
 
 
-
-
-for walk_distance in $(seq 3 $upper_bound)
+# run it 30 times
+for iteration in $(seq 1 30)
 do
-  # run it 30 times
-  for iteration in $(seq 1 30)
-  do
-    sbatch ./src/recognizer/2_01_run_simple_recognizer.sh $walk_distance $iteration $amount_of_summed_embeddings 0.0
-  done
+  sbatch ./src/recognizer/2_01_run_simple_recognizer.sh -1 $iteration $amount_of_summed_embeddings
 done

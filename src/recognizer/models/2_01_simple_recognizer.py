@@ -96,7 +96,8 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path) ->
 
             # Calculate metrics for the current embedding and batch
             all_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
-            all_metrics[embedding]['precision'].append(precision_score(y_true, y_pred, average='macro', zero_division=0))
+            all_metrics[embedding]['precision'].append(
+                precision_score(y_true, y_pred, average='macro', zero_division=0))
             all_metrics[embedding]['recall'].append(recall_score(y_true, y_pred, average='macro', zero_division=0))
             all_metrics[embedding]['f1'].append(f1_score(y_true, y_pred, average='macro', zero_division=0))
 
@@ -119,7 +120,6 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path) ->
         }).to_csv(Path(save_path, f"{embedding}_predictions.csv"), index=False)
 
     return averaged_metrics
-
 
 
 if __name__ == '__main__':
@@ -149,25 +149,21 @@ if __name__ == '__main__':
     print(f"Run iteration: {run_iteration}")
     print(f"Summed embedding count: {amount_of_summed_embeddings}")
     print(f"Noise ratio: {noise_ratio}")
+    run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
         hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings")
+        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
     else:
-        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings.h5")
+        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings.h5")
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings")
 
     print(f"Loading data from {hdf5_file}...")
-
-
-
-    run_name = f"run_{run_iteration}"
-    save_path = Path(save_path, run_name)
+    print(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
-
-    print(f"Saving results to {save_path}")
 
     # Load data dimensions
     with h5py.File(hdf5_file, "r") as f:
