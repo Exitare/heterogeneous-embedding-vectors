@@ -35,7 +35,9 @@ def hdf5_generator(hdf5_file_path, batch_size, indices):
     """
     with h5py.File(hdf5_file_path, 'r') as f:
         X = f["X"]
-        labels = {key: f[key] for key in f.keys() if key != "X"}
+        # Exclude non-datasets like "meta_information"
+        label_keys = [key for key in f.keys() if key != "X" and isinstance(f[key], h5py.Dataset)]
+        labels = {key: f[key] for key in label_keys}  # Map labels to their datasets
 
         while True:
             np.random.shuffle(indices)  # Shuffle indices for randomness
@@ -43,7 +45,7 @@ def hdf5_generator(hdf5_file_path, batch_size, indices):
                 end_idx = min(start_idx + batch_size, len(indices))
                 batch_indices = indices[start_idx:end_idx]
                 batch_indices = np.sort(batch_indices)  # Ensure ascending order for HDF5 compatibility
-                X_batch = X[batch_indices]
+                X_batch = X[batch_indices.tolist()]  # Convert to list for HDF5 compatibility
 
                 # Update label keys to match model output names
                 y_batch = {
@@ -51,11 +53,12 @@ def hdf5_generator(hdf5_file_path, batch_size, indices):
                     f"output_image" if key == "Image" else
                     f"output_mutation" if key == "Mutation" else
                     f"output_rna" if key == "RNA" else
-                    f"output_cancer_{key}": labels[key][batch_indices]
+                    f"output_cancer_{key}": labels[key][batch_indices.tolist()]  # Convert to list here as well
                     for key in labels
                 }
 
                 yield X_batch, y_batch
+
 
 def evaluate_model_in_batches(model, generator, steps, embeddings, save_path, walk_distance):
     """
@@ -121,7 +124,6 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path, wa
     return metrics_df
 
 
-
 def build_model(input_dim, cancer_list: []):
     """
     Build a multi-output model for embeddings.
@@ -140,16 +142,16 @@ def build_model(input_dim, cancer_list: []):
     x = Dense(64, activation='relu', name='base_dense4')(x)
     x = BatchNormalization()(x)
 
-    text_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_text')(x)
-    image_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_image')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_mutation')(x)
+    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_text')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_image')(x)
+    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_mutation')(x)
 
     rna_x = Dense(128, activation='relu', name='rna_dense1')(x)
     rna_x = Dropout(0.2)(rna_x)
     rna_x = Dense(64, activation='relu', name='rna_dense2')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=walk_distance), name='output_rna')(rna_x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_rna')(rna_x)
 
-    cancer_outputs = [Dense(1, activation=ReLU(max_value=walk_distance), name=f'output_cancer_{cancer}')(x)
+    cancer_outputs = [Dense(1, activation=ReLU(max_value=max_embedding), name=f'output_cancer_{cancer}')(x)
                       for cancer in cancer_list]
     outputs = [text_output, image_output, mutation_output, rna_output] + cancer_outputs
     return Model(inputs=inputs, outputs=outputs, name="multi_output_model")
@@ -184,17 +186,26 @@ if __name__ == '__main__':
     print(f"Run iteration: {run_iteration}")
     run_name = f"run_{run_iteration}"
 
+    if walk_distance == -1:
+        load_path = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         "combined_embeddings.h5")
+        save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings",
+                         run_name)
+        with h5py.File(load_path, "r") as f:
+            max_embedding = f["meta_information"].attrs["max_embedding"]
+            print(f"Max embedding: {max_embedding}")
+    else:
+        load_path = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings.h5")
+        save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings", run_name)
+        max_embedding = walk_distance
 
-    save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
-                     f"{walk_distance}_embeddings", run_name)
+    print(f"Loading data from {load_path}")
     print(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
-
-    load_path = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
-                     f"{walk_distance}_embeddings.h5")
-    print(f"Loading data from {load_path}")
 
     train_indices, val_indices, test_indices = create_indices(load_path)
 
@@ -243,7 +254,6 @@ if __name__ == '__main__':
     for layer in model.layers:
         if 'text' not in layer.name:
             layer.trainable = False
-
 
     # adjust the text loss weight
     loss_weights["output_text"] = 4.0
