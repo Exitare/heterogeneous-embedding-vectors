@@ -19,14 +19,27 @@ load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
 def create_indices(hdf5_file_path, test_size=0.2, random_state=42):
     """
-    Create random train-test split indices without loading the entire dataset.
+    Create random train-test split indices with stratification based on class labels.
     """
     with h5py.File(hdf5_file_path, 'r') as hdf5_file:
         num_samples = hdf5_file['X'].shape[0]
+        walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
+
     indices = np.arange(num_samples)
-    train_indices, test_indices = train_test_split(indices, test_size=test_size, random_state=random_state)
-    train_indices, val_indices = train_test_split(train_indices, test_size=0.2, random_state=random_state)
+
+    # Stratify by walk distances
+    train_indices, test_indices = train_test_split(
+        indices, test_size=test_size, random_state=random_state, stratify=walk_distances
+    )
+
+    # Further split train into train and validation
+    train_indices, val_indices = train_test_split(
+        train_indices, test_size=0.2, random_state=random_state,
+        stratify=walk_distances[train_indices]
+    )
+
     return train_indices, val_indices, test_indices
+
 
 
 def hdf5_generator(hdf5_file_path, batch_size, indices):
