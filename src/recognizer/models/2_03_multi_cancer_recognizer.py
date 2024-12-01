@@ -60,7 +60,7 @@ def hdf5_generator(hdf5_file_path, batch_size, indices):
                 yield X_batch, y_batch
 
 
-def evaluate_model_in_batches(model, generator, steps, embeddings, save_path, walk_distance):
+def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, walk_distance: int, noise: float):
     """
     Evaluate the model using a generator and save predictions, ground truth, and metrics.
     """
@@ -109,19 +109,35 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path, wa
             "precision": np.mean(all_metrics[embedding]['precision']),
             "recall": np.mean(all_metrics[embedding]['recall']),
             "f1": np.mean(all_metrics[embedding]['f1']),
+            "noise": noise
         })
         # Save predictions and ground truth for this embedding
         df_predictions = pd.DataFrame({
             f'predicted_{embedding.lower()}': all_predictions[embedding],
             f'true_{embedding.lower()}': all_ground_truth[embedding]
         })
-        df_predictions.to_csv(save_path / f"{embedding}_predictions.csv", index=False)
+        df_predictions.to_csv(Path(save_path, f"{embedding}_predictions.csv"), index=False)
 
     # Save overall metrics to a CSV
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(save_path / "metrics.csv", index=False)
-    print("Evaluation complete. Metrics saved.")
+    print("Metrics saved.")
     return metrics_df
+
+
+def evaluate_accuracy_per_walk_distance(metrics_df: pd.DataFrame, save_path: Path):
+    """
+    Calculate the accuracy per embedding and walk distance.
+    """
+    # Group by walk_distance and embedding to calculate mean accuracy
+    grouped_metrics = metrics_df.groupby(['walk_distance', 'embedding']).agg({
+        'accuracy': 'mean'
+    }).reset_index()
+
+    # Save results to CSV
+    grouped_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+    print("Split metrics saved.")
+    return grouped_metrics
 
 
 def build_model(input_dim, cancer_list: []):
@@ -283,5 +299,8 @@ if __name__ == '__main__':
 
     # Final Evaluation
     metrics_df = evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
-                                           walk_distance)
+                                           walk_distance=walk_distance, noise=noise_ratio)
+
+    # Calculate and save accuracy per embedding and walk distance
+    accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
     print("Fine-tuning and evaluation complete!")
