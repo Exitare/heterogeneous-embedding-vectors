@@ -41,7 +41,6 @@ def create_indices(hdf5_file_path, test_size=0.2, random_state=42):
     return train_indices, val_indices, test_indices
 
 
-
 def hdf5_generator(hdf5_file_path, batch_size, indices):
     """
     HDF5 data generator for summed embeddings and labels.
@@ -188,9 +187,9 @@ def build_model(input_dim, cancer_list: []):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
+    parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--walk_distance', "-w", type=int, required=True,
-                        help='The number of the walk distance to work with.')
+                        help='The number of the walk distance to work with.', choices=list(range(3, 16)) + [-1])
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
@@ -308,7 +307,7 @@ if __name__ == '__main__':
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Save fine-tuning history
-    pd.DataFrame(history.history).to_csv(save_path / "fine_tuning_history.csv", index=False)
+    pd.DataFrame(history.history).to_csv(Path(save_path, "fine_tuning_history.csv"), index=False)
 
     # Final Evaluation
     metrics_df = evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
