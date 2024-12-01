@@ -77,7 +77,7 @@ def hdf5_generator(hdf5_file, batch_size, input_key="X", label_keys=None, start_
                 yield X_batch, tuple(y_batch)  # Return labels as a tuple of arrays
 
 
-def evaluate_model_in_batches(model, generator, steps, embeddings, save_path) -> []:
+def evaluate_model_in_batches(model, generator, steps, embeddings, save_path, noise) -> []:
     all_metrics = {embedding: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for embedding in embeddings}
     all_predictions = {embedding: [] for embedding in embeddings}
     all_ground_truth = {embedding: [] for embedding in embeddings}
@@ -110,6 +110,7 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path) ->
             "precision": np.mean(all_metrics[embedding]['precision']),
             "recall": np.mean(all_metrics[embedding]['recall']),
             "f1": np.mean(all_metrics[embedding]['f1']),
+            "noise": noise
         }
         averaged_metrics.append(metrics)
 
@@ -244,7 +245,7 @@ if __name__ == '__main__':
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
-    metrics: [] = evaluate_model_in_batches(model, test_generator, test_steps, embeddings, save_path)
+    metrics: [] = evaluate_model_in_batches(model, test_generator, test_steps, embeddings=embeddings, save_path=save_path, noise=noise_ratio)
 
     # Save metrics
     metrics_df = pd.DataFrame(metrics)
