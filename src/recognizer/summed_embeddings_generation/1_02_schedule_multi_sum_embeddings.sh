@@ -1,8 +1,8 @@
 #!/bin/bash
-selected_cancers=$1 # the data files
-lower_bound=$2
-upper_bound=$3
-
+lower_bound=$1
+upper_bound=$2
+amount_of_summed_embeddings=$3
+selected_cancers=$4 # the data files
 # ./src/recognizer/1_02_schedule_multi_sum_embeddings.sh "BRCA LUAD STAD BLCA COAD THCA"
 
 # if selected_cancers is not provided, then exit
@@ -14,8 +14,8 @@ fi
 # if lower bound not set, set to 2
 if [ -z "$lower_bound" ]
 then
-  echo "Lower bound not set, setting to 2"
-  lower_bound=2
+  echo "Lower bound not set, setting to 3"
+  lower_bound=3
 fi
 
 # if upper bound not set, set to 10
@@ -24,13 +24,19 @@ then
   echo "Upper bound not set, setting to 10"
   upper_bound=10
 fi
-´
+
+# if no summed embeddings count is provided, set to 1000
+if [ -z "$amount_of_summed_embeddings" ]
+then
+  echo "Amount of summed embeddings not set, setting to 1000000"
+  amount_of_summed_embeddings=1000000
+fi
 
 # iterate through lower_bound to upper_bound
-for i in $(seq $lower_bound $upper_bound)
+for walk_distance in $(seq $lower_bound $upper_bound)
 do
-  for noise_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0
+  for noise_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99
   do
-    sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $i "${selected_cancers}" $noise_ratio
+    sbatch ./src/recognizer/1_02_create_multi_sum_embeddings.sh $walk_distance "${selected_cancers}" "${amount_of_summed_embeddings}" $noise_ratio
   done
 done

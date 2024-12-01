@@ -34,10 +34,16 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
     # Determine the shape of each dataset in the output file
     total_sizes = {name: 0 for name in dataset_names}
     max_embedding = 3
+    walk_distances = []  # Track walk distances for each row in the merged dataset
+
     for file_path in input_files:
         with h5py.File(file_path, 'r') as f:
             for name in dataset_names:
                 total_sizes[name] += f[name].shape[0]
+            # Extract walk distance from the file name
+            walk_distance = int(file_path.stem.split("_")[0])  # Assuming the file name format is "<walk>_embeddings.h5"
+            num_rows = f[dataset_names[0]].shape[0]
+            walk_distances.extend([walk_distance] * num_rows)
 
     # Initialize the output file with extendable datasets
     with h5py.File(output_file, 'w') as f_out:
@@ -58,9 +64,18 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
                 chunks=True  # Enable chunking for efficient appending
             )
 
+        # Create a new dataset for walk distances
+        f_out.create_dataset(
+            "WalkDistances",
+            shape=(0,),  # Initial shape
+            maxshape=(None,),  # Extendable along the first dimension
+            dtype=np.int32,
+            chunks=True,
+        )
+
         # Iterate over each input file and append data
         for file_path in tqdm(input_files, desc="Merging files"):
-            max_embedding = max(max_embedding, int(Path(file_path).parts[-1].split("_")[0]))
+            walk_distance = int(file_path.stem.split("_")[0])  # Extract walk distance
             with h5py.File(file_path, 'r') as f_in, h5py.File(output_file, 'a') as f_out:
                 for name in dataset_names:
                     data = f_in[name]
@@ -77,7 +92,11 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
                         output_dataset.resize(output_dataset.shape[0] + chunk_data.shape[0], axis=0)
                         output_dataset[-chunk_data.shape[0]:] = chunk_data
 
-    available_keys = []
+                # Append the walk distances for this file
+                walk_dataset = f_out["WalkDistances"]
+                walk_dataset.resize(walk_dataset.shape[0] + num_rows, axis=0)
+                walk_dataset[-num_rows:] = walk_distance
+
     with h5py.File(output_file, 'a') as f_out:
         # Add a metadata group with the maximum embedding value
         meta_group = f_out.create_group("meta_information")
