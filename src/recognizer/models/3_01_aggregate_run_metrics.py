@@ -13,7 +13,7 @@ if __name__ == '__main__':
 
     data_folder: Path = args.data_folder
 
-    print("Using data folder:", data_folder)
+    print(f"Using data folder: {data_folder}")
 
     # assert last path element must be a number
     assert data_folder.parts[-1].isdigit(), "Last path element must be a number"
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # extract last two pieces of data_folder
     appendix = Path(*data_folder.parts[-2:])
     save_folder = Path(save_folder, appendix)
-    print(save_folder)
+    print(f"Using save folder: {save_folder}")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
