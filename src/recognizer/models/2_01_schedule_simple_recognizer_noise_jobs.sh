@@ -11,10 +11,11 @@ then
   upper_bound=10
 fi
 
-# if summed embeddings count not set, exit
+# if summed embeddings count not set, set to 1000000
 if [ -z "$amount_of_summed_embeddings" ]
 then
-  echo "Amount of summed embeddings count not set, stopping."
+  echo "Amount of summed embeddings count not set, setting to 1000000"
+  amount_of_summed_embeddings=1000000
   exit 1
 fi
 
@@ -23,12 +24,12 @@ fi
 
 for walk_distance in $(seq 3 $upper_bound)
 do
-  for noise in 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9
+  for noise in 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99
   do
     # run it 30 times
-    for iteration in $(seq 1 30)
+    for iteration in $(seq 1 15)
     do
-      sbatch ./src/recognizer/2_01_run_simple_recognizer.sh $walk_distance $iteration $amount_of_summed_embeddings $noise
+      sbatch ./src/recognizer/models/2_01_run_simple_recognizer.sh $walk_distance $iteration $amount_of_summed_embeddings $noise
     done
   done
 done

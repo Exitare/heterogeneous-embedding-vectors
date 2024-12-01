@@ -17,5 +17,5 @@ run_iteration=$2
 cancer_types=$3
 amount_of_summed_embeddings=$4
 
-#echo src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types}
-python3 src/recognizer/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types -a "${amount_of_summed_embeddings}"}
+#echo src/recognizer/models/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types}
+python3 src/recognizer/models/2_03_multi_cancer_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -c ${cancer_types -a "${amount_of_summed_embeddings}"}

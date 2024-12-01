@@ -18,4 +18,4 @@ amount_of_summed_embeddings=$3
 noise_ratio=$4
 
 
-python3 src/recognizer/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
+python3 src/recognizer/models/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
