@@ -17,4 +17,4 @@ selected_cancers=$2
 amount_of_summed_embeddings=$3
 noise_ratio=$4
 
-python3 src/recognizer/1_02_create_multi_cancer_sum_embeddings.py  -a "${amount_of_summed_embeddings}" -w "${walk_distance}" -c ${selected_cancers} -n "${noise_ratio}"
+python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py  -a "${amount_of_summed_embeddings}" -w "${walk_distance}" -c ${selected_cancers} -n "${noise_ratio}"

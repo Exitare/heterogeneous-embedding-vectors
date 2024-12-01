@@ -1,10 +1,12 @@
 #!/bin/bash
 
 # add range of values to iterate through
-lower_bound=$1
-upper_bound=$2
-amount_of_summed_embeddings=$3
-cancer_types=$4
+cancer_types=$1
+amount_of_summed_embeddings=$2
+lower_bound=$3
+upper_bound=$4
+
+#./src/recognizer/summed_embeddings_generation/1_01_schedule_simple_sum_embeddings.sh "BRCA LUAD STAD BLCA COAD THCA"
 
 # if lower bound not set, set to 2
 if [ -z "$lower_bound" ]
@@ -35,6 +37,6 @@ for walk_distance in $(seq $lower_bound $upper_bound)
 do
   for noise_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99
   do
-    sbatch ./src/recognizer/1_01_create_simple_sum_embeddings.sh $walk_distance $amount_of_summed_embeddings "${cancer_types}" $noise_ratio
+     sbatch ./src/recognizer/summed_embeddings_generation/1_01_create_simple_sum_embeddings.sh $walk_distance $amount_of_summed_embeddings "${cancer_types}" $noise_ratio
   done
 done
