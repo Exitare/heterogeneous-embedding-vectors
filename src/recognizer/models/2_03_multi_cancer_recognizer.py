@@ -23,9 +23,15 @@ def create_indices(hdf5_file_path, test_size=0.2, random_state=42):
     """
     with h5py.File(hdf5_file_path, 'r') as hdf5_file:
         num_samples = hdf5_file['X'].shape[0]
-        walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
+        if walk_distance == -1:
+            walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
 
     indices = np.arange(num_samples)
+
+    if walk_distance != -1:
+        train_indices, test_indices = train_test_split(indices, test_size=test_size, random_state=random_state)
+        train_indices, val_indices = train_test_split(train_indices, test_size=0.2, random_state=random_state)
+        return train_indices, val_indices, test_indices
 
     # Stratify by walk distances
     train_indices, test_indices = train_test_split(
