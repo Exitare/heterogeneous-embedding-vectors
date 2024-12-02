@@ -7,107 +7,152 @@ import h5py
 save_folder = Path("results", "embeddings")
 
 
-def load_rna_embeddings(embeddings_path: Path) -> pd.DataFrame:
-    """Load RNA embeddings from multiple CSV files into a single DataFrame."""
-    rna_embeddings = []
-    for file in embeddings_path.iterdir():
-        if file.is_file() and file.name.endswith("_embeddings.csv"):
-            print("Loading RNA embeddings from", file)
-            rna_embeddings.append(pd.read_csv(file))
-    return pd.concat(rna_embeddings, ignore_index=True)
+def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
+    """
+    Load data from a directory or a single file in chunks.
 
+    Parameters:
+        path (Path): Path to a directory or file.
+        chunk_size (int): Number of rows per chunk.
+        file_extension (str): Extension of files to process (default: .csv).
 
-def load_annotations_embeddings(embeddings_path: Path) -> pd.DataFrame:
-    """Load annotation embeddings from a single CSV file."""
-    return pd.read_csv(embeddings_path)
+    Yields:
+        pd.DataFrame: Chunk of data from files or a single file.
+    """
+    path = Path(path)
 
-
-def load_image_embeddings(embeddings_path: Path, selected_cancers: []) -> pd.DataFrame:
-    """Generator that yields image embeddings from TSV files."""
-    for file in embeddings_path.iterdir():
-        if file.is_file() and file.name.startswith("TCGA") and file.name.endswith(".tsv") and any(
-                cancer in file.name for cancer in selected_cancers):
-            print("Loading image embeddings from", file)
-            yield pd.read_csv(file, sep="\t")
-
-
-def load_mutation_embeddings(embeddings_path: Path) -> pd.DataFrame:
-    """Load mutation embeddings from a single CSV file."""
-    return pd.read_csv(embeddings_path)
+    if path.is_dir():
+        # Process all files in the directory
+        for file_path in path.iterdir():
+            if file_path.is_file() and file_path.suffix == file_extension:
+                print(f"Loading file in chunks: {file_path}")
+                for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+                    yield chunk
+    elif path.is_file():
+        # Process the single file
+        print(f"Loading single file in chunks: {path}")
+        for chunk in pd.read_csv(path, chunksize=chunk_size):
+            yield chunk
+    else:
+        raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
 def dataframe_to_structured_array(df: pd.DataFrame) -> np.ndarray:
     """Convert a Pandas DataFrame to a structured NumPy array."""
     dtype = []
     for col in df.columns:
-        if df[col].dtype == 'object':  # String data
-            dtype.append((col, h5py.string_dtype(encoding='utf-8')))
+        if df[col].dtype == "object":  # String data
+            dtype.append((col, h5py.string_dtype(encoding="utf-8")))
         else:  # Numeric data
             dtype.append((col, df[col].dtype))
 
     structured_array = np.zeros(len(df), dtype=dtype)
     for col in df.columns:
-        structured_array[col] = df[col].astype(str) if df[col].dtype == 'object' else df[col]
+        structured_array[col] = (
+            df[col].astype(str) if df[col].dtype == "object" else df[col]
+        )
 
     return structured_array
 
 
-if __name__ == '__main__':
+def process_and_store_in_chunks(
+        dataset_name, loader, f, key_column="submitter_id"
+):
+    """Process data in chunks and store them in the HDF5 file, while creating indices."""
+    print(f"Processing {dataset_name} in chunks...")
+
+    group = f.create_group(dataset_name)
+    dataset = None
+    current_size = 0
+    indices = {}
+
+    for chunk in loader:
+        structured_chunk = dataframe_to_structured_array(chunk)
+
+        if dataset is None:
+            # Create the dataset dynamically on the first chunk
+            dtype = structured_chunk.dtype
+            dataset = group.create_dataset(
+                "embeddings",
+                shape=(0,),  # Start with zero rows
+                maxshape=(None,),  # Unlimited rows
+                dtype=dtype,
+                chunks=True,
+            )
+
+        # Resize and append the chunk
+        new_size = current_size + structured_chunk.shape[0]
+        dataset.resize(new_size, axis=0)
+        dataset[current_size:new_size] = structured_chunk
+
+        # Create indices for this chunk
+        for i, row in enumerate(structured_chunk):
+            submitter_id = row[key_column]
+
+            parts = submitter_id.split('-')
+            if len(parts) == 4:
+                submitter_id = '-'.join(parts[:-1])
+
+            if submitter_id not in indices:
+                indices[submitter_id] = []
+            indices[submitter_id].append(current_size + i)
+
+        current_size = new_size
+
+    print(f"Completed processing {dataset_name} with {current_size} rows.")
+    return indices
+
+
+if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument(
+        "--cancers", "-c", nargs="+", required=True, help="The cancer types to work with."
+    )
 
     args = parser.parse_args()
     selected_cancers = args.cancers
     cancers = "_".join(selected_cancers)
 
     rna_load_folder = Path("results", "embeddings", "rna", cancers)
-    annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
+    annotation_embedding_file = Path(
+        "results", "embeddings", "annotations", cancers, "embeddings.csv"
+    )
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
     image_embedding_folder = Path("results", "embeddings", "images")
 
     with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
-        # RNA embeddings
-        rna_group = f.create_group("rna")
-        rna_data = load_rna_embeddings(rna_load_folder)
-        rna_structured = dataframe_to_structured_array(rna_data)
-        rna_group.create_dataset("embeddings", data=rna_structured)
+        # Process RNA embeddings
+        rna_loader = chunked_dataframe_loader(rna_load_folder)
+        rna_indices = process_and_store_in_chunks("rna", rna_loader, f)
 
-        # Annotation embeddings
-        annotation_group = f.create_group("annotations")
-        annotation_data = load_annotations_embeddings(annotation_embedding_file)
-        annotation_structured = dataframe_to_structured_array(annotation_data)
-        annotation_group.create_dataset("embeddings", data=annotation_structured)
+        # Process Annotation embeddings
+        annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
+        annotation_indices = process_and_store_in_chunks("annotations", annotation_loader, f)
 
-        # Mutation embeddings
-        mutation_group = f.create_group("mutations")
-        mutation_data = load_mutation_embeddings(mutation_embedding_file)
-        mutation_structured = dataframe_to_structured_array(mutation_data)
-        mutation_group.create_dataset("embeddings", data=mutation_structured)
+        # Process Mutation embeddings
+        mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
+        mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f)
 
-        # Image embeddings
-        images_group = f.create_group("images")
-        first_file = next(load_image_embeddings(image_embedding_folder, selected_cancers))
-        num_columns = first_file.shape[1]
-        dtype = [
-            (col, h5py.string_dtype(encoding='utf-8') if first_file[col].dtype == 'object' else 'f8')
-            for col in first_file.columns
-        ]
+        # Process Image embeddings
+        image_loader = chunked_dataframe_loader(image_embedding_folder)
+        image_indices = process_and_store_in_chunks("images", image_loader, f)
 
-        # Create a structured dataset with an unlimited first dimension
-        image_dataset = images_group.create_dataset(
-            "embeddings",
-            shape=(0,),  # Start with zero rows
-            maxshape=(None,),  # Unlimited rows
-            dtype=dtype,
-            chunks=True
-        )
+        submitter_ids = list(rna_indices.keys())
+        submitter_ids.sort()
+        # Store indices
+        index_group = f.create_group("indices")
+        index_group.create_dataset("submitter_ids", data=np.array(submitter_ids, dtype="S"))
+        for modality, indices in [
+            ("rna", rna_indices),
+            ("annotations", annotation_indices),
+            ("mutations", mutation_indices),
+            ("images", image_indices),
+        ]:
+            modality_index_group = index_group.create_group(modality)
+            for submitter_id, rows in indices.items():
+                modality_index_group.create_dataset(
+                    submitter_id, data=np.array(rows, dtype="int64")
+                )
 
-        # Incrementally write image embeddings
-        for chunk in load_image_embeddings(image_embedding_folder, selected_cancers):
-            structured_chunk = dataframe_to_structured_array(chunk)
-            current_size = image_dataset.shape[0]
-            new_size = current_size + structured_chunk.shape[0]
-            image_dataset.resize(new_size, axis=0)
-            image_dataset[current_size:new_size] = structured_chunk
-
-        print("HDF5 file created successfully.")
+        print("HDF5 file with indices created successfully.")
+        print(f"Available groups: {f.keys()}")
