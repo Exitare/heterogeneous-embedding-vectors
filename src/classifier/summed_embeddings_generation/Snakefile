@@ -3,7 +3,7 @@ configfile: './config.yaml'
 
 all_cancers = config['cancers']
 joined_cancers = '_'.join(config['cancers'])
-requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] +1)
+requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
 requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
 
 
@@ -26,7 +26,7 @@ rule create_summed_embeddings:
 
     output:
         expand(
-            f"results/classifier/summed_embeddings{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
             cancers=joined_cancers,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance
