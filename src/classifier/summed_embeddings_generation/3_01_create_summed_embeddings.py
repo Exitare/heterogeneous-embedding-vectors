@@ -117,7 +117,8 @@ def process_submitter_chunk(
 
 
 def process_all_submitters(
-        h5_file_path: Path, groups: List[str], output_path: Path, walk_distance: int, amount_of_walks: int, batch_size: int = 100, n_jobs: int = 4
+        h5_file_path: Path, groups: List[str], output_path: Path, walk_distance: int, amount_of_walks: int,
+        batch_size: int = 100, n_jobs: int = 4
 ) -> None:
     """
     Process all submitters using parallel processing.
@@ -141,12 +142,17 @@ def process_all_submitters(
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="f")
         out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
         out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
+        out_file.attrs["walk_distance"] = walk_distance
+        out_file.attrs["amount_of_walks"] = amount_of_walks
 
+        unique_classes = []
         chunks = [submitter_ids[i:i + batch_size] for i in range(0, len(submitter_ids), batch_size)]
         with ProcessPoolExecutor(max_workers=n_jobs) as executor:
             for X_batch, y_batch, submitter_ids_batch in tqdm(
-                executor.map(process_submitter_chunk, [str(h5_file_path)] * len(chunks), [groups] * len(chunks), chunks,
-                             [walk_distance] * len(chunks), [amount_of_walks] * len(chunks)), desc="Processing Chunks"):
+                    executor.map(process_submitter_chunk, [str(h5_file_path)] * len(chunks), [groups] * len(chunks),
+                                 chunks,
+                                 [walk_distance] * len(chunks), [amount_of_walks] * len(chunks)),
+                    desc="Processing Chunks"):
                 current_size = out_file["X"].shape[0]
                 new_size = current_size + len(X_batch)
 
@@ -158,6 +164,14 @@ def process_all_submitters(
 
                 out_file["submitter_ids"].resize(new_size, axis=0)
                 out_file["submitter_ids"][current_size:new_size] = submitter_ids_batch
+
+                # add all unique classes to the unique classes list, if not already in the list
+                for y in y_batch:
+                    if y not in unique_classes:
+                        unique_classes.append(y)
+
+        out_file.attrs["classes"] = unique_classes
+        out_file.attrs["feature_shape"] = 767 * amount_of_walks
 
 
 def load_groups(h5_file_path: Path) -> List[str]:
