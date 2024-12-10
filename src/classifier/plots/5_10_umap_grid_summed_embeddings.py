@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     cancers = "_".join(selected_cancers)
 
-    fig_save_folder = Path(fig_save_folder, cancers)
+    fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distances[-1]}_{amount_of_walks[-1]}")
 
     if not fig_save_folder.exists():
         fig_save_folder.mkdir(parents=True)
@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     plt.tight_layout()
     # add legend to last plot
-    axes[-1].legend(title='Cancer', loc='upper right')
+    axes[-1].legend(title='Cancer', loc='lower left')
     plt.suptitle('UMAP Visualization of Summed Embeddings', y=1.02)
     plt.savefig(Path(fig_save_folder, f'combined_summed_embeddings.png'), dpi=150)
     plt.close()
