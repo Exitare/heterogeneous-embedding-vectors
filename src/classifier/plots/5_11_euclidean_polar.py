@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 import pandas as pd
-from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.metrics.pairwise import euclidean_distances, cosine_distances
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -13,6 +13,16 @@ walk_amounts = [3, 4, 5]
 
 figure_save_folder = Path("figures", "classifier", "distance_plots")
 results_save_folder = Path("results", "classifier", "distances")
+
+
+def dot_product_distance(X, Y=None):
+    """
+    Compute the dot product distance between rows of X and rows of Y.
+    If Y is not provided, compute the dot product distance between rows of X.
+    """
+    if Y is None:
+        Y = X
+    return -np.dot(X, Y.T)
 
 
 def create_polar_line_plot(df, distance_type, ax, color_dict, all_combos):
@@ -164,7 +174,7 @@ def create_polar_inter_plot(df, ax, color_dict, all_combos):
     ax.set_ylim(0, max_distance * 1.1)
 
 
-def main_polar_plots(combined_df):
+def main_polar_plots(combined_df: pd.DataFrame, file_name: str):
     """
     Generates two separate polar plots for intra and inter distances with enhanced legends.
     """
@@ -205,7 +215,119 @@ def main_polar_plots(combined_df):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
     # Save the figure
-    plt.savefig(Path(figure_save_folder, "euclidean_polar.png"), bbox_inches='tight', dpi=150)
+    plt.savefig(Path(figure_save_folder, f"{file_name}.png"), bbox_inches='tight', dpi=150)
+
+
+def calculate_intra_inter_distances(summed_embeddings: dict, selected_cancers: list,
+                                    distance_metric: str = "euclidean"):
+    intra_distances = {}
+    inter_distances = {}
+
+    # Process each (walk_distance, walk_amount) combination separately
+    for (walk_distance, walk_amount), df in summed_embeddings.items():
+        cancer_dfs = {}
+
+        # Iterate over each selected cancer type
+        for cancer in selected_cancers:
+            # Select rows where the specific cancer type is present
+            cancer_rows = df[df["cancer"] == cancer].copy()
+
+            if cancer_rows.empty:
+                print(
+                    f"Warning: No data for cancer type '{cancer}' with walk_distance={walk_distance} and walk_amount={walk_amount}.")
+                continue
+
+            # Drop unwanted columns
+            cancer_rows = cancer_rows.drop(columns=["cancer"])
+
+            # Ensure that unwanted columns are indeed dropped
+            assert "cancer" not in cancer_rows.columns, "Cancer column is present"
+
+            # Store the filtered DataFrame
+            cancer_dfs[cancer] = cancer_rows
+
+        # Calculate intra-class (within the same cancer type) distances
+        for cancer, df_cancer in cancer_dfs.items():
+            if df_cancer.empty:
+                print(
+                    f"Warning: No data for cancer type '{cancer}' with walk_distance={walk_distance} and walk_amount={walk_amount}.")
+                continue
+
+            if distance_metric == "euclidean":
+                intra_distance = euclidean_distances(df_cancer)
+            elif distance_metric == "cosine":
+                intra_distance = cosine_distances(df_cancer)
+            elif distance_metric == "dot_product":
+                intra_distance = dot_product_distance(df_cancer)
+            else:
+                raise ValueError(f"Invalid distance metric: {distance_metric}")
+
+            # Extract the upper triangle without the diagonal
+            intra_distance = intra_distance[np.triu_indices_from(intra_distance, k=1)]
+            intra_key = (walk_distance, walk_amount, cancer)
+            intra_distances[intra_key] = intra_distance
+
+        # Calculate inter-class (between different cancer types) distances
+        cancers_list = list(cancer_dfs.keys())
+        for i in range(len(cancers_list)):
+            for j in range(i + 1, len(cancers_list)):
+                cancer1 = cancers_list[i]
+                cancer2 = cancers_list[j]
+                df1 = cancer_dfs[cancer1]
+                df2 = cancer_dfs[cancer2]
+
+                if df1.empty or df2.empty:
+                    print(f"Warning: One of the DataFrames for cancers '{cancer1}' or '{cancer2}' is empty.")
+                    continue
+
+                if distance_metric == "euclidean":
+                    inter_distance = euclidean_distances(df1, df2).flatten()
+                elif distance_metric == "cosine":
+                    inter_distance = cosine_distances(df1, df2).flatten()
+                elif distance_metric == "dot_product":
+                    inter_distance = dot_product_distance(df1, df2).flatten()
+                else:
+                    raise ValueError(f"Invalid distance metric: {distance_metric}")
+
+                inter_key = (walk_distance, walk_amount, cancer1, cancer2)
+                inter_distances[inter_key] = inter_distance
+
+    return intra_distances, inter_distances
+
+
+def convert_to_records(intra_df: {}, inter_df: {}):
+    # Convert intra_distances to a DataFrame
+    intra_records = []
+    for key, distances in intra_df.items():
+        walk_distance, walk_amount, cancer = key
+        for distance in distances:
+            intra_records.append({
+                "type": "intra",
+                "walk_distance": walk_distance,
+                "walk_amount": walk_amount,
+                "cancer": cancer,
+                "distance": distance,
+                "combined_cancer": cancer
+            })
+    intra_df = pd.DataFrame(intra_records)
+
+    # Convert inter_distances to a DataFrame
+    inter_records = []
+    for key, distances in inter_df.items():
+        walk_distance, walk_amount, cancer1, cancer2 = key
+        for distance in distances:
+            inter_records.append({
+                "type": "inter",
+                "walk_distance": walk_distance,
+                "walk_amount": walk_amount,
+                "cancer1": cancer1,
+                "cancer2": cancer2,
+                "distance": distance,
+                "combined_cancer": f"{cancer1}-{cancer2}"
+            })
+    inter_df = pd.DataFrame(inter_records)
+
+    return intra_df, inter_df
 
 
 if __name__ == '__main__':
@@ -215,9 +337,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
-
-
-
 
     figure_save_folder = Path(figure_save_folder, cancers)
     results_save_folder = Path(results_save_folder, cancers)
@@ -256,8 +375,6 @@ if __name__ == '__main__':
                 print(f"Warning: 'cancer' column is missing in {csv_path}. Skipping this file.")
                 continue
 
-
-
             key = (walk_distance, walk_amount)
             if key not in summed_embeddings:
                 summed_embeddings[key] = [df]
@@ -269,99 +386,37 @@ if __name__ == '__main__':
         summed_embeddings[key] = pd.concat(dfs, ignore_index=True)
 
     # Initialize dictionaries to store distances
-    intra_distances = {}
-    inter_distances = {}
+    euclidean_intra_distances, euclidean_inter_distances = calculate_intra_inter_distances(summed_embeddings,
+                                                                                           selected_cancers,
+                                                                                           distance_metric="euclidean")
+    cosine_intra_distances, cosine_inter_distances = calculate_intra_inter_distances(summed_embeddings,
+                                                                                     selected_cancers,
+                                                                                     distance_metric="cosine")
+    dot_product_intra_distances, dot_product_inter_distances = calculate_intra_inter_distances(summed_embeddings,
+                                                                                               selected_cancers,
+                                                                                               distance_metric="dot_product")
 
-    # Process each (walk_distance, walk_amount) combination separately
-    for (walk_distance, walk_amount), df in summed_embeddings.items():
-        cancer_dfs = {}
-
-        # Iterate over each selected cancer type
-        for cancer in selected_cancers:
-            # Select rows where the specific cancer type is present
-            cancer_rows = df[df["cancer"] == cancer].copy()
-
-            if cancer_rows.empty:
-                print(
-                    f"Warning: No data for cancer type '{cancer}' with walk_distance={walk_distance} and walk_amount={walk_amount}.")
-                continue
-
-            # Drop unwanted columns
-            cancer_rows = cancer_rows.drop(columns=["cancer"])
-
-            # Ensure that unwanted columns are indeed dropped
-            assert "cancer" not in cancer_rows.columns, "Cancer column is present"
-
-            # Store the filtered DataFrame
-            cancer_dfs[cancer] = cancer_rows
-
-        # Calculate intra-class (within the same cancer type) distances
-        for cancer, df_cancer in cancer_dfs.items():
-            if df_cancer.empty:
-                print(
-                    f"Warning: No data for cancer type '{cancer}' with walk_distance={walk_distance} and walk_amount={walk_amount}.")
-                continue
-
-            intra_distance = euclidean_distances(df_cancer)
-            # Extract the upper triangle without the diagonal
-            intra_distance = intra_distance[np.triu_indices_from(intra_distance, k=1)]
-            intra_key = (walk_distance, walk_amount, cancer)
-            intra_distances[intra_key] = intra_distance
-
-        # Calculate inter-class (between different cancer types) distances
-        cancers_list = list(cancer_dfs.keys())
-        for i in range(len(cancers_list)):
-            for j in range(i + 1, len(cancers_list)):
-                cancer1 = cancers_list[i]
-                cancer2 = cancers_list[j]
-                df1 = cancer_dfs[cancer1]
-                df2 = cancer_dfs[cancer2]
-
-                if df1.empty or df2.empty:
-                    print(f"Warning: One of the DataFrames for cancers '{cancer1}' or '{cancer2}' is empty.")
-                    continue
-
-                inter_distance = euclidean_distances(df1, df2).flatten()
-                inter_key = (walk_distance, walk_amount, cancer1, cancer2)
-                inter_distances[inter_key] = inter_distance
-
-    # Convert intra_distances to a DataFrame
-    intra_records = []
-    for key, distances in intra_distances.items():
-        walk_distance, walk_amount, cancer = key
-        for distance in distances:
-            intra_records.append({
-                "type": "intra",
-                "walk_distance": walk_distance,
-                "walk_amount": walk_amount,
-                "cancer": cancer,
-                "distance": distance,
-                "combined_cancer": cancer
-            })
-    intra_df = pd.DataFrame(intra_records)
-
-    # Convert inter_distances to a DataFrame
-    inter_records = []
-    for key, distances in inter_distances.items():
-        walk_distance, walk_amount, cancer1, cancer2 = key
-        for distance in distances:
-            inter_records.append({
-                "type": "inter",
-                "walk_distance": walk_distance,
-                "walk_amount": walk_amount,
-                "cancer1": cancer1,
-                "cancer2": cancer2,
-                "distance": distance,
-                "combined_cancer": f"{cancer1}-{cancer2}"
-            })
-    inter_df = pd.DataFrame(inter_records)
+    # Convert to DataFrames
+    euclidean_intra_df, euclidean_inter_df = convert_to_records(euclidean_intra_distances, euclidean_inter_distances)
+    cosine_intra_df, cosine_inter_df = convert_to_records(cosine_intra_distances, cosine_inter_distances)
+    dot_product_intra_df, dot_product_inter_df = convert_to_records(dot_product_intra_distances,
+                                                                    dot_product_inter_distances)
 
     # Combine intra and inter distance DataFrames
-    combined_df = pd.concat([intra_df, inter_df], ignore_index=True)
-    combined_save_file_name: str = "euclidean_combined_distances.csv"
+    euclidean_combined_df = pd.concat([euclidean_intra_df, euclidean_inter_df], ignore_index=True)
+    cosine_combined_df = pd.concat([cosine_intra_df, cosine_inter_df], ignore_index=True)
+    dot_product_combined_df = pd.concat([dot_product_intra_df, dot_product_inter_df], ignore_index=True)
+
+    euclidean_save_file_name: str = "euclidean_combined_distances.csv"
+    cosine_save_file_name: str = "cosine_combined_distances.csv"
+    dot_product_save_file_name: str = "dot_product_combined_distances.csv"
+
     # Save the combined DataFrame
-    combined_df.to_csv(Path(results_save_folder, combined_save_file_name), index=False)
-    print(f"Combined distance DataFrame has been saved {combined_save_file_name}.")
+    euclidean_combined_df.to_csv(Path(results_save_folder, euclidean_save_file_name), index=False)
+    cosine_combined_df.to_csv(Path(results_save_folder, cosine_save_file_name), index=False)
+    dot_product_combined_df.to_csv(Path(results_save_folder, dot_product_save_file_name), index=False)
 
     # Generate the polar plots with enhanced legends
-    main_polar_plots(combined_df)
+    main_polar_plots(euclidean_combined_df, "euclidean_polar")
+    main_polar_plots(cosine_combined_df, "cosine_polar")
+    main_polar_plots(dot_product_combined_df, "dot_product_polar")
