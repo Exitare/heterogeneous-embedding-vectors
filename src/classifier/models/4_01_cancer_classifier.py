@@ -161,18 +161,18 @@ if __name__ == "__main__":
 
     batch_size = args.batch_size
     walk_distance = args.walk_distance
-    amount_of_walks = args.amount_of_walks
+    walk_amount = args.amount_of_walks
     iteration = args.iteration
 
     cancers = "_".join(args.cancer)
     print(f"Selected cancers: {cancers}")
-    print(f"Walk distance: {walk_distance}, Amount of walks: {amount_of_walks}")
+    print(f"Walk distance: {walk_distance}, Amount of walks: {walk_amount}")
 
-    load_folder = Path(load_folder, cancers, f"{walk_distance}_{amount_of_walks}")
+    load_folder = Path(load_folder, cancers, f"{walk_distance}_{walk_amount}")
     h5_file_path = Path(load_folder, "summed_embeddings.h5")
 
     cancer_save_folder = Path(save_folder, cancers)
-    cancer_save_folder = Path(cancer_save_folder, f"{walk_distance}_{amount_of_walks}")
+    cancer_save_folder = Path(cancer_save_folder, f"{walk_distance}_{walk_amount}")
     iteration_save_folder = Path(cancer_save_folder, str(iteration))
 
     if not cancer_save_folder.exists():

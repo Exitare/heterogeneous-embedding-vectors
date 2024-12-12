@@ -1,0 +1,59 @@
+
+configfile: './config.yaml'
+
+all_cancers = config['cancers']
+joined_cancers = '_'.join(config['cancers'])
+requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+run_iterations = range(0, config['run_iterations'])
+
+rule all:
+    input:
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
+        ),
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
+        )
+
+rule run_classification:
+    input:
+        expand(
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
+            cancers=joined_cancers,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+        )
+    output:
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
+        ),
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
+        )
+
+    run:
+        cancers=all_cancers
+        amount_of_walks=requested_walk_amounts
+        walk_distances=requested_walk_distance
+        iterations=run_iterations
+
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                for iteration in iterations:
+                    shell(f"python ./src/classifier/models/4_01_cancer_classifier.py -c {{cancers}} -a {{walk}} -w {{walk_distance}} -i {{iteration}}")
+
+
+
