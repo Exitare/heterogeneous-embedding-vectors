@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from argparse import ArgumentParser
 
+from sklearn.metrics.pairwise import distance_metrics
+
 # Corrected walk_distances to include 4
 walk_distances = [3, 4, 5]
 walk_amounts = [3, 4, 5]
@@ -78,7 +80,7 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
     ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.0), title="Cancer Type")
 
 
-def main_polar_plots_for_primary_cancers(combined_df):
+def main_polar_plots_for_primary_cancers(combined_df: pd.DataFrame, metric: str):
     """
     Creates one polar plot for each primary cancer.
     """
@@ -108,25 +110,34 @@ def main_polar_plots_for_primary_cancers(combined_df):
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(Path(save_folder, f"{primary_cancer}_euclidean_polar.png"), dpi=150)
+        plt.savefig(Path(save_folder, f"{primary_cancer}_{metric}_polar.png"), dpi=150)
         plt.close(fig)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
+    parser.add_argument("--distance_metric", "-dm", type=str, required=True, help="The distance metric to load.",
+                        choices=["euclidean", "cosine", "dot_product"], default="euclidean")
     args = parser.parse_args()
     selected_cancers = args.cancer
+    distance_metric = args.distance_metric
     cancers = "_".join(selected_cancers)
 
     save_folder = Path(save_folder, cancers)
+    results_load_folder = Path(results_load_folder, cancers)
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
-    # Assume combined_df is already available from previous processing
+    file_name = "euclidean_combined_distances.csv"
+    if distance_metric == "cosine":
+        file_name = "cosine_combined_distances.csv"
+    elif distance_metric == "dot_product":
+        file_name = "dot_product_combined_distances.csv"
+
     combined_df = pd.read_csv(
-        Path(results_load_folder, "euclidean_combined_distances.csv"))
+        Path(results_load_folder, file_name))
 
     # Generate polar plots for each primary cancer
-    main_polar_plots_for_primary_cancers(combined_df)
+    main_polar_plots_for_primary_cancers(combined_df, distance_metric)

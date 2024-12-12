@@ -19,10 +19,16 @@ def dot_product_distance(X, Y=None):
     """
     Compute the dot product distance between rows of X and rows of Y.
     If Y is not provided, compute the dot product distance between rows of X.
+    Normalize to make values non-negative for visualization.
     """
     if Y is None:
         Y = X
-    return -np.dot(X, Y.T)
+    dot_product = np.dot(X, Y.T)
+    # Normalize to [0, 1] range for better visualization
+    min_val = dot_product.min()
+    max_val = dot_product.max()
+    normalized = (dot_product - min_val) / (max_val - min_val)
+    return -normalized  # Negate to align with distance interpretation
 
 
 def create_polar_line_plot(df, distance_type, ax, color_dict, all_combos):

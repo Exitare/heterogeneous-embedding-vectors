@@ -5,6 +5,7 @@ all_cancers = config['cancers']
 joined_cancers = '_'.join(config['cancers'])
 requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
 requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+distance_metrics = config['distance_metrics']
 
 rule all:
     input:
@@ -31,6 +32,24 @@ rule all:
             f"figures/classifier/distance_plots/{{cancers}}/{{cancer}}_euclidean_polar.png",
             cancers=joined_cancers,
             cancer=all_cancers
+        ),
+        expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/euclidean_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
+        ),
+        expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/cosine_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
+        ),
+         expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/dot_product_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
         )
 
 
@@ -60,7 +79,7 @@ rule generate_combined_umap_embeddings:
 rule generate_overall_polar_plots:
     input:
         expand(
-            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
             cancers=joined_cancers,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance
@@ -92,22 +111,90 @@ rule generate_overall_polar_plots:
         )
     run:
         cancers=all_cancers
-        shell(f"python ./src/classifier/plots/5_11_euclidean_polar.py -c {{cancers}}")
+        shell(f"python ./src/classifier/plots/5_11_polar_generic.py -c {{cancers}}")
 
 rule generate_polar_single_cancer_plots:
     input:
         expand(
-            f"results/classifier/distances/{{cancers}}/euclidean_combined_distances.csv",
-            cancers=joined_cancers
+            f"results/classifier/distances/{{cancers}}/{{distance_metric}}_combined_distances.csv",
+            cancers=joined_cancers,
+            distance_metric=distance_metrics
         )
 
     output:
         expand(
-            f"figures/classifier/distance_plots/{{cancers}}/{{cancer}}_euclidean_polar.png",
+            f"figures/classifier/distance_plots/{{cancers}}/{{cancer}}_{{distance_metric}}_polar.png",
             cancers=joined_cancers,
-            cancer=all_cancers
+            cancer=all_cancers,
+            distance_metric=distance_metrics
         )
 
     run:
         cancers=all_cancers
-        shell(f"python ./src/classifier/plots/5_12_euclidean_polar_single.py -c {{cancers}}")
+        for distance_metric in distance_metrics:
+            shell(f"python ./src/classifier/plots/5_12_polar_cancer_specific.py -c {{cancers}} -dm {{distance_metric}}")
+
+
+rule create_euclidean_distance_plots:
+    input:
+        expand(
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
+            cancers=joined_cancers,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance
+        )
+    output:
+        expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/euclidean_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
+        )
+    run:
+        cancers = ' '.join(all_cancers)
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                shell(f"python3 src/classifier/plots/5_08_euclidean.py -c {{cancers}} -w {{walk_distance}} -a {{walk}}")
+
+
+rule create_cosine_distance_plots:
+    input:
+        expand(
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
+            cancers=joined_cancers,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance
+        )
+    output:
+        expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/cosine_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
+        )
+    run:
+        cancers = ' '.join(all_cancers)
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                shell(f"python3 src/classifier/plots/5_06_cosine.py -c {{cancers}} -w {{walk_distance}} -a {{walk}}")
+
+rule create_dot_product_plots:
+    input:
+        expand(
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
+            cancers=joined_cancers,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance
+        )
+    output:
+        expand(
+            f"figures/classifier/distance_plots/{{cancers}}/{{walk_distance}}_{{walk_amount}}/dot_product_per_cancer.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts
+        )
+    run:
+        cancers = ' '.join(all_cancers)
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                shell(f"python3 src/classifier/plots/5_07_dot_product.py -c {{cancers}} -w {{walk_distance}} -a {{walk}}")
