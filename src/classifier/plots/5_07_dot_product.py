@@ -118,15 +118,15 @@ if __name__ == '__main__':
     n_cancers = len(primary_cancers)
     n_rows = math.ceil(n_cancers / 2)  # Use math.ceil to round up if there's an odd number of cancers
 
-    y_lim: int = 0
+    y_lim: int = 100
     for (primary_cancer, df) in primary_cancers.items():
         df = pd.concat(df)
         for type in df["Type"].unique():
             print(f"Primary Cancer: {primary_cancer}, Type: {type}, Mean: {df[df['Type'] == type]['Distance'].mean()}")
-            if y_lim < df[df['Type'] == type]['Distance'].mean():
+            if y_lim > df[df['Type'] == type]['Distance'].mean():
                 y_lim = df[df['Type'] == type]['Distance'].mean()
 
-    y_lim += 10
+    y_lim -= 10
     print("Y Lim:", y_lim)
 
     # Create subplots with 2 columns and n_rows rows
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         sns.barplot(data=df, x='Cancer', y='Distance', hue="Type", ax=axs[i])
         axs[i].set_title(f'Euclidean Distance for {primary_cancer}')
         axs[i].set_ylabel('Distance')
-        axs[i].set_ylim(0, y_lim)
+        axs[i].set_ylim(y_lim, 0)
         # Rotate x axis labels
         axs[i].set_xticklabels(axs[i].get_xticklabels(), rotation=45)
         # put legend to left bottom
@@ -151,5 +151,5 @@ if __name__ == '__main__':
         fig.delaxes(axs[j])
 
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, "euclidean_per_cancer.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, "dot_product_per_cancer.png"), dpi=150)
     plt.close('all')
