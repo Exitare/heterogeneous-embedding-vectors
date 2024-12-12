@@ -117,7 +117,7 @@ def process_submitter_chunk(
 
 
 def process_all_submitters(
-        h5_file_path: Path, groups: List[str], output_path: Path, walk_distance: int, amount_of_walks: int,
+        h5_file_path: Path, groups: List[str], output_path: Path, walk_distance: int, walk_amount: int,
         batch_size: int = 100, n_jobs: int = 4
 ) -> None:
     """
@@ -128,7 +128,7 @@ def process_all_submitters(
         groups (List[str]): List of group names to process.
         output_path (Path): Path to save combined data.
         walk_distance (int): Number of embeddings to sum.
-        amount_of_walks (int): Number of summed embeddings to create.
+        walk_amount (int): Number of summed embeddings to create.
         batch_size (int): Number of submitters in a chunk.
         n_jobs (int): Number of parallel workers.
     """
@@ -138,12 +138,12 @@ def process_all_submitters(
         ]
 
     with h5py.File(output_path, "w") as out_file:
-        shape = 767 * amount_of_walks
+        shape = 767 * walk_amount
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="f")
         out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
         out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
         out_file.attrs["walk_distance"] = walk_distance
-        out_file.attrs["amount_of_walks"] = amount_of_walks
+        out_file.attrs["walk_amount"] = walk_amount
 
         unique_classes = []
         chunks = [submitter_ids[i:i + batch_size] for i in range(0, len(submitter_ids), batch_size)]
@@ -151,7 +151,7 @@ def process_all_submitters(
             for X_batch, y_batch, submitter_ids_batch in tqdm(
                     executor.map(process_submitter_chunk, [str(h5_file_path)] * len(chunks), [groups] * len(chunks),
                                  chunks,
-                                 [walk_distance] * len(chunks), [amount_of_walks] * len(chunks)),
+                                 [walk_distance] * len(chunks), [walk_amount] * len(chunks)),
                     desc="Processing Chunks"):
                 current_size = out_file["X"].shape[0]
                 new_size = current_size + len(X_batch)
@@ -171,7 +171,7 @@ def process_all_submitters(
                         unique_classes.append(y)
 
         out_file.attrs["classes"] = unique_classes
-        out_file.attrs["feature_shape"] = 767 * amount_of_walks
+        out_file.attrs["feature_shape"] = 767 * walk_amount
 
 
 def load_groups(h5_file_path: Path) -> List[str]:
@@ -199,10 +199,10 @@ if __name__ == "__main__":
 
     selected_cancers: List[str] = args.cancer
     walk_distance: int = args.walk_distance
-    amount_of_walks: int = args.amount_of_walks
+    walk_amount: int = args.amount_of_walks
     cancers: str = "_".join(selected_cancers)
 
-    save_folder = Path("results", "classifier", "summed_embeddings", cancers, f"{walk_distance}_{amount_of_walks}")
+    save_folder = Path("results", "classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}")
     save_folder.mkdir(parents=True, exist_ok=True)
 
     h5_load_path: Path = Path("results", "embeddings", f"{cancers}.h5")
@@ -214,5 +214,5 @@ if __name__ == "__main__":
         groups=groups,
         output_path=output_file,
         walk_distance=walk_distance,
-        amount_of_walks=amount_of_walks,
+        walk_amount=walk_amount,
     )
