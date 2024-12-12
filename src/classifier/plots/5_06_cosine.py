@@ -9,7 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 import h5py
 import math
 
-fig_save_folder = Path("figures", "classifier", "distance_plots")
+fig_save_folder = Path("figures", "classifier")
 load_folder = Path("results", "classifier", "embeddings", "annotated_cancer")
 
 if __name__ == '__main__':
@@ -34,7 +34,7 @@ if __name__ == '__main__':
         # encode the cancer type in utf8
         summed_embeddings["cancer"] = summed_embeddings["cancer"].apply(lambda x: x.decode("utf-8"))
 
-    fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distance}_{walk_amount}")
+    fig_save_folder = Path(fig_save_folder, cancers, "distances", f"{walk_distance}_{walk_amount}")
 
     if not fig_save_folder.exists():
         fig_save_folder.mkdir(parents=True)
@@ -48,7 +48,7 @@ if __name__ == '__main__':
         cancer_rows = cancer_rows.drop(columns=["cancer"])
 
         # assert that no Image, Text or RNA columns are present
-        #assert "patient_id" not in cancer_rows.columns, "Patient id column is present"
+        # assert "patient_id" not in cancer_rows.columns, "Patient id column is present"
         assert "cancer" not in cancer_rows.columns, "Cancer column is present"
 
         # Add the selected rows to the dictionary with the cancer type as the key

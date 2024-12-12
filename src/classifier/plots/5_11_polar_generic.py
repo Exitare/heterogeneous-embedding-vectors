@@ -11,7 +11,7 @@ import h5py
 walk_distances = [3, 4, 5]
 walk_amounts = [3, 4, 5]
 
-figure_save_folder = Path("figures", "classifier", "distance_plots")
+figure_save_folder = Path("figures", "classifier")
 results_save_folder = Path("results", "classifier", "distances")
 
 
@@ -344,7 +344,7 @@ if __name__ == '__main__':
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
 
-    figure_save_folder = Path(figure_save_folder, cancers)
+    figure_save_folder = Path(figure_save_folder, cancers, "distances")
     results_save_folder = Path(results_save_folder, cancers)
 
     if not figure_save_folder.exists():

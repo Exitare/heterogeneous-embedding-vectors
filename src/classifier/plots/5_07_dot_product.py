@@ -7,7 +7,7 @@ import seaborn as sns
 import math
 import h5py
 
-fig_save_folder = Path("figures", "classifier", "distance_plots")
+fig_save_folder = Path("figures", "classifier")
 load_folder = Path("results", "classifier", "embeddings", "annotated_cancer")
 
 
@@ -41,7 +41,7 @@ if __name__ == '__main__':
         # encode the cancer type in utf8
         summed_embeddings["cancer"] = summed_embeddings["cancer"].apply(lambda x: x.decode("utf-8"))
 
-    fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distance}_{walk_amount}")
+    fig_save_folder = Path(fig_save_folder, cancers, "distances", f"{walk_distance}_{walk_amount}")
 
     if not fig_save_folder.exists():
         fig_save_folder.mkdir(parents=True)

@@ -12,7 +12,7 @@ walk_distances = [3, 4, 5]
 walk_amounts = [3, 4, 5]
 
 results_load_folder = Path("results", "classifier", "distances")
-save_folder = Path("figures", "classifier", "distance_plots")
+save_folder = Path("figures", "classifier")
 
 
 def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     distance_metric = args.distance_metric
     cancers = "_".join(selected_cancers)
 
-    save_folder = Path(save_folder, cancers)
+    save_folder = Path(save_folder, cancers, "distances")
     results_load_folder = Path(results_load_folder, cancers)
 
     if not save_folder.exists():

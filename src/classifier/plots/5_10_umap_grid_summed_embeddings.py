@@ -8,7 +8,7 @@ from argparse import ArgumentParser
 import umap
 
 load_folder = Path("results", "classifier", "summed_embeddings")
-fig_save_folder = Path("figures", "classifier", "umap")
+fig_save_folder = Path("figures", "classifier")
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Embedding UMAP')
@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     cancers = "_".join(selected_cancers)
 
-    fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distances[-1]}_{amount_of_walks[-1]}")
+    fig_save_folder = Path(fig_save_folder, cancers, "umap", f"{walk_distances[-1]}_{amount_of_walks[-1]}")
 
     if not fig_save_folder.exists():
         fig_save_folder.mkdir(parents=True)

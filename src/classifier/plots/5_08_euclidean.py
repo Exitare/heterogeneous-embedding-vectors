@@ -8,9 +8,8 @@ import seaborn as sns
 import math
 import h5py
 
-fig_save_folder = Path("figures", "classifier", "distance_plots")
+fig_save_folder = Path("figures", "classifier")
 load_folder = Path("results", "classifier", "embeddings", "annotated_cancer")
-results_save_folder = Path("results", "classifier", "distances")
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -36,7 +35,7 @@ if __name__ == '__main__':
     # min_max_scaler = MinMaxScaler()
     # summed_embeddings.iloc[:, :-2] = min_max_scaler.fit_transform(summed_embeddings.iloc[:, :-2])
 
-    fig_save_folder = Path(fig_save_folder, cancers, f"{walk_distance}_{walk_amount}")
+    fig_save_folder = Path(fig_save_folder, cancers, "distances", f"{walk_distance}_{walk_amount}")
     if not fig_save_folder.exists():
         fig_save_folder.mkdir(parents=True)
 
@@ -131,7 +130,6 @@ if __name__ == '__main__':
     # Flatten the axes array for easy indexing
     axs = axs.flatten()
 
-
     for i, (primary_cancer, df) in enumerate(primary_cancers.items()):
         df = pd.concat(df)
         sns.barplot(data=df, x='Cancer', y='Distance', hue="Type", ax=axs[i])
@@ -146,7 +144,6 @@ if __name__ == '__main__':
     # Hide any empty subplots if the number of plots is odd
     for j in range(i + 1, len(axs)):
         fig.delaxes(axs[j])
-
 
     plt.tight_layout()
     plt.savefig(Path(fig_save_folder, "euclidean_per_cancer.png"), dpi=150)
