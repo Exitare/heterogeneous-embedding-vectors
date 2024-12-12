@@ -1,6 +1,5 @@
 configfile: './config.yaml'
 
-
 all_cancers = config['cancers']
 joined_cancers = '_'.join(config['cancers'])
 requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
