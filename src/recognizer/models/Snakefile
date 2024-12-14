@@ -16,7 +16,7 @@ rule all:
             ),
 
         expand(
-            f"results/recognizer/aggregated_metrics/multi/{{cancers}}/{{amount}}/metrics.csv",
+            f"results/recognizer/aggregated_metrics/{{cancers}}/{{amount}}/metrics.csv",
             amount=amount_of_summed_embeddings,
             cancers=joined_cancers
         )
@@ -44,9 +44,10 @@ rule run_simple_recognizer:
         # Python loop for control
         for walk_distance in range(3, simple_cancer_max_walk + 1):
             for noise in noise_ratios:
+                print(f"Processing noise: {noise}")
                 if max_run_iterations == 1:
                     # Run only once if max_run_iterations is 1
-                    shell(f"python src/recognizer/models/2_01_simple_recognizer.py -w {walk_distance} -ri 0 -a {amount}")
+                    shell(f"python src/recognizer/models/2_01_simple_recognizer.py -w {walk_distance} -ri 0 -a {amount} -n {noise}")
                 else:
                     # Run multiple times if max_run_iterations > 1
                     for iteration in range(max_run_iterations):
@@ -62,8 +63,8 @@ rule run_simple_recognizer_combined:
         )
     output:
         expand(
-           f"results/recognizer/simple/{{amount}}/0.0/run_{{iteration}}/metrics.csv",
-           iteration=max_run_iterations,
+           f"results/recognizer/simple/{{amount}}/0.0/combined_embeddings/run_{{iteration}}/metrics.csv",
+           iteration=range(0,max_run_iterations),
            amount=amount_of_summed_embeddings,
         )
     run:
@@ -73,27 +74,27 @@ rule run_simple_recognizer_combined:
         # Python loop for control
         if max_run_iterations == 1:
             # Run only once if run_iterations is 1
-            shell(f"python3 src/recognizer/models/2_01_simple_recognizer.py -w {max_walk_distance} -ri 0 -a {amount} -n 0.0")
+            shell(f"python3 src/recognizer/models/2_01_simple_recognizer.py -w -1 -ri 0 -a {amount} -n 0.0")
         else:
             # Run multiple times if run_iterations > 1
             for iteration in range(run_iterations):
-                shell(f"python3 src/recognizer/models/2_01_simple_recognizer.py -w {max_walk_distance} -ri {iteration} -a {amount} -n 0.0")
+                shell(f"python3 src/recognizer/models/2_01_simple_recognizer.py -w -1 -ri {iteration} -a {amount} -n 0.0")
 
 
 rule aggregate_simple_recognizer_results:
     input:
         expand(
-           f"results/recognizer/simple/{{amount}}/{{noise}}/{{i}}_embeddings/run_{{run_iterations}}/metrics.csv",
-            i=range(3, simple_cancer_max_walk + 1),
-            run_iterations=range(0, max_run_iterations + 1),
-            noise=noise_ratios,
-            amount=amount_of_summed_embeddings
+           f"results/recognizer/simple/{{amount}}/{{noise}}/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(max_run_iterations),
+            amount=amount_of_summed_embeddings,
+            noise=noise_ratios
         ),
         expand(
            f"results/recognizer/simple/{{amount}}/0.0/combined_embeddings/run_{{run_iterations}}/metrics.csv",
-            run_iterations=range(0, max_run_iterations + 1),
+            run_iterations=range(0, max_run_iterations),
             amount=amount_of_summed_embeddings
-        )
+        ),
     output:
          expand(f"results/recognizer/aggregated_metrics/simple/{{amount}}/metrics.csv",
             amount=amount_of_summed_embeddings
@@ -101,7 +102,7 @@ rule aggregate_simple_recognizer_results:
 
     run:
         amount = amount_of_summed_embeddings
-        shell(f"python src/recognizer/3_01_aggregate_run_metrics.py -d results/recognizer/simple/{{amount_of_summed_embeddings}}")
+        shell(f"python src/recognizer/models/3_01_aggregate_run_metrics.py -d results/recognizer/simple/{{amount_of_summed_embeddings}}")
 
 rule run_multi_cancer_recognizer:
     input:
@@ -149,10 +150,10 @@ rule run_multi_cancer_recognizer_combined:
         )
     output:
         expand(
-           f"results/recognizer/multi/{{cancers}}/{{amount}}/0.0/run_{{iteration}}/metrics.csv",
-           iteration=max_run_iterations,
+           f"results/recognizer/multi/{{cancers}}/{{amount}}/0.0/combined_embeddings/run_{{iteration}}/metrics.csv",
+           iteration=range(0,max_run_iterations),
            amount=amount_of_summed_embeddings,
-           cancers=joined_cancers
+           cancers=joined_cancers,
         )
     run:
         # Set the values from config
@@ -160,23 +161,25 @@ rule run_multi_cancer_recognizer_combined:
         cancers = all_cancers
 
         # Python loop for control
-        if max_run_iterations == 1:
-            # Run only once if run_iterations is 1
-            shell(f"python3 src/recognizer/models/2_03_multi_cancer_recognizer.py -w {max_walk_distance} -ri 0 -a {amount} -c {cancers} -n 0.0")
-        else:
-            # Run multiple times if run_iterations > 1
-            for iteration in range(run_iterations):
-                shell(f"python3 src/recognizer/models/2_03_multi_cancer_recognizer.py -w {max_walk_distance} -ri {iteration} -a {amount} -c {cancers} -n 0.0")
+        for walk_distance in range(3, multi_cancer_max_walk + 1):
+            if max_run_iterations == 1:
+                # Run only once if run_iterations is 1
+                shell(f"python3 src/recognizer/models/2_03_multi_cancer_recognizer.py -w -1 -ri 0 -a {amount} -c {cancers} -n 0.0")
+            else:
+                # Run multiple times if run_iterations > 1
+                for iteration in range(run_iterations):
+                    shell(f"python3 src/recognizer/models/2_03_multi_cancer_recognizer.py -w -1 -ri {iteration} -a {amount} -c {cancers} -n 0.0")
 
 
 
 rule aggregate_multi_recognizer_results:
     input:
         expand(
-           f"results/recognizer/multi/{{cancers}}/{{amount}}/0.0/run_{{iteration}}/metrics.csv",
-           iteration=max_run_iterations,
+           f"results/recognizer/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+           iteration=range(0,max_run_iterations),
            amount=amount_of_summed_embeddings,
-           cancers=joined_cancers
+           cancers=joined_cancers,
+           walk_distance=range(3, multi_cancer_max_walk + 1)
         ),
         expand(
            f"results/recognizer/multi/{{cancers}}/{{amount}}/{{noise}}/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
@@ -185,10 +188,21 @@ rule aggregate_multi_recognizer_results:
             amount=amount_of_summed_embeddings,
             noise=noise_ratios,
             cancers=joined_cancers
+        ),
+        expand(
+           f"results/recognizer/multi/{{cancers}}/{{amount}}/0.0/combined_embeddings/run_{{iteration}}/metrics.csv",
+           iteration=range(0,max_run_iterations),
+           amount=amount_of_summed_embeddings,
+           cancers=joined_cancers,
         )
     output:
         expand(
-            f"results/recognizer/aggregated_metrics/multi/{{cancers}}/{{amount}}/metrics.csv",
+            f"results/recognizer/aggregated_metrics/{{cancers}}/{{amount}}/metrics.csv",
             amount=amount_of_summed_embeddings,
             cancers=joined_cancers
         )
+
+    run:
+        amount = amount_of_summed_embeddings
+        cancers = joined_cancers
+        shell(f"python src/recognizer/models/3_01_aggregate_run_metrics.py -d results/recognizer/multi/{{cancers}}/{{amount}}")

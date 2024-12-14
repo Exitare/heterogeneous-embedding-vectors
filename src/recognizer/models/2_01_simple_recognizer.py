@@ -126,9 +126,6 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
 
 
 if __name__ == '__main__':
-    if not save_path.exists():
-        save_path.mkdir(parents=True)
-
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--walk_distance', "-w", type=int, required=True,
@@ -213,7 +210,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=1,
                         callbacks=[early_stopping])
 
     # save history
@@ -244,7 +241,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=1,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
