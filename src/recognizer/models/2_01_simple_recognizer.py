@@ -152,38 +152,55 @@ if __name__ == '__main__':
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
-        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
+        train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
     else:
-        hdf5_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
+        if noise_ratio == 0.0:
+            train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
                          f"{walk_distance}_embeddings.h5")
+            print(f"Loading data from {train_file}...")
+        else:
+            # Load the test file, which is noisy
+            test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings.h5")
+            # Load the train file, which is not noisy
+            train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"{walk_distance}_embeddings.h5")
+
+            print(f"Loading data from {train_file} and {test_file}...")
+
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings",
                          run_name)
 
-    print(f"Loading data from {hdf5_file}...")
+
     print(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
     # Load data dimensions
-    with h5py.File(hdf5_file, "r") as f:
-        input_dim = f["X"].shape[1]
-        num_samples = f["X"].shape[0]
-        label_keys = embeddings
+    with h5py.File(train_file, "r") as f:
+            input_dim = f["X"].shape[1]
+            num_samples = f["X"].shape[0]
+            label_keys = embeddings
 
     print(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
 
     if walk_distance != -1:
         max_embedding = walk_distance
     else:
-        with h5py.File(hdf5_file, "r") as f:
+        with h5py.File(train_file, "r") as f:
             max_embedding = f["meta_information"].attrs["max_embedding"]
             print(f"Max embedding: {max_embedding}")
 
     # Calculate train-test split indices
-    train_end = int(0.8 * num_samples)
-    test_start = train_end
+    if noise_ratio != 0.0:
+        # train end is always 100 of sample of train data
+        train_end = num_samples
+        test_start = num_samples
+    else:
+        # split original file in an 80-20 split
+        train_end = int(0.8 * num_samples)
+        test_start = train_end
 
     print("Building model....")
     model = build_model(input_dim)
@@ -194,13 +211,23 @@ if __name__ == '__main__':
     model.summary()
 
     # Train and test generators
-    train_generator = hdf5_generator(hdf5_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
+    if noise_ratio == 0.0:
+        train_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
                                      end_idx=train_end)
-    test_generator = hdf5_generator(hdf5_file, batch_size, input_key="X", label_keys=label_keys, start_idx=test_start,
+        test_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=test_start,
+                                    end_idx=num_samples)
+    else:
+        train_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
+                                     end_idx=num_samples)
+        test_generator = hdf5_generator(test_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
                                     end_idx=num_samples)
 
-    train_steps = max(1, train_end // batch_size)  # Ensure at least 1 step
-    test_steps = max(1, (num_samples - train_end) // batch_size)  # Ensure at least 1 step
+    if noise_ratio == 0.0:
+        train_steps = max(1, train_end // batch_size)  # Ensure at least 1 step
+        test_steps = max(1, (num_samples - train_end) // batch_size)  # Ensure at least 1 step
+    else:
+        train_steps = max(1, num_samples // batch_size) # Ensure at least 1 step
+        test_steps = max(1, num_samples // batch_size)  # Ensure at least 1 step
 
     print(f"Training on {train_steps} steps and testing on {test_steps} steps.")
 
