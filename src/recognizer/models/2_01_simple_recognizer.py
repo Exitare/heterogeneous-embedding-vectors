@@ -152,7 +152,14 @@ if __name__ == '__main__':
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
-        train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), f"combined_embeddings.h5")
+        if noise_ratio == 0.0:
+            train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings.h5")
+            print(f"Loading data from {train_file}...")
+        else:
+            raise NotImplementedError("Noise ratio is not supported for walk_distance -1.")
+            train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"combined_embeddings.h5")
+            test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings.h5")
+
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
     else:
         if noise_ratio == 0.0:
