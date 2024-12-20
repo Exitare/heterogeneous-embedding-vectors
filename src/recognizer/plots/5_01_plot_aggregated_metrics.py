@@ -1,3 +1,5 @@
+import sys
+
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -10,93 +12,114 @@ load_folder = Path("results", "recognizer", "aggregated_metrics")
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
-if __name__ == '__main__':
-    parser = ArgumentParser(description='Aggregate metrics from recognizer results')
-    parser.add_argument("--file_name", "-fn", type=Path, required=False, help="File name to save the plot")
-    parser.add_argument("-c", "--cancer", required=False, nargs='+')
-    parser.add_argument("--foundation", "-f", action="store_true", help="Plot for foundation model")
-    parser.add_argument("--multi", "-m", action="store_true", help="Plot for multi recognizer")
 
-    args = parser.parse_args()
-    multi = args.multi
-    file_name: Path = args.file_name
-    cancers: [] = args.cancer
-    foundation: bool = args.foundation
-
-    print(f"Loading data for multi: {multi}, cancers: {cancers}, foundation: {foundation}")
-
-    if multi:
-        selected_cancers = '_'.join(cancers)
-        if foundation:
-            load_folder = Path(load_folder, "mrf", selected_cancers)
-            file = Path(load_folder, "split_metrics.csv")
-        else:
-            load_folder = Path(load_folder, "mr", selected_cancers)
-            file = Path(load_folder, "metrics.csv")
-    else:
-        if foundation:
-            load_folder = Path(load_folder, "srf")
-            file = Path(load_folder, "split_metrics.csv")
-        else:
-            load_folder = Path(load_folder, "sr")
-            file = Path(load_folder, "metrics.csv")
-
-    print(f"Loading file {file}...")
-    df = pd.read_csv(file)
-
-    print(df)
-    # calculate mean of embeddings
-    df = df.groupby(["walk_distance", "embedding"]).mean(numeric_only=True)
-    # embeddings,iteration,embedding,accuracy,precision,recall,f1
-    # plot the accuracy for each embeddings, hue by embeddings
-    df = df.sort_values(by=["accuracy"], ascending=False)
-
-    # plot line plot for embeddings, embeddings and accuracy
-    df = df.reset_index()
-
-    # print mean accuracy for each embedding
-    print(df[["embedding", "accuracy"]].groupby("embedding").mean(numeric_only=True))
-    df_mean = df.groupby("walk_distance", as_index=False)["accuracy"].mean()
-
-    # upper case all embedding
-    df["embedding"] = df["embedding"].str.upper()
-
-    title = ''
-
-    if cancers is not None:
-        title = f"Mean accuracy of walk distances using cancer\n{' '.join([can for can in cancers])}"
-    else:
-        title = "Mean accuracy of walk distances"
-
-    # Plot
+def plot_bar_plot(df: pd.DataFrame):
     fig = plt.figure(figsize=(10, 5), dpi=150)
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
 
     # Plot individual embeddings
-    sns.lineplot(data=df, x="walk_distance", y="accuracy", hue="embedding", palette="tab10", alpha=0.6)
+    sns.barplot(data=df, x="embedding", y="accuracy", hue="embedding", alpha=0.6)
 
-    # Plot mean line
-    sns.lineplot(data=df_mean, x="walk_distance", y="accuracy", color='black', marker='o', linestyle='--', label='Mean')
+    plt.savefig(Path(save_folder, "bar_plot.png"), dpi=150)
 
-    plt.title(title)
-    plt.ylabel("Accuracy")
-    plt.xlabel("Walk Distance")
-    plt.xticks(rotation=45)
-    plt.legend(title="Embedding")
-    plt.tight_layout()
-    # set y axis to 0.2 and 1
-    plt.ylim(0.2, 1)
-    # if multi set x ticks starting at 2 to 20
-    if multi:
-        plt.xticks(range(2, 21))
-        plt.xlim(2, 20)
+
+def plot_noise(df: pd.DataFrame):
+    # calculate mean for each noise
+    df = df.groupby(["walk_distance", "noise"]).mean(numeric_only=True)
+
+    fig = plt.figure(figsize=(10, 5), dpi=150)
+    sns.set_theme(style="whitegrid")
+    sns.set_context("paper")
+
+    # Plot individual embeddings
+    sns.lineplot(data=df, x="walk_distance", y="accuracy", hue="noise", palette="tab10", alpha=0.6)
+
+    plt.savefig(Path(save_folder, "noise_plot.png"), dpi=150)
+
+
+def noise_grid(df):
+    # Ensure 'noise' is treated as a categorical variable for plotting
+    df["noise"] = df["noise"].astype(str)  # Convert to string to ensure proper FacetGrid behavior
+    # sort the noise values
+    df["noise"] = pd.Categorical(df["noise"], categories=sorted(df["noise"].unique()), ordered=True)
+
+    # Set up Seaborn theme
+    sns.set_theme(style="whitegrid")
+    sns.set_context("paper")
+
+    # Create a FacetGrid with one plot per unique noise value
+    g = sns.FacetGrid(df, col="noise", col_wrap=4, height=4)
+
+    # Map the lineplot to each facet
+    g.map(
+        sns.lineplot,
+        "walk_distance", "accuracy", "embedding",
+        palette="tab10", alpha=0.6
+    )
+
+    # Add legend to the grid
+    g.add_legend(title="Embedding")
+
+    # Show the plots
+    plt.savefig(Path(save_folder, "noise_grid.png"), dpi=150)
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Aggregate metrics from recognizer results')
+    parser.add_argument("-c", "--cancer", required=True, nargs='+')
+    parser.add_argument("--multi", "-m", action="store_true", help="Plot for multi recognizer")
+    parser.add_argument("-a", "--amount_of_summed_embeddings", type=int, default=1000,
+                        help="Amount of summed embeddings")
+    parser.add_argument("-combined", "--combined", action="store_true", help="Plot for combined model")
+
+    args = parser.parse_args()
+    multi = args.multi
+    cancers: [] = args.cancer
+    selected_cancers = '_'.join(cancers)
+    amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
+    combined: bool = args.combined
+
+    print(f"Loading data for multi: {multi}, cancers: {cancers}")
+
+    if not multi:
+        load_folder = Path(load_folder, selected_cancers, "simple",
+                           str(amount_of_summed_embeddings), "metrics.csv")
+        save_folder = Path(save_folder, selected_cancers, "simple",
+                           str(amount_of_summed_embeddings), "combined" if combined else "")
     else:
-        plt.xticks(range(2, 31))
-        plt.xlim(2, 30)
+        load_folder = Path(load_folder, selected_cancers, "multi",
+                           str(amount_of_summed_embeddings), "metrics.csv")
+        save_folder = Path(save_folder, selected_cancers, "multi",
+                           str(amount_of_summed_embeddings), "combined" if combined else "")
 
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
 
-    if file_name is None:
-        plt.show()
+    df = pd.read_csv(load_folder)
+
+    if combined:
+        df = df[df["walk_distance"] == -1]
+        plot_bar_plot(df)
+        sys.exit(0)
     else:
-        plt.savefig(Path(save_folder, file_name))
+        # remove all embeddings smaller than 3
+        df = df[df["walk_distance"] >= 3]
+        # remove noise 0.7,0.8,0.9,0.99
+        df = df[~df["noise"].isin([0.7, 0.8, 0.9, 0.99])]
+        # assert that no walk_distance of -1 is in the dataframe
+        assert -1 not in df["walk_distance"].values, "Walk distance of -1 is present"
+
+    # calculate mean of embeddings
+    grouped = df.groupby(["walk_distance", "embedding", "noise"]).mean(numeric_only=True)
+    # embeddings,iteration,embedding,accuracy,precision,recall,f1
+    # plot the accuracy for each embeddings, hue by embeddings
+    grouped = grouped.sort_values(by=["accuracy"], ascending=False)
+
+    # plot line plot for embeddings, embeddings and accuracy
+    grouped = grouped.reset_index()
+
+    plot_noise(grouped)
+    noise_grid(grouped)
+
+    print("Done")
