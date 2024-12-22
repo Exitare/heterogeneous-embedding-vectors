@@ -4,7 +4,6 @@ amount_of_summed_embeddings=$w
 lower_bound=$3
 upper_bound=$4
 
-
 # ./src/recognizer/summed_embeddings_generation/1_02_schedule_multi_sum_embeddings.sh "BRCA LUAD STAD BLCA COAD THCA"
 
 # if selected_cancers is not provided, then exit

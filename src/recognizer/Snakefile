@@ -1,0 +1,16 @@
+
+rule all:
+    input:
+        # all plots
+
+rule generate_plots:
+    run:
+        snakemake --snakefile src/recognizer/plots/Snakefile --cores 1
+
+rule run_models:
+    run:
+        snakemake --snakefile src/recognizer/models/Snakefile --cores 1
+
+rule run_summed_embeddings_generation:
+    run:
+        snakemake --snakefile src/recognizer/summed_embeddings_generation/Snakefile --cores 1

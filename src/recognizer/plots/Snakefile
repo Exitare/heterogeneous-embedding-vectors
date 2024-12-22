@@ -1,4 +1,44 @@
 
+configfile: "config.yaml"
 
+joined_cancers = '_'.join(config['cancers'])
+amount_of_summed_embeddings = config['amount_of_summed_embeddings']
+noise_ratio=config['noise_ratios']
 
 rule all:
+    input:
+        expand(f"figures/recognizer/{{cancers}}/simple/{{amount}}/noise_grid.png",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        ),
+         expand(f"figures/recognizer/{{cancers}}/simple/{{amount}}/noise_plot.png",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        ),
+        expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_grid.png",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        ),
+         expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_plot.png",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        ),
+
+rule create_noise_plot:
+    input:
+        expand(f"results/recognizer/aggregated_metrics/{{cancers}}/multi/{{amount}}/metrics.csv",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings,
+        )
+    output:
+        expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_plot.png",
+            cancers=joined_cancers,
+            amount=amount_of_summed_embeddings
+        )
+    run:
+        cancers=joined_cancers,
+        amount=amount_of_summed_embeddings,
+        shell(f"python3 src/recognizer/plots/5_01_plot_aggregated_metrics.py -c {{cancers}} -a {{amount}}")
+
+
+

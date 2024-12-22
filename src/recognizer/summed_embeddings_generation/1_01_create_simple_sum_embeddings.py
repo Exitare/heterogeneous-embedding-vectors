@@ -120,7 +120,7 @@ def add_random_or_real_embedding(buffer, add_noise, latent_dim):
     Adds either random Gaussian noise or a real embedding from the buffer.
     """
     if add_noise:
-        return np.random.normal(0, 1, size=latent_dim).astype(np.float32)
+        return np.random.uniform(-1, 1, size=latent_dim).astype(np.float32)
     else:
         return buffer.get_next_embedding()
 
