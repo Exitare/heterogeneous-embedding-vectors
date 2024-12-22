@@ -17,7 +17,7 @@ save_path = Path("results", "recognizer", "multi")
 load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
 
-def create_indices(hdf5_file_path, test_size=0.2, random_state=42):
+def create_indices(hdf5_file_path, walk_distance: int, test_size=0.2, random_state=42):
     """
     Create random train-test split indices with stratification based on class labels.
     """
@@ -45,6 +45,25 @@ def create_indices(hdf5_file_path, test_size=0.2, random_state=42):
     )
 
     return train_indices, val_indices, test_indices
+
+
+def create_train_val_indices(hdf5_file_path, walk_distance: int, test_size=0.2, random_state=42):
+    """
+    Create random train-test split indices with stratification based on class labels.
+    """
+    with h5py.File(hdf5_file_path, 'r') as hdf5_file:
+        num_samples = hdf5_file['X'].shape[0]
+        if walk_distance == -1:
+            walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
+
+    indices = np.arange(num_samples)
+    if walk_distance != -1:
+        return train_test_split(indices, test_size=test_size, random_state=random_state)
+
+        # Stratify by walk distances
+    return train_test_split(
+        indices, test_size=test_size, random_state=random_state, stratify=walk_distances
+    )
 
 
 def hdf5_generator(hdf5_file_path, batch_size, indices):
@@ -221,33 +240,66 @@ if __name__ == '__main__':
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
-        load_path = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
-                         "combined_embeddings.h5")
-        save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings",
-                         run_name)
-        with h5py.File(load_path, "r") as f:
-            max_embedding = f["meta_information"].attrs["max_embedding"]
-            print(f"Max embedding: {max_embedding}")
+        if noise_ratio == 0.0:
+            train_file = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                              "combined_embeddings.h5")
+            print(f"Loading data from {train_file}")
+
+            with h5py.File(train_file, "r") as f:
+                max_embedding = f["meta_information"].attrs["max_embedding"]
+                print(f"Max embedding: {max_embedding}")
+        else:
+            raise NotImplementedError("Noise ratio is not supported for walk distance -1")
+            train_file = Path(load_path, cancers, str(amount_of_summed_embeddings), "0.0",
+                              "combined_embeddings.h5")
+            test_file = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                             "combined_embeddings.h5")
+            print(f"Loading data from {train_file} and {test_file}")
+
+            with h5py.File(train_file, "r") as f:
+                max_embedding = f["meta_information"].attrs["max_embedding"]
+                print(f"Max embedding: {max_embedding}")
+
+        save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         "combined_embeddings", run_name)
     else:
-        load_path = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
-                         f"{walk_distance}_embeddings.h5")
+        if noise_ratio == 0.0:
+            train_file = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                              f"{walk_distance}_embeddings.h5")
+            print(f"Loading data from {train_file}")
+        else:
+            train_file = Path(load_path, cancers, str(amount_of_summed_embeddings), "0.0",
+                              f"{walk_distance}_embeddings.h5")
+            test_file = Path(load_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                             f"{walk_distance}_embeddings.h5")
+            print(f"Loading data from {train_file} and {test_file}")
+
         save_path = Path(save_path, cancers, str(amount_of_summed_embeddings), str(noise_ratio),
                          f"{walk_distance}_embeddings", run_name)
         max_embedding = walk_distance
 
-    print(f"Loading data from {load_path}")
     print(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
-    train_indices, val_indices, test_indices = create_indices(load_path)
+    if noise_ratio == 0.0:
+        train_indices, val_indices, test_indices = create_indices(train_file, walk_distance=walk_distance)
+    else:
+        train_indices, val_indices = create_train_val_indices(train_file, walk_distance=walk_distance)
+        with h5py.File(test_file, "r") as f:
+            test_indices = np.arange(f['X'].shape[0])
 
-    train_gen = hdf5_generator(load_path, batch_size, train_indices)
-    val_gen = hdf5_generator(load_path, batch_size, val_indices)
-    test_gen = hdf5_generator(load_path, batch_size, test_indices)
+    if noise_ratio == 0.0:
+        train_gen = hdf5_generator(train_file, batch_size, train_indices)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices)
+        test_gen = hdf5_generator(train_file, batch_size, test_indices)
+    else:
+        train_gen = hdf5_generator(train_file, batch_size, train_indices)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices)
+        test_gen = hdf5_generator(test_file, batch_size, test_indices)
 
-    with h5py.File(load_path, 'r') as f:
+    with h5py.File(train_file, 'r') as f:
         input_dim = f['X'].shape[1]
 
     model = build_model(input_dim, selected_cancers)
