@@ -34,7 +34,7 @@ if __name__ == '__main__':
         cancer_rows = summed_embeddings[summed_embeddings[cancer] > 0]
 
         # Drop the cancer columns and Image Text and RNA
-        cancer_rows = cancer_rows.drop(columns=["Image", "Text", "RNA"] + selected_cancers)
+        cancer_rows = cancer_rows.drop(columns=["Image", "Text", "RNA", "Mutation"] + selected_cancers)
         cancer_rows["cancer"] = cancer
 
         # assert that no Nan values are present
