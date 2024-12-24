@@ -14,6 +14,16 @@ LATENT_SPACE_DIM = 767
 CHUNK_SIZE = 10000  # Number of embeddings per chunk
 LOAD_FOLDER = Path("results", "embeddings")
 
+modality_weights = {
+    'RNA': 0.25,
+    'Text': 0.25,
+    'Image': 0.25,
+    'Mutation': 0.25
+}
+
+modality_choices = list(modality_weights.keys())
+modality_probs = list(modality_weights.values())
+
 
 class EmbeddingBuffer:
     """
@@ -182,28 +192,31 @@ def main():
         for buffer in buffers.values():
             buffer.load_next_chunk()
 
+        counts = {modality: 0 for modality in modality_choices}
+
         for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
             combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
             combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
 
-            # Allocate walk_distance across modalities using vectorized operations
-            random_modalities = np.random.choice(modality_choices, size=walk_distance)
-            unique, counts = np.unique(random_modalities, return_counts=True)
-            modality_counts = dict(zip(unique, counts))
+            # Weighted sampling of modalities for the current summation
+            random_modalities = np.random.choice(
+                modality_choices,
+                size=walk_distance,
+                p=modality_probs
+            )
+            unique, sampled_counts = np.unique(random_modalities, return_counts=True)
+            modality_counts = dict(zip(unique, sampled_counts))
+
+            # Update global counts
+            for modality, count in modality_counts.items():
+                counts[modality] += count
 
             for modality, count in modality_counts.items():
                 buffer = buffers[modality]
                 for _ in range(count):
                     add_noise = np.random.random() < noise_ratio
-                    try:
-                        embedding = add_random_or_real_embedding(buffer, add_noise, LATENT_SPACE_DIM)
-                        combined_sum += embedding
-                    except IndexError as e:
-                        logging.error(f"IndexError when accessing embedding: {e}")
-                        continue
-                    except Exception as e:
-                        logging.error(f"Unexpected error when accessing embedding: {e}")
-                        continue
+                    embedding = add_random_or_real_embedding(buffer, add_noise, LATENT_SPACE_DIM)
+                    combined_sum += embedding
 
                     if not add_noise:
                         combination_counts[modality] += 1

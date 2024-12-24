@@ -280,18 +280,33 @@ def main():
             buffer.load_next_chunk()
 
         selected_cancer_list = []
+        # Initialize cancer selection counts
+        cancer_counts = {cancer: 0 for cancer in selected_cancers}
 
         # Generate summed embeddings
         for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
             combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
 
-            # Select a cancer type randomly for this summed embedding
-            selected_cancer = random.choice(selected_cancers)
+            # Calculate dynamic probabilities for cancer selection
+            total_cancer_selections = sum(cancer_counts.values())
+            cancer_probs = [
+                (1 - (count / total_cancer_selections)) if total_cancer_selections > 0 else 1
+                for count in cancer_counts.values()
+            ]
+            cancer_probs = np.array(cancer_probs) / np.sum(cancer_probs)  # Normalize to sum to 1
+
+            # Select a cancer type based on dynamic probabilities
+            selected_cancer = np.random.choice(selected_cancers, p=cancer_probs)
+            cancer_counts[selected_cancer] += 1  # Update count
+
             selected_cancer_list.append(selected_cancer)
 
-            # Define modality choices for this summed embedding
-            modality_choices = modality_choices_general + [selected_cancer]
-            random_modalities = np.random.choice(modality_choices, size=walk_distance)
+            # Update modality weights to include the selected cancer
+            modality_weights = {"Text": 0.25, "Image": 0.25, "Mutation": 0.25, selected_cancer: 0.25}
+            modality_choices = list(modality_weights.keys())
+            modality_probs = list(modality_weights.values())
+            # Perform weighted sampling for this embedding
+            random_modalities = np.random.choice(modality_choices, size=walk_distance, p=modality_probs)
             unique, counts = np.unique(random_modalities, return_counts=True)
             modality_counts = dict(zip(unique, counts))
 
