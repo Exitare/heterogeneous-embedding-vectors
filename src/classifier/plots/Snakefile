@@ -57,7 +57,11 @@ rule all:
             cancers=joined_cancers
         ),
         expand(
-            f"figures/classifier/{{cancers}}/performance/accuracy_grid.png",
+            f"figures/classifier/{{cancers}}/performance/accuracy_score_grid.png",
+            cancers=joined_cancers
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/performance/f1_score_grid.png",
             cancers=joined_cancers
         ),
         expand(
@@ -65,7 +69,7 @@ rule all:
             cancers=joined_cancers
         ),
         expand(
-            f"figures/classifier/{{cancers}}/performance/accuracy.png",
+            f"figures/classifier/{{cancers}}/performance/accuracy_score.png",
             cancers=joined_cancers
         ),
         expand(
@@ -80,6 +84,17 @@ rule all:
             f"figures/classifier/{{cancers}}/performance/grid_performance.png",
             cancers=joined_cancers
         ),
+        expand(
+            f"figures/classifier/{{cancers}}/performance/overview_scores.png",
+            cancers=joined_cancers
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/performance/{{walk_distance}}_{{walk_amount}}_confusion_matrix.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts,
+        )
+
 
 
 
@@ -257,7 +272,15 @@ rule create_performance_plots:
         )
     output:
         expand(
-            f"figures/classifier/{{cancers}}/performance/accuracy_grid.png",
+            f"figures/classifier/{{cancers}}/performance/accuracy_score_grid.png",
+            cancers=joined_cancers
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/performance/f1_score_grid.png",
+            cancers=joined_cancers
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/performance/overview_scores.png",
             cancers=joined_cancers
         ),
         expand(
@@ -265,7 +288,7 @@ rule create_performance_plots:
             cancers=joined_cancers
         ),
         expand(
-            f"figures/classifier/{{cancers}}/performance/accuracy.png",
+            f"figures/classifier/{{cancers}}/performance/accuracy_score.png",
             cancers=joined_cancers
         )
     run:
@@ -296,4 +319,27 @@ rule create_performance_grid_plots:
         )
     run:
         cancers = ' '.join(all_cancers)
-        shell(f"python3 src/classifier/plots/6_03_performance_grid.py -c {{cancers}}")
+        shell(f"python3 src/classifier/plots/6_03_performance_grid_plot.py -c {{cancers}}")
+
+rule create_confusion_matrix:
+    input:
+        expand(
+            f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts,
+            iteration=max_iterations
+        )
+    output:
+        expand(
+            f"figures/classifier/{{cancers}}/performance/{{walk_distance}}_{{walk_amount}}_confusion_matrix.png",
+            cancers=joined_cancers,
+            walk_distance=requested_walk_distance,
+            walk_amount=requested_walk_amounts,
+        )
+
+    run:
+        cancers = ' '.join(all_cancers)
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                shell(f"python3 src/classifier/plots/6_04_confusion_matrix.py -c {{cancers}} -w {{walk_distance}} -a {{walk}}")

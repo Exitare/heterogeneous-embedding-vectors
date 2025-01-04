@@ -3,7 +3,8 @@ import numpy as np
 import tensorflow as tf
 from keras.src.layers import BatchNormalization
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.preprocessing import label_binarize
 import pandas as pd
 from pathlib import Path
 import argparse
@@ -82,12 +83,24 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     # Predict and collect results
     y_test = []
     y_pred = []
+    y_pred_proba = []  # Collect probabilities instead of labels
     for X_batch, y_batch in test_ds:
         y_test.extend(y_batch.numpy())
         y_pred.extend(model.predict(X_batch).argmax(axis=1))
+        y_pred_proba.extend(model.predict(X_batch))
 
     y_test = np.array(y_test)
     y_pred = np.array(y_pred)
+    y_pred_proba = np.array(y_pred_proba)
+
+    predictions = pd.DataFrame({
+        "y_test": y_test,
+        "y_test_decoded": label_encoder.inverse_transform(y_test),
+        "y_pred": y_pred,
+        "y_pred_decoded": label_encoder.inverse_transform(y_pred)
+    })
+
+    predictions.to_csv(Path(save_folder, f"predictions.csv"), index=False)
 
     # Metrics by cancer type
     results = []
@@ -122,8 +135,16 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     recall_total = recall_score(y_test, y_pred, average='weighted')
     accuracy_total = (y_test == y_pred).mean()
 
+    print(y_test.shape)
+    print(y_pred.shape)
+    # Assuming the number of classes is known
+    num_classes = y_pred_proba.shape[1]  # Infer from probabilities
+    y_test_one_hot = label_binarize(y_test, classes=np.arange(num_classes))
+    # Compute AUC-ROC score
+    auc_score = roc_auc_score(y_test_one_hot, y_pred_proba, multi_class='ovo', average='macro')
+
     print(
-        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}")
+        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f}")
 
     results.append({
         "cancer": "All",
@@ -131,6 +152,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         "f1": f1_total,
         "precision": precision_total,
         "recall": recall_total,
+        "auc": auc_score,
         "iteration": iteration,
         "walk_distance": walk_distance,
         "amount_of_walks": amount_of_walks
@@ -182,8 +204,8 @@ if __name__ == "__main__":
         iteration_save_folder.mkdir(parents=True)
 
     train_ratio = 0.7
-    val_ratio = 0.15
-    test_ratio = 0.15
+    val_ratio = 0.05
+    test_ratio = 0.25
 
     class_counts = Counter()
 

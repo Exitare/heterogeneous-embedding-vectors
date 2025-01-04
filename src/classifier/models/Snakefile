@@ -20,7 +20,14 @@ rule all:
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
                iteration=run_iterations
+        ),
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
         )
+
 
 rule run_classification:
     input:
@@ -38,6 +45,12 @@ rule run_classification:
                iteration=run_iterations
         ),
         expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
+               cancers=joined_cancers,
+               walk_amount=requested_walk_amounts,
+               walk_distance=requested_walk_distance,
+               iteration=run_iterations
+        ),
+        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
