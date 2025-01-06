@@ -16,6 +16,25 @@ load_folder = Path("results", "classifier", "summed_embeddings")
 save_folder = Path("results", "classifier", "classification")
 
 
+def apply_weights_and_bias(model, loaded_weights_and_biases):
+    # Apply the weights and biases to the model
+    for layer in model.layers:
+        if layer.name in loaded_weights_and_biases:
+            if layer.name == "batch_normalization":
+                continue
+            weights = loaded_weights_and_biases[layer.name]['weights']
+            biases = loaded_weights_and_biases[layer.name]['biases']
+            if biases is not None:
+                layer.set_weights([weights, biases])
+            else:
+                layer.set_weights([weights])
+            print(f"Applied weights to layer: {layer.name}")
+        else:
+            print(f"No weights found for layer: {layer.name}")
+
+    return model
+
+
 def h5_generator_specific_indices(h5_file_path, indices, batch_size, label_encoder):
     """
     Generator that yields batches of data based on specific indices.
@@ -57,6 +76,11 @@ def create_tf_dataset_specific_indices(h5_file_path, indices, batch_size, label_
 def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_folder: Path, iteration: int,
                              walk_distance: int,
                              amount_of_walks: int, label_encoder):
+    import pickle
+    # Load the saved weights and biases
+    with open('weights_and_biases.pkl', 'rb') as f:
+        loaded_weights_and_biases = pickle.load(f)
+
     input_layer = tf.keras.layers.Input(shape=(train_ds.element_spec[0].shape[1],))
 
     x = BatchNormalization()(input_layer)
@@ -64,7 +88,19 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     x = tf.keras.layers.Dense(128, activation='relu')(x)
     output_layer = tf.keras.layers.Dense(num_classes, activation='softmax')(x)
 
+    classes = list(label_encoder.classes_)
+    decoded_classes = label_encoder.inverse_transform(np.arange(num_classes))
+
+    # using the deocded classes and the classes increase the weights for classes LUAD, BRCA and BLCA
+    class_weights = {classes.index(cancer): 1.0 for cancer in decoded_classes}
+    class_weights[classes.index("LUAD")] = 6
+    # class_weight[classes.index("BRCA")] = 2
+    class_weights[classes.index("BLCA")] = 2.5
+
     model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
+
+    model = apply_weights_and_bias(model, loaded_weights_and_biases)
+
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     # Train model
@@ -73,8 +109,10 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
                         steps_per_epoch=train_batches,
                         validation_data=val_ds,
                         validation_steps=val_batches,
+                        class_weight=class_weights,
                         callbacks=[
-                            tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+                            tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5, mode='max',
+                                                             restore_best_weights=True)
                         ])
 
     loss, accuracy = model.evaluate(test_ds)
@@ -164,7 +202,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     print("Results saved.")
 
     # Save model and training history
-    model.save(Path(save_folder, f"model.h5"))
+    model.save(Path(save_folder, f"model.keras"))
     history_df = pd.DataFrame(history.history)
     history_df.to_csv(Path(save_folder, f"history.csv"), index=False)
     print("Model and history saved.")
