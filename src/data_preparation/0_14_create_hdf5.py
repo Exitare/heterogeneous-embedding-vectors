@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import pandas as pd
 import numpy as np
 import h5py
+import sys
 
 save_folder = Path("results", "embeddings")
 
@@ -26,8 +27,46 @@ def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
         for file_path in path.iterdir():
             if file_path.is_file() and file_path.suffix == file_extension:
                 print(f"Loading file in chunks: {file_path}")
-                for chunk in pd.read_csv(file_path, chunksize=chunk_size):
+                sep = "," if file_extension == ".csv" else "\t"
+                for chunk in pd.read_csv(file_path, chunksize=chunk_size, sep=sep):
                     yield chunk
+    elif path.is_file():
+        # Process the single file
+        print(f"Loading single file in chunks: {path}")
+        for chunk in pd.read_csv(path, chunksize=chunk_size):
+            yield chunk
+    else:
+        raise ValueError(f"Provided path is neither a file nor a directory: {path}")
+
+
+def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
+    """
+    Load data from a directory or a single file in chunks.
+
+    Parameters:
+        path (Path): Path to a directory or file.
+        chunk_size (int): Number of rows per chunk.
+        file_extension (str): Extension of files to process (default: .csv).
+
+    Yields:
+        pd.DataFrame: Chunk of data from files or a single file.
+    """
+    path = Path(path)
+
+    if path.is_dir():
+        # Process all files in the directory
+        for file_path in path.iterdir():
+            print(file_path)
+            if file_path.is_file():
+                continue
+            for cancer_path in file_path.iterdir():
+                print("cancer_path", cancer_path)
+                if cancer_path.is_file() and cancer_path.suffix == file_extension:
+                    print(f"Loading file in chunks: {cancer_path}")
+                    sep = "," if file_extension == ".csv" else "\t"
+                    for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
+                        yield chunk
+
     elif path.is_file():
         # Process the single file
         print(f"Loading single file in chunks: {path}")
@@ -87,15 +126,20 @@ def process_and_store_in_chunks(
 
         # Create indices for this chunk
         for i, row in enumerate(structured_chunk):
-            submitter_id = row[key_column]
+            try:
+                submitter_id = row[key_column]
 
-            parts = submitter_id.split('-')
-            if len(parts) == 4:
-                submitter_id = '-'.join(parts[:-1])
+                parts = submitter_id.split('-')
+                if len(parts) == 4:
+                    submitter_id = '-'.join(parts[:-1])
 
-            if submitter_id not in indices:
-                indices[submitter_id] = []
-            indices[submitter_id].append(current_size + i)
+                if submitter_id not in indices:
+                    indices[submitter_id] = []
+                indices[submitter_id].append(current_size + i)
+            except BaseException as ex:
+                print(ex)
+                print(f"Error occurred in row {i}")
+                sys.exit(0)
 
         current_size = new_size
 
@@ -134,7 +178,7 @@ if __name__ == "__main__":
         mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f)
 
         # Process Image embeddings
-        image_loader = chunked_dataframe_loader(image_embedding_folder)
+        image_loader = chunked_image_dataframe_loader(image_embedding_folder, file_extension=".tsv")
         image_indices = process_and_store_in_chunks("images", image_loader, f)
 
         submitter_ids = list(rna_indices.keys())
