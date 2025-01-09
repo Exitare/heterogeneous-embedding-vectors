@@ -99,7 +99,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
 
     model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
 
-    model = apply_weights_and_bias(model, loaded_weights_and_biases)
+    # model = apply_weights_and_bias(model, loaded_weights_and_biases)
 
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
