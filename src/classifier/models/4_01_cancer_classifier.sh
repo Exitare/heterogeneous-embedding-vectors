@@ -1,8 +1,24 @@
 #!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --job-name=classifier
+#SBATCH --time=9-00:00:00
+#SBATCH --partition=exacloud
+#SBATCH --qos=long_jobs
+#SBATCH --ntasks=1
+#SBATCH --mem=128000
+#SBATCH --cpus-per-task=4
+#SBATCH --output=./output_reports/slurm.%N.%j.out
+#SBATCH --error=./error_reports/slurm.%N.%j.err
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=kirchgae@ohsu.edu
+
 #./src/classifier/4_01_cancer_classifier.sh "BRCA BLCA LUAD STAD THCA COAD"
+
+
 cancers=$1
 walk_distance=$2
 walk_amount=$3
+iteration=$4
 
 # Check if cancers is empty
 if [ -z "$cancers" ]; then
@@ -22,9 +38,5 @@ if [ -z "$walk_amount" ]; then
   echo "walk_amount is empty, setting to 3"
 fi
 
-# iterate 30 times
-for i in {1..30}
-do
-  # call script
-  python src/classifier/4_01_cancer_classifier.py -c ${cancers} -i ${i} -w ${walk_distance} -a ${walk_amount}
-done
+# call script
+python src/classifier/4_01_cancer_classifier.py -c ${cancers} -i ${iteration} -w ${walk_distance} -a ${walk_amount}
