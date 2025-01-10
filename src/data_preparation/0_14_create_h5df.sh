@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --job-name=c_h5df
 #SBATCH --time=9-00:00:00
-#SBATCH --partition=exacloud
+#SBATCH --partition=batch
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
 #SBATCH --mem=64000
