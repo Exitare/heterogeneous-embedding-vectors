@@ -164,39 +164,45 @@ if __name__ == "__main__":
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
     image_embedding_folder = Path("results", "embeddings", "images")
 
-    with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
-        # Process RNA embeddings
-        rna_loader = chunked_dataframe_loader(rna_load_folder)
-        rna_indices = process_and_store_in_chunks("rna", rna_loader, f)
+    try:
+        with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
+            # Process RNA embeddings
+            rna_loader = chunked_dataframe_loader(rna_load_folder)
+            rna_indices = process_and_store_in_chunks("rna", rna_loader, f)
 
-        # Process Annotation embeddings
-        annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
-        annotation_indices = process_and_store_in_chunks("annotations", annotation_loader, f)
+            # Process Annotation embeddings
+            annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
+            annotation_indices = process_and_store_in_chunks("annotations", annotation_loader, f)
 
-        # Process Mutation embeddings
-        mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
-        mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f)
+            # Process Mutation embeddings
+            mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
+            mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f)
 
-        # Process Image embeddings
-        image_loader = chunked_image_dataframe_loader(image_embedding_folder, file_extension=".tsv")
-        image_indices = process_and_store_in_chunks("images", image_loader, f)
+            # Process Image embeddings
+            image_loader = chunked_image_dataframe_loader(image_embedding_folder, file_extension=".tsv")
+            image_indices = process_and_store_in_chunks("images", image_loader, f)
 
-        submitter_ids = list(rna_indices.keys())
-        submitter_ids.sort()
-        # Store indices
-        index_group = f.create_group("indices")
-        index_group.create_dataset("submitter_ids", data=np.array(submitter_ids, dtype="S"))
-        for modality, indices in [
-            ("rna", rna_indices),
-            ("annotations", annotation_indices),
-            ("mutations", mutation_indices),
-            ("images", image_indices),
-        ]:
-            modality_index_group = index_group.create_group(modality)
-            for submitter_id, rows in indices.items():
-                modality_index_group.create_dataset(
-                    submitter_id, data=np.array(rows, dtype="int64")
-                )
+            submitter_ids = list(rna_indices.keys())
+            submitter_ids.sort()
+            # Store indices
+            index_group = f.create_group("indices")
+            index_group.create_dataset("submitter_ids", data=np.array(submitter_ids, dtype="S"))
+            for modality, indices in [
+                ("rna", rna_indices),
+                ("annotations", annotation_indices),
+                ("mutations", mutation_indices),
+                ("images", image_indices),
+            ]:
+                modality_index_group = index_group.create_group(modality)
+                for submitter_id, rows in indices.items():
+                    modality_index_group.create_dataset(
+                        submitter_id, data=np.array(rows, dtype="int64")
+                    )
 
-        print("HDF5 file with indices created successfully.")
-        print(f"Available groups: {f.keys()}")
+            print("HDF5 file with indices created successfully.")
+            print(f"Available groups: {f.keys()}")
+    except BaseException as e:
+        print(f"Error occurred: {e}")
+        with open("error.txt", "w") as f:
+            f.write(str(e))
+        sys.exit(1)
