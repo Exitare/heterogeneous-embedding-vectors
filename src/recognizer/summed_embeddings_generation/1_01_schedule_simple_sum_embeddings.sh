@@ -35,7 +35,7 @@ echo $cancer_types
 # iterate through lower_bound to upper_bound
 for walk_distance in $(seq $lower_bound $upper_bound)
 do
-  for noise_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 0.99
+  for noise_ratio in 0.0 0.1 0.2 0.3 0.4 0.5 0.6
   do
      sbatch ./src/recognizer/summed_embeddings_generation/1_01_create_simple_sum_embeddings.sh $walk_distance $amount_of_summed_embeddings "${cancer_types}" $noise_ratio
   done
