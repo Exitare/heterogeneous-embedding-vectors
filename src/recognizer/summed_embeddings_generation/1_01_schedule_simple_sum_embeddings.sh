@@ -19,7 +19,7 @@ fi
 if [ -z "$upper_bound" ]
 then
   echo "Upper bound not set, setting to 30"
-  upper_bound=30
+  upper_bound=15
 fi
 
 # if amount_of_summed_embeddings not set, set to 1000000
