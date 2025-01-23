@@ -31,6 +31,9 @@ cd $SCRATCH_PATH
 file_name=$(echo "${selected_cancers}" | tr ' ' '_' ).h5
 source_file_path="./results/embeddings/${file_name}"
 
+echo "File name: ${file_name}"
+echo "Source file path: ${source_file_path}"
+
 # Copy only the specific file to the scratch directory
 if [ -f "${source_file_path}" ]; then
     echo "Copying ${source_file_path} to scratch"
