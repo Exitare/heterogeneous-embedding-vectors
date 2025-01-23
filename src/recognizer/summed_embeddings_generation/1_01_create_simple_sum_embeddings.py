@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Configuration
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "simple")
 LATENT_SPACE_DIM = 767
-CHUNK_SIZE = 10000  # Number of embeddings per chunk
+CHUNK_SIZE = 200000  # Number of embeddings per chunk
 LOAD_FOLDER = Path("results", "embeddings")
 
 modality_weights = {
@@ -226,7 +226,7 @@ def main():
                 labels_data[label][i] = count
 
     # Save the data to an HDF5 file with compression for efficiency
-    output_file = save_path / f"{walk_distance}_embeddings.h5"
+    output_file = Path(save_path, f"{walk_distance}_embeddings.h5")
     with h5py.File(output_file, "w") as f_out:
         # Save combined embeddings
         f_out.create_dataset("X", data=combined_data, compression="gzip")

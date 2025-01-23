@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "multi")
 LOAD_PATH = Path("results", "embeddings")
 LATENT_SPACE_DIM = 767
-CHUNK_SIZE = 10000  # Number of embeddings per chunk
+CHUNK_SIZE = 200000  # Number of embeddings per chunk
 
 
 class EmbeddingBuffer:

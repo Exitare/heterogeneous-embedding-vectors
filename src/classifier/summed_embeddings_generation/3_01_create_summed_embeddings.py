@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 def extract_submitter_data(
-        h5_file_path: str, groups: List[str], submitter_id: str, chunk_size: int = 10000
+        h5_file_path: str, groups: List[str], submitter_id: str, chunk_size: int = 100000
 ) -> Dict[str, np.ndarray]:
     """
     Extract all rows for a specific submitter_id from all groups in an HDF5 file.
