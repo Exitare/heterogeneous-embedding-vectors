@@ -27,12 +27,14 @@ srun /usr/local/bin/mkdir-scratch.sh
 SCRATCH_PATH="/mnt/scratch/${SLURM_JOB_ID}"
 cd $SCRATCH_PATH
 
+
 # Construct the file name based on selected cancers
 file_name=$(echo "${selected_cancers}" | tr ' ' '_' ).h5
 source_file_path="./results/embeddings/${file_name}"
 
 echo "File name: ${file_name}"
 echo "Source file path: ${source_file_path}"
+echo "SCRATCH_PATH: ${SCRATCH_PATH}"
 
 # Copy only the specific file to the scratch directory
 if [ -f "${source_file_path}" ]; then
