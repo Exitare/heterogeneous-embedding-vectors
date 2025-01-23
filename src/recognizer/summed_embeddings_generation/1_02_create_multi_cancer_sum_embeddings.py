@@ -12,7 +12,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Configuration Constants
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "multi")
-LOAD_PATH = Path("results", "embeddings")
 LATENT_SPACE_DIM = 767
 CHUNK_SIZE = 200000  # Number of embeddings per chunk
 
@@ -165,40 +164,15 @@ def main():
     parser = ArgumentParser(
         description='Sum embeddings from different sources with performance improvements'
     )
-    parser.add_argument(
-        "--walk_distance",
-        "-w",
-        type=int,
-        help="Number of embeddings to sum",
-        required=True,
-    )
-    parser.add_argument(
-        "--amount_of_summed_embeddings",
-        "-a",
-        type=int,
-        default=200000,
-        help="Amount of summed embeddings to generate",
-    )
-    parser.add_argument(
-        "--selected_cancers",
-        "-c",
-        nargs="+",
-        required=True,
-        help="The selected cancer identifiers to sum",
-    )
-    parser.add_argument(
-        "--noise_ratio",
-        "-n",
-        type=float,
-        default=0.0,
-        help="Ratio of random noise vectors to add",
-    )
-    parser.add_argument(
-        "--debug",
-        "-d",
-        action="store_true",
-        help="Enable debug mode",
-    )
+    parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum", required=True)
+    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, default=200000,
+                        help="Amount of summed embeddings to generate")
+    parser.add_argument("--selected_cancers", "-c", nargs="+", required=True,
+                        help="The selected cancer identifiers to sum")
+    parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
+    parser.add_argument("--debug", "-d", action="store_true", help="Enable debug mode")
+    parser.add_argument("--load_path", "-l", type=str, default="results/embeddings",
+                        help="Path to the embeddings folder")
     args = parser.parse_args()
 
     amount_of_summed_embeddings = args.amount_of_summed_embeddings
@@ -206,6 +180,7 @@ def main():
     noise_ratio = args.noise_ratio
     selected_cancers = args.selected_cancers
     cancers = "_".join(selected_cancers)
+    LOAD_PATH: Path = Path(args.load_path)
     debug = args.debug
 
     # Set logging level based on debug flag
@@ -215,9 +190,10 @@ def main():
         logging.debug(f"Walk distance: {walk_distance}")
         logging.debug(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
         logging.debug(f"Noise ratio: {noise_ratio}")
+        logging.debug(f"Load path: {LOAD_PATH}")
 
     # Prepare Save Directory
-    save_path = SAVE_FOLDER / cancers / str(amount_of_summed_embeddings) / str(noise_ratio)
+    save_path = Path(SAVE_FOLDER, cancers, str(amount_of_summed_embeddings), str(noise_ratio))
     save_path.mkdir(parents=True, exist_ok=True)
     logging.info(f"Save path: {save_path}")
 
@@ -225,8 +201,6 @@ def main():
     combined_data = np.zeros((amount_of_summed_embeddings, LATENT_SPACE_DIM), dtype=np.float32)
     labels = ["Text", "Image", "Mutation", "RNA"] + selected_cancers
     labels_data = {label: np.zeros(amount_of_summed_embeddings, dtype=np.int32) for label in labels}
-
-    modality_choices_general = ["Text", "Image", "Mutation"]
 
     with h5py.File(Path(LOAD_PATH, f"{cancers}.h5"), 'r') as f:
         # Validate selected cancers and get their indices
