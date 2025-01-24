@@ -29,7 +29,7 @@ cd $SCRATCH_PATH
 
 # Construct the file name based on selected cancers
 file_name=$(echo "${selected_cancers}" | tr ' ' '_' ).h5
-source_file_path="./results/embeddings/${file_name}"
+source_file_path="/home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/${file_name}"
 
 echo "File name: ${file_name}"
 echo "Source file path: ${source_file_path}"
