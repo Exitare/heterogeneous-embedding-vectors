@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=FAIL, BEGIN, END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 #SBATCH --gres=disk:2048 # Request scratch space in GB
 
@@ -26,7 +26,6 @@ echo "Making working directory in scratch"
 srun /usr/local/bin/mkdir-scratch.sh
 SCRATCH_PATH="/mnt/scratch/${SLURM_JOB_ID}"
 cd $SCRATCH_PATH
-
 
 # Construct the file name based on selected cancers
 file_name=$(echo "${selected_cancers}" | tr ' ' '_' ).h5
@@ -47,6 +46,12 @@ fi
 
 # Run your Python script with the scratch path as the load path
 echo "Running Python script"
+echo "walk_distance: ${walk_distance}"
+echo "selected_cancers: ${selected_cancers}"
+echo "amount_of_summed_embeddings: ${amount_of_summed_embeddings}"
+echo "noise_ratio: ${noise_ratio}"
+echo "load_path: ${SCRATCH_PATH}/${file_name}"
+
 srun python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py \
     -a "${amount_of_summed_embeddings}" \
     -w "${walk_distance}" \
@@ -61,4 +66,4 @@ cd ../
 echo ""
 echo "************************************"
 echo "Cleaning up workdir"
-srun /usr/local/bin/rmdir-scratch.sh
+srun rmdir-scratch.sh
