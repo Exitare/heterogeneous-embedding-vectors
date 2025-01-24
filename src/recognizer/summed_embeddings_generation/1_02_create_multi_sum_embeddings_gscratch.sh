@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
-#SBATCH --mail-type=FAIL, BEGIN, END
+#SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 #SBATCH --gres=disk:2048 # Request scratch space in GB
 
