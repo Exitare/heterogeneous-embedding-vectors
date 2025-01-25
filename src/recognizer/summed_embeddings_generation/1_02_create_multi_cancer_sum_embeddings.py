@@ -179,7 +179,13 @@ def main():
     walk_distance = args.walk_distance
     noise_ratio = args.noise_ratio
     selected_cancers = args.selected_cancers
+
+    if len(selected_cancers) == 1:
+        print("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     cancers = "_".join(selected_cancers)
+
     LOAD_PATH: Path = Path(args.load_path)
     debug = args.debug
 

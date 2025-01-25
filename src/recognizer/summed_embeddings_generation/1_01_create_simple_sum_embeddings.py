@@ -149,6 +149,11 @@ def main():
     walk_distance: int = args.walk_distance
     noise_ratio: float = args.noise_ratio
     selected_cancers = args.selected_cancers
+
+    if len(selected_cancers) == 1:
+        print("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     cancers = "_".join(selected_cancers)
 
     logging.info(
