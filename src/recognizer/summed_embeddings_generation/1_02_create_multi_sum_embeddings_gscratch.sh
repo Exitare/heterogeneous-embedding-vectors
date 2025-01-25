@@ -33,16 +33,17 @@ embeddings_file_path="/home/groups/EllrottLab/heterogeneous-embedding-vectors/re
 script_file_path="/home/groups/EllrottLab/heterogeneous-embedding-vectors/src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py"
 
 # Save folder construction
-results_folder="/home/groups/EllrottLab/heterogeneous-embedding-vectors/results/recognizer/summed_embeddings/multi/$(echo "${selected_cancers}" | tr ' ' '_')/${amount_of_summed_embeddings}/${noise_ratio}"
+original_results_folder="/home/groups/EllrottLab/heterogeneous-embedding-vectors/results/recognizer/summed_embeddings/multi/$(echo "${selected_cancers}" | tr ' ' '_')/${amount_of_summed_embeddings}/${noise_ratio}"
 results_file="${walk_distance}_embeddings.h5"
 gscratch_results_folder="${SCRATCH_PATH}/results/recognizer/summed_embeddings/multi/$(echo "${selected_cancers}" | tr ' ' '_')/${amount_of_summed_embeddings}/${noise_ratio}"
 
 echo "File name: ${file_name}"
 echo "SCRATCH_PATH: ${SCRATCH_PATH}"
 echo "Embeddings file path: ${embeddings_file_path}"
-echo "Original results folder: ${results_folder}"
+echo "Original results folder: ${original_results_folder}"
 echo "Results file: ${results_file}"
 echo "gscratch_results_folder: ${gscratch_results_folder}"
+echo "script_file_path: ${script_file_path}"
 
 # Check if embeddings file exists and copy to scratch
 if [ -f "${embeddings_file_path}" ]; then
@@ -75,18 +76,25 @@ srun python3 "${SCRATCH_PATH}/1_02_create_multi_cancer_sum_embeddings.py" \
     -w "${walk_distance}" \
     -c "${selected_cancers}" \
     -n "${noise_ratio}" \
-    --load_path "${SCRATCH_PATH}/${file_name}"
+    --load_path "${SCRATCH_PATH}"
 
 # Copy only the results file to the save folder
-echo "Copying results file (${results_file}) back to ${save_folder}"
-mkdir -p "${save_folder}" # Create the save folder if it doesn't exist
+echo "Copying results file (${results_file}) back to ${original_results_folder}"
+mkdir -p "${original_results_folder}" # Create the save folder if it doesn't exist
+
+if [ -f "${gscratch_results_folder}" ]; then
+    echo "Results folder "${gscratch_results_folder}" found in scratch."
+else
+    echo "Error: Results folder ${gscratch_results_folder} not found in scratch."
+    # list the contents of the scratch directory
+    ls -l "${SCRATCH_PATH}"
+fi
 
 if [ -f "${gscratch_results_folder}/${results_file}" ]; then
-    cp "${gscratch_results_folder}/${results_file}" "${results_folder}/"
+    cp "${gscratch_results_folder}/${results_file}" "${original_results_folder}/"
     echo "Results file copied successfully."
 else
     echo "Error: Results file ${results_file} not found in scratch."
-    exit 1
 fi
 
 # Back out of the scratch directory before cleanup
