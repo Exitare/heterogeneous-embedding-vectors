@@ -151,7 +151,7 @@ def main():
     selected_cancers = args.selected_cancers
 
     if len(selected_cancers) == 1:
-        print("Selected cancers is a single string. Converting...")
+        logging.info("Selected cancers is a single string. Converting...")
         selected_cancers = selected_cancers[0].split(" ")
 
     cancers = "_".join(selected_cancers)
