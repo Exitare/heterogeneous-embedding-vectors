@@ -236,6 +236,7 @@ def main():
 
         logging.info("All modalities have compatible dimensions.")
 
+        logging.info("Initializing buffers...")
         # Initialize buffers for each modality
         buffers = {
             'Text': EmbeddingBuffer(f['annotations']['embeddings'], annotation_total_rows, CHUNK_SIZE,
@@ -245,6 +246,7 @@ def main():
                                         LATENT_SPACE_DIM),
         }
 
+        logging.info("Loading initial chunks...")
         # Initialize buffers for each selected cancer's RNA
         for cancer, indices in cancer_indices.items():
             buffers[cancer] = EmbeddingBuffer(
@@ -255,6 +257,7 @@ def main():
                 filter_indices=indices
             )
 
+        logging.info("Pre-loading initial chunks...")
         # Pre-load the first chunk for each buffer
         for buffer in buffers.values():
             buffer.load_next_chunk()
@@ -263,6 +266,7 @@ def main():
         # Initialize cancer selection counts
         cancer_counts = {cancer: 0 for cancer in selected_cancers}
 
+        logging.info("Generating summed embeddings...")
         # Generate summed embeddings
         for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
             combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
