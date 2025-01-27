@@ -115,9 +115,6 @@ def main():
         logging.info(f"Filtered RNA indices: {cancer_indices}")
 
     logging.info("Generating summed embeddings...")
-    cancer_counts = {cancer: 0 for cancer in selected_cancers}
-
-    selected_cancer_list = []
     # Initialize cancer selection counts
     cancer_counts = {cancer: 0 for cancer in selected_cancers}
 
