@@ -187,16 +187,13 @@ def main():
     cancers = "_".join(selected_cancers)
 
     LOAD_PATH: Path = Path(args.load_path)
-    debug = args.debug
 
     # Set logging level based on debug flag
-    if debug:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.debug(f"Selected cancers: {selected_cancers}")
-        logging.debug(f"Walk distance: {walk_distance}")
-        logging.debug(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
-        logging.debug(f"Noise ratio: {noise_ratio}")
-        logging.debug(f"Load path: {LOAD_PATH}")
+    logging.info(f"Selected cancers: {selected_cancers}")
+    logging.info(f"Walk distance: {walk_distance}")
+    logging.info(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
+    logging.info(f"Noise ratio: {noise_ratio}")
+    logging.info(f"Load path: {LOAD_PATH}")
 
     # Prepare Save Directory
     save_path = Path(SAVE_FOLDER, cancers, str(amount_of_summed_embeddings), str(noise_ratio))
