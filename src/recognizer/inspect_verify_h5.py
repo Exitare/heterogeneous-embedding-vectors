@@ -57,11 +57,18 @@ with h5py.File(file) as h5_file:
         if key in keys:
             df[key] = h5_file[key][()]
 
+
+with h5py.File(file) as h5_file:
+    x = h5_file["X"]
+    print(f"X: {x[:]}")
+
 df["Total"] = df["Image"] + df["Mutation"] + df["RNA"] + df["Text"]
 # Set Pandas to display all columns permanently
 pd.set_option('display.max_columns', None)
 # show all columns of dataset
 print(df)
+
+
 
 cancers = ['THCA', 'BRCA', 'LUAD', 'COAD', 'STAD', 'BLCA']
 
