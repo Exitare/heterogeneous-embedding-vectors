@@ -6,24 +6,16 @@ import h5py
 import sys
 
 save_folder = Path("results", "embeddings")
+chunk_size = 10000
 
 
 def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
     """
     Load data from a directory or a single file in chunks.
-
-    Parameters:
-        path (Path): Path to a directory or file.
-        chunk_size (int): Number of rows per chunk.
-        file_extension (str): Extension of files to process (default: .csv).
-
-    Yields:
-        pd.DataFrame: Chunk of data from files or a single file.
     """
     path = Path(path)
 
     if path.is_dir():
-        # Process all files in the directory
         for file_path in path.iterdir():
             if file_path.is_file() and file_path.suffix == file_extension:
                 print(f"Loading file in chunks: {file_path}")
@@ -31,7 +23,6 @@ def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
                 for chunk in pd.read_csv(file_path, chunksize=chunk_size, sep=sep):
                     yield chunk
     elif path.is_file():
-        # Process the single file
         print(f"Loading single file in chunks: {path}")
         for chunk in pd.read_csv(path, chunksize=chunk_size):
             yield chunk
@@ -41,24 +32,23 @@ def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
 
 def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
     """
-    Load data from a directory or a single file in chunks.
+    Load image data from a directory containing cancer-specific subdirectories.
 
     Parameters:
-        path (Path): Path to a directory or file.
+        path (Path): Path to the image data directory.
         chunk_size (int): Number of rows per chunk.
-        file_extension (str): Extension of files to process (default: .csv).
+        file_extension (str): Extension of image data files (default: .csv).
 
     Yields:
-        pd.DataFrame: Chunk of data from files or a single file.
+        pd.DataFrame: Chunk of data from the cancer-specific subdirectories.
     """
     path = Path(path)
 
     if path.is_dir():
-        # Process all files in the directory
         for file_path in path.iterdir():
             print(file_path)
             if file_path.is_file():
-                continue
+                continue  # Skip files at the top level
             for cancer_path in file_path.iterdir():
                 print("cancer_path", cancer_path)
                 if cancer_path.is_file() and cancer_path.suffix == file_extension:
@@ -66,9 +56,7 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".csv"
                     sep = "," if file_extension == ".csv" else "\t"
                     for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
                         yield chunk
-
     elif path.is_file():
-        # Process the single file
         print(f"Loading single file in chunks: {path}")
         for chunk in pd.read_csv(path, chunksize=chunk_size):
             yield chunk
@@ -80,9 +68,9 @@ def dataframe_to_structured_array(df: pd.DataFrame) -> np.ndarray:
     """Convert a Pandas DataFrame to a structured NumPy array."""
     dtype = []
     for col in df.columns:
-        if df[col].dtype == "object":  # String data
+        if df[col].dtype == "object":
             dtype.append((col, h5py.string_dtype(encoding="utf-8")))
-        else:  # Numeric data
+        else:
             dtype.append((col, df[col].dtype))
 
     structured_array = np.zeros(len(df), dtype=dtype)
@@ -94,10 +82,10 @@ def dataframe_to_structured_array(df: pd.DataFrame) -> np.ndarray:
     return structured_array
 
 
-def process_and_store_in_chunks(
-        dataset_name, loader, f, key_column="submitter_id"
-):
-    """Process data in chunks and store them in the HDF5 file, while creating indices."""
+def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_id", chunk_size=10000):
+    """
+    Process data in chunks and store them in the HDF5 file, while creating indices.
+    """
     print(f"Processing {dataset_name} in chunks...")
 
     group = f.create_group(dataset_name)
@@ -116,7 +104,7 @@ def process_and_store_in_chunks(
                 shape=(0,),  # Start with zero rows
                 maxshape=(None,),  # Unlimited rows
                 dtype=dtype,
-                chunks=True,
+                chunks=(chunk_size,),  # Match the chunk size of the loader
             )
 
         # Resize and append the chunk
@@ -136,10 +124,9 @@ def process_and_store_in_chunks(
                 if submitter_id not in indices:
                     indices[submitter_id] = []
                 indices[submitter_id].append(current_size + i)
-            except BaseException as ex:
-                print(ex)
-                print(f"Error occurred in row {i}")
-                sys.exit(0)
+            except Exception as ex:
+                print(f"Error occurred in row {i}: {ex}")
+                continue
 
         current_size = new_size
 
@@ -168,23 +155,24 @@ if __name__ == "__main__":
         with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
             # Process RNA embeddings
             rna_loader = chunked_dataframe_loader(rna_load_folder)
-            rna_indices = process_and_store_in_chunks("rna", rna_loader, f)
+            rna_indices = process_and_store_in_chunks("rna", rna_loader, f, chunk_size=chunk_size)
 
             # Process Annotation embeddings
             annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
-            annotation_indices = process_and_store_in_chunks("annotations", annotation_loader, f)
+            annotation_indices = process_and_store_in_chunks("annotations", annotation_loader, f, chunk_size=chunk_size)
 
             # Process Mutation embeddings
             mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
-            mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f)
+            mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f, chunk_size=chunk_size)
 
             # Process Image embeddings
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, file_extension=".tsv")
-            image_indices = process_and_store_in_chunks("images", image_loader, f)
+            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size, file_extension=".tsv")
+            image_indices = process_and_store_in_chunks("images", image_loader, f, chunk_size=chunk_size)
 
+            # Store indices
             submitter_ids = list(rna_indices.keys())
             submitter_ids.sort()
-            # Store indices
+
             index_group = f.create_group("indices")
             index_group.create_dataset("submitter_ids", data=np.array(submitter_ids, dtype="S"))
             for modality, indices in [
@@ -201,7 +189,8 @@ if __name__ == "__main__":
 
             print("HDF5 file with indices created successfully.")
             print(f"Available groups: {f.keys()}")
-    except BaseException as e:
+
+    except Exception as e:
         print(f"Error occurred: {e}")
         with open("error.txt", "w") as f:
             f.write(str(e))
