@@ -12,7 +12,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "simple")
 LATENT_SPACE_DIM = 767
 CHUNK_SIZE = 200000  # Number of embeddings per chunk
-LOAD_FOLDER = Path("results", "embeddings")
 
 modality_weights = {
     'RNA': 0.25,
@@ -143,12 +142,15 @@ def main():
                         help="Amount of summed embeddings to generate")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0, help="Ratio of random noise vectors to add")
     parser.add_argument("--selected_cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--load_path", "-l", type=str, default="results/embeddings",
+                        help="Path to the embeddings folder")
     args = parser.parse_args()
 
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     walk_distance: int = args.walk_distance
     noise_ratio: float = args.noise_ratio
     selected_cancers = args.selected_cancers
+    load_folder: Path = Path(args.load_path)
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -171,7 +173,7 @@ def main():
 
     modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
 
-    with h5py.File(Path(LOAD_FOLDER, f"{cancers}.h5"), 'r') as f:
+    with h5py.File(Path(load_folder, f"{cancers}.h5"), 'r') as f:
         # Get total rows and columns for each modality
         rna_total_rows, rna_columns = get_total_rows_and_columns(f, "rna")
         image_total_rows, image_columns = get_total_rows_and_columns(f, "images")
