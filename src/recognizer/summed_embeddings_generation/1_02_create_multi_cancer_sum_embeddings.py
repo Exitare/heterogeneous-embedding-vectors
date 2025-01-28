@@ -13,94 +13,51 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Configuration Constants
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "multi")
 LATENT_SPACE_DIM = 767
-CHUNK_SIZE = 10000  # Number of embeddings per chunk
+CHUNK_SIZE = 100  # Number of embeddings per chunk
 
 
 class EmbeddingBuffer:
-    """
-    A buffer to manage chunks of embeddings for a given modality.
-    Handles both structured and unstructured datasets.
-    """
-
-    def __init__(
-            self,
-            dataset: h5py.Dataset,
-            num_rows: int,
-            chunk_size: int,
-            latent_dim: int,
-            filter_indices: Optional[List[int]] = None,
-    ):
+    def __init__(self, dataset, num_rows, chunk_size, latent_dim, filter_indices=None):
         self.dataset = dataset
         self.chunk_size = chunk_size
         self.latent_dim = latent_dim
-
-        if filter_indices is not None:
-            self.indices = np.array(filter_indices)
-            self.num_rows = len(self.indices)
-        else:
-            self.indices = np.arange(num_rows)
-            self.num_rows = num_rows
-
+        self.indices = (
+            np.array(filter_indices) if filter_indices is not None else np.arange(num_rows)
+        )
+        self.num_rows = len(self.indices)
         np.random.shuffle(self.indices)
         self.current_chunk = None
         self.current_index = 0
         self.chunk_pointer = 0
         self.total_chunks = int(np.ceil(self.num_rows / self.chunk_size))
-
-        # Determine if the dataset is structured
-        if self.dataset.dtype.names:
-            self.structured = True
-            self.field_names = self.dataset.dtype.names[:self.latent_dim]
-            logging.info(f"Dataset '{self.dataset.name}' is structured.")
-        else:
-            self.structured = False
-            logging.info(f"Dataset '{self.dataset.name}' is unstructured.")
+        self.field_names = dataset.dtype.names[:latent_dim]
 
     def load_next_chunk(self):
         """
-        Loads the next chunk of embeddings into the buffer.
+        Loads the next chunk of embeddings into the buffer, ensuring sorted indices for HDF5 slicing.
         """
         if self.chunk_pointer >= self.total_chunks:
-            # Re-shuffle indices when all chunks have been used
+            # Re-shuffle indices only when all chunks have been processed
             np.random.shuffle(self.indices)
             self.chunk_pointer = 0
 
+        # Get the indices for the current chunk
         start = self.chunk_pointer * self.chunk_size
         end = min(start + self.chunk_size, self.num_rows)
         chunk_indices = self.indices[start:end]
 
-        # Sort chunk_indices to satisfy h5py's requirement for increasing order
+        # Sort indices to satisfy HDF5 slicing requirements
         sorted_chunk_indices = np.sort(chunk_indices)
 
         try:
             rows = self.dataset[sorted_chunk_indices]
+            # Access fields directly and stack them
+            self.current_chunk = np.stack(
+                [rows[name] for name in self.field_names], axis=1
+            ).astype(np.float32)
         except Exception as e:
             logging.error(f"Error accessing dataset rows: {e}")
             raise
-
-        if self.structured:
-            try:
-                # Extract and stack fields across all rows
-                self.current_chunk = np.stack(
-                    [rows[field] for field in self.field_names], axis=1
-                ).astype(np.float32)
-            except IndexError as e:
-                logging.error(f"Structured indexing error: {e}")
-                logging.error(f"Available fields: {self.dataset.dtype.names}")
-                raise
-            except Exception as e:
-                logging.error(f"Error processing structured dataset: {e}")
-                raise
-        else:
-            try:
-                # Assume rows are 2D numeric arrays; slice columns up to latent_dim
-                self.current_chunk = rows[:, : self.latent_dim].astype(np.float32)
-            except IndexError as e:
-                logging.error(f"Unstructured slicing error: {e}")
-                raise
-            except Exception as e:
-                logging.error(f"Error processing unstructured dataset: {e}")
-                raise
 
         self.chunk_pointer += 1
         self.current_index = 0
@@ -108,14 +65,9 @@ class EmbeddingBuffer:
             f"Loaded chunk {self.chunk_pointer}/{self.total_chunks} for dataset '{self.dataset.name}'."
         )
 
-    def get_next_embedding(self) -> np.ndarray:
-        """
-        Retrieves the next embedding from the current chunk.
-        Loads a new chunk if the current one is exhausted.
-        """
+    def get_next_embedding(self):
         if self.current_chunk is None or self.current_index >= self.current_chunk.shape[0]:
             self.load_next_chunk()
-
         embedding = self.current_chunk[self.current_index]
         self.current_index += 1
         return embedding
