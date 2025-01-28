@@ -147,6 +147,7 @@ def main():
     logging.info(f"Noise ratio: {noise_ratio}")
     logging.info(f"Load path: {LOAD_PATH}")
 
+
     # Prepare Save Directory
     save_path = Path(SAVE_FOLDER, cancers, str(amount_of_summed_embeddings), str(noise_ratio))
     save_path.mkdir(parents=True, exist_ok=True)
@@ -158,6 +159,10 @@ def main():
     labels_data = {label: np.zeros(amount_of_summed_embeddings, dtype=np.int32) for label in labels}
 
     with h5py.File(Path(LOAD_PATH, f"{cancers}.h5"), 'r') as f:
+        logging.info(f"RNA chunk size: {f['rna']['embeddings'].chunks}")
+        logging.info(f"Image chunk size: {f['images']['embeddings'].chunks}")
+        logging.info(f"Found {f['images']['embeddings'].shape[0]} rows for images.")
+
         # Validate selected cancers and get their indices
         cancer_indices = {}
         rna_dataset = f['rna']['embeddings']
