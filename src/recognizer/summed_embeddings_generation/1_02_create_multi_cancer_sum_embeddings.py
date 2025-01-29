@@ -12,62 +12,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Configuration Constants
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "multi")
-LATENT_SPACE_DIM = 767
+LATENT_SPACE_DIM = 768
 CHUNK_SIZE = 100000
-
-
-class EmbeddingBuffer:
-    def __init__(self, dataset, num_rows, chunk_size, latent_dim, filter_indices=None):
-        self.dataset = dataset
-        self.chunk_size = chunk_size
-        self.latent_dim = latent_dim
-        self.indices = (
-            np.array(filter_indices) if filter_indices is not None else np.arange(num_rows)
-        )
-        self.num_rows = len(self.indices)
-        np.random.shuffle(self.indices)
-        self.current_chunk = None
-        self.current_index = 0
-        self.chunk_pointer = 0
-        self.total_chunks = int(np.ceil(self.num_rows / self.chunk_size))
-        self.field_names = dataset.dtype.names[:latent_dim]
-
-    def load_next_chunk(self):
-        """
-        Loads the next chunk of embeddings into the buffer, ensuring sorted indices for HDF5 slicing.
-        """
-        if self.chunk_pointer >= self.total_chunks:
-            np.random.shuffle(self.indices)  # Shuffle only when all chunks have been processed
-            self.chunk_pointer = 0
-
-        start = self.chunk_pointer * self.chunk_size
-        end = min(start + self.chunk_size, self.num_rows)
-        chunk_indices = self.indices[start:end]
-
-        # Ensure indices are sorted for HDF5 slicing
-        sorted_chunk_indices = np.sort(chunk_indices)
-
-        try:
-            rows = self.dataset[sorted_chunk_indices]
-            self.current_chunk = np.stack(
-                [rows[name] for name in self.field_names], axis=1
-            ).astype(np.float32)
-        except Exception as e:
-            logging.error(f"Error accessing dataset rows: {e}")
-            raise
-
-        self.chunk_pointer += 1
-        self.current_index = 0
-
-    def get_next_embedding(self):
-        """
-        Get the next embedding from the current chunk, loading a new chunk if necessary.
-        """
-        if self.current_chunk is None or self.current_index >= self.current_chunk.shape[0]:
-            self.load_next_chunk()
-        embedding = self.current_chunk[self.current_index]
-        self.current_index += 1
-        return embedding
 
 
 def get_total_rows_and_columns(f: h5py.File, group: str) -> (int, int):
@@ -86,14 +32,35 @@ def filter_rows_by_cancer(dataset: h5py.Dataset, cancer_type: str) -> List[int]:
     Filters rows by cancer type within the given dataset.
     Assumes there is a 'cancer' field in the dataset.
     """
-    if 'cancer' not in dataset.dtype.names:
-        logging.error(f"'cancer' field not found in dataset '{dataset.name}'.")
-        raise KeyError("'cancer' field not found in dataset.")
 
     cancer_bytes = dataset['cancer']
     cancer_str = np.array([c.decode("utf-8") for c in cancer_bytes])
     indices = np.where(cancer_str == cancer_type)[0]
     return indices.tolist()
+
+
+def reload_image_chunk(f, image_chunk: int, chunk_size: int):
+    total_images = f["images"]["embeddings"].shape[0]
+    start_id = image_chunk * chunk_size
+    end_id = start_id + chunk_size
+
+    # Ensure start_id does not exceed total_images
+    if start_id >= total_images:
+        image_chunk = (image_chunk + 1) % (total_images // chunk_size)  # Cycle through chunks
+        start_id = image_chunk * chunk_size
+        end_id = start_id + chunk_size
+
+    # If end_id exceeds total images, shift start_id by 40% of total images
+    if end_id > total_images:
+        start_id = int(total_images * 0.4)
+        end_id = start_id + chunk_size
+
+        # Ensure end_id does not exceed total_images
+        if end_id > total_images:
+            end_id = total_images
+            start_id = max(0, total_images - chunk_size)  # Adjust start_id accordingly
+
+    return f["images"]["embeddings"][start_id:end_id]
 
 
 def generate_noise(embedding_length: int, scale: float = 0.1) -> np.ndarray:
@@ -104,6 +71,7 @@ def generate_noise(embedding_length: int, scale: float = 0.1) -> np.ndarray:
 
 
 def main():
+    image_chunk: int = 0
     # Argument Parsing
     parser = ArgumentParser(description='Sum embeddings from different sources.')
     parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum", required=True)
@@ -127,13 +95,13 @@ def main():
         selected_cancers = selected_cancers[0].split(" ")
 
     cancers = "_".join(selected_cancers)
-    LOAD_PATH: Path = Path(args.load_path)
+    load_path: Path = Path(args.load_path)
 
     logging.info(f"Selected cancers: {selected_cancers}")
     logging.info(f"Walk distance: {walk_distance}")
     logging.info(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
-    logging.info(f"Load path: {LOAD_PATH}")
+    logging.info(f"Load path: {load_path}")
 
     save_path = Path(SAVE_FOLDER, cancers, str(amount_of_summed_embeddings), str(noise_ratio))
     save_path.mkdir(parents=True, exist_ok=True)
@@ -143,7 +111,7 @@ def main():
     labels_data = {label: np.zeros(amount_of_summed_embeddings, dtype=np.int32)
                    for label in ["Text", "Image", "Mutation", "RNA"] + selected_cancers}
 
-    with h5py.File(Path(LOAD_PATH, f"{cancers}.h5"), 'r') as f:
+    with h5py.File(Path(load_path, f"{cancers}.h5"), 'r') as f:
         rna_total_rows, rna_columns = get_total_rows_and_columns(f, "rna")
         image_total_rows, image_columns = get_total_rows_and_columns(f, "images")
         mutation_total_rows, mutation_columns = get_total_rows_and_columns(f, "mutations")
@@ -153,41 +121,91 @@ def main():
             "All modalities must have the same usable dimensions."
 
         cancer_indices = {}
-        rna_dataset = f['rna']['embeddings']
+        rna_dataset = f['rna']
+        print(rna_dataset)
+
         for cancer in selected_cancers:
             indices = filter_rows_by_cancer(rna_dataset, cancer)
             if indices:
                 cancer_indices[cancer] = indices
 
-        buffers = {
-            'Text': EmbeddingBuffer(f['annotations']['embeddings'], annotation_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
-            'Image': EmbeddingBuffer(f['images']['embeddings'], image_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
-            'Mutation': EmbeddingBuffer(f['mutations']['embeddings'], mutation_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
+        # Read text, image and rna data into memory
+        text_data = f["annotations"]["embeddings"][:]
+        mutation_data = f["mutations"]["embeddings"][:]
+        # Load the first image chunk
+        image_data = reload_image_chunk(f, image_chunk, CHUNK_SIZE)
+
+        data: {} = {
+            "Text": text_data,
+            "Mutation": mutation_data,
+            "Image": image_data
         }
 
         for cancer, indices in cancer_indices.items():
-            buffers[cancer] = EmbeddingBuffer(
-                dataset=f['rna']['embeddings'], num_rows=len(indices),
-                chunk_size=CHUNK_SIZE, latent_dim=LATENT_SPACE_DIM, filter_indices=indices
-            )
+            data[cancer] = f["rna"]["embeddings"][indices]
 
-        logging.info("Preloading buffers...")
-        for buffer in buffers.values():
-            buffer.load_next_chunk()
-        logging.info("Buffers preloaded.")
+        selected_cancer_list = []
+        # Initialize cancer selection counts
+        cancer_counts = {cancer: 0 for cancer in selected_cancers}
 
         for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
             combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
-            modalities = random.choices(list(buffers.keys()), k=walk_distance)
 
-            for modality in modalities:
-                if random.random() < noise_ratio:
-                    combined_sum += generate_noise(LATENT_SPACE_DIM)
-                else:
-                    combined_sum += buffers[modality].get_next_embedding()
+            # Calculate dynamic probabilities for cancer selection
+            total_cancer_selections = sum(cancer_counts.values())
+            cancer_probs = [
+                (1 - (count / total_cancer_selections)) if total_cancer_selections > 0 else 1
+                for count in cancer_counts.values()
+            ]
+            cancer_probs = np.array(cancer_probs) / np.sum(cancer_probs)  # Normalize to sum to 1
+
+            # Select a cancer type based on dynamic probabilities
+            selected_cancer = np.random.choice(selected_cancers, p=cancer_probs)
+            cancer_counts[selected_cancer] += 1  # Update count
+
+            selected_cancer_list.append(selected_cancer)
+
+            # Update modality weights to include the selected cancer
+            modality_weights = {"Text": 0.25, "Image": 0.25, "Mutation": 0.25, selected_cancer: 0.25}
+            modality_choices = list(modality_weights.keys())
+            modality_probs = list(modality_weights.values())
+            # Perform weighted sampling for this embedding
+            random_modalities = np.random.choice(modality_choices, size=walk_distance, p=modality_probs)
+            unique, counts = np.unique(random_modalities, return_counts=True)
+            modality_counts = dict(zip(unique, counts))
+
+            for modality, count in modality_counts.items():
+                buffer = data[modality]
+                for _ in range(count):
+                    if random.random() < noise_ratio:
+                        # Add noise vector
+                        noise_vector = generate_noise(LATENT_SPACE_DIM)
+                        combined_sum += noise_vector
+                        continue
+
+                    try:
+                        embedding = random.choice(buffer)
+                        combined_sum += embedding
+                        labels_data[modality][i] += 1
+
+                        # If the modality is the selected cancer, increment RNA label
+                        if modality == selected_cancer:
+                            labels_data["RNA"][i] += 1
+                    except IndexError as e:
+                        logging.error(f"IndexError when accessing embedding: {e}")
+                        continue
+                    except Exception as e:
+                        logging.error(f"Unexpected error when accessing embedding: {e}")
+                        continue
 
             combined_data[i] = combined_sum
 
+    # check that the unique selected_cancer_list is the same as the selected_cancers
+    unique_selected_cancers = list(set(selected_cancer_list))
+    assert set(unique_selected_cancers) == set(selected_cancers), \
+        "The unique selected cancers do not match the selected cancers."
+
+    logging.info("Summed embeddings generated successfully. Saving...")
     output_file = Path(save_path, f"{walk_distance}_embeddings.h5")
     with h5py.File(output_file, "w") as f_out:
         f_out.create_dataset("X", data=combined_data, compression="gzip")

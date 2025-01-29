@@ -64,27 +64,9 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".csv"
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
-def dataframe_to_structured_array(df: pd.DataFrame) -> np.ndarray:
-    """Convert a Pandas DataFrame to a structured NumPy array."""
-    dtype = []
-    for col in df.columns:
-        if df[col].dtype == "object":
-            dtype.append((col, h5py.string_dtype(encoding="utf-8")))
-        else:
-            dtype.append((col, df[col].dtype))
-
-    structured_array = np.zeros(len(df), dtype=dtype)
-    for col in df.columns:
-        structured_array[col] = (
-            df[col].astype(str) if df[col].dtype == "object" else df[col]
-        )
-
-    return structured_array
-
-
 def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_id", chunk_size=100000):
     """
-    Process data in chunks and store them in the HDF5 file, while creating indices.
+    Process data in chunks and store embeddings in the HDF5 file, while keeping metadata separate.
     """
     print(f"Processing {dataset_name} in chunks...")
 
@@ -93,45 +75,68 @@ def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_i
     current_size = 0
     indices = {}
 
+    # Prepare lists to store metadata
+    cancer_list = []
+    submitter_id_list = []
+
     for chunk in loader:
-        structured_chunk = dataframe_to_structured_array(chunk)
+        # Extract only numeric columns (skip 'cancer' and 'submitter_id')
+        numeric_cols = [col for col in chunk.columns if
+                        col not in ["cancer", "submitter_id", "cancer_type", "tile_pos"]]
+        numeric_data = chunk[numeric_cols].to_numpy(dtype=np.float32)
+
+        if dataset_name == "images":
+            print("Loading image cancer column...")
+            cancer_values = chunk["cancer_type"].to_numpy(dtype="S")  # Store as byte strings
+        else:
+            print("Loading other cancer columns...")
+            cancer_values = chunk["cancer"].to_numpy(dtype="S")  # Store as byte strings
+
+        # Extract metadata
+
+        submitter_values = chunk["submitter_id"].to_numpy(dtype="S")
 
         if dataset is None:
             # Create the dataset dynamically on the first chunk
-            dtype = structured_chunk.dtype
             dataset = group.create_dataset(
                 "embeddings",
-                shape=(0,),  # Start with zero rows
-                maxshape=(None,),  # Unlimited rows
-                dtype=dtype,
-                chunks=(chunk_size,),  # Match the chunk size of the loader
+                shape=(0, numeric_data.shape[1]),  # Zero rows, fixed columns
+                maxshape=(None, numeric_data.shape[1]),  # Unlimited rows, fixed columns
+                dtype="float32",
+                chunks=(chunk_size, numeric_data.shape[1]),  # Chunking for efficiency
             )
 
-        # Resize and append the chunk
-        new_size = current_size + structured_chunk.shape[0]
+        # Resize and append embeddings
+        new_size = current_size + numeric_data.shape[0]
         dataset.resize(new_size, axis=0)
-        dataset[current_size:new_size] = structured_chunk
+        dataset[current_size:new_size, :] = numeric_data
 
-        # Create indices for this chunk
-        for i, row in enumerate(structured_chunk):
-            try:
-                submitter_id = row[key_column]
+        # Append metadata
+        cancer_list.extend(cancer_values)
+        submitter_id_list.extend(submitter_values)
 
-                parts = submitter_id.split('-')
-                if len(parts) == 4:
-                    submitter_id = '-'.join(parts[:-1])
-
-                if submitter_id not in indices:
-                    indices[submitter_id] = []
-                indices[submitter_id].append(current_size + i)
-            except Exception as ex:
-                print(f"Error occurred in row {i}: {ex}")
-                continue
+        # Create indices for lookup
+        for i, submitter_id in enumerate(submitter_values):
+            if submitter_id not in indices:
+                indices[submitter_id] = []
+            indices[submitter_id].append(current_size + i)
 
         current_size = new_size
 
-    print(f"Completed processing {dataset_name} with {current_size} rows.")
-    return indices
+    try:
+        # Store metadata as separate datasets
+        group.create_dataset("cancer", data=np.array(cancer_list, dtype="S"), compression="gzip")
+        group.create_dataset("submitter_id", data=np.array(submitter_id_list, dtype="S"), compression="gzip")
+
+        # assert that both cancer and submitter id datasets are not empty
+        assert group["cancer"].shape[0] > 0, "Cancer dataset is empty."
+        assert group["submitter_id"].shape[0] > 0, "Submitter ID dataset is empty."
+
+        print(f"Completed processing {dataset_name} with {current_size} rows.")
+        return indices
+    except Exception as e:
+        print(f"Error while storing metadata for {dataset_name}: {e}")
+        raise
 
 
 if __name__ == "__main__":
@@ -166,7 +171,8 @@ if __name__ == "__main__":
             mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f, chunk_size=chunk_size)
 
             # Process Image embeddings
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size, file_extension=".tsv")
+            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size,
+                                                          file_extension=".tsv")
             image_indices = process_and_store_in_chunks("images", image_loader, f, chunk_size=chunk_size)
 
             # Store indices
@@ -191,6 +197,7 @@ if __name__ == "__main__":
             print(f"Available groups: {f.keys()}")
 
     except Exception as e:
+        print(e)
         print(f"Error occurred: {e}")
         with open("error.txt", "w") as f:
             f.write(str(e))

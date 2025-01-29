@@ -76,6 +76,8 @@ cancers = ['THCA', 'BRCA', 'LUAD', 'COAD', 'STAD', 'BLCA']
 if not set(cancers).issubset(df.columns):
     sys.exit("Not all cancer types are present in the dataset.")
 
+
+
 # Validate unique cancer condition
 violations = df[cancers].apply(lambda row: (row > 0).sum() > 1, axis=1)
 

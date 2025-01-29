@@ -51,6 +51,7 @@ if __name__ == '__main__':
 
         # split the submitter text using the .
         text = annotations[annotations["submitter_id"] == submitter_id]["text"].values[0]
+        cancer = annotations[annotations["submitter_id"] == submitter_id]["cancer"].values[0]
         # count the number of dots in the text
         num_of_dots = text.count(".")
 
@@ -71,7 +72,8 @@ if __name__ == '__main__':
         for text in texts:
             text_annotations.append({
                 "submitter_id": submitter_id,
-                "text": text
+                "text": text,
+                "cancer": cancer
             })
 
     if len(text_annotations) == 0:
@@ -85,10 +87,21 @@ if __name__ == '__main__':
 
     # print("Encoding sentences...")
     # Sentences are encoded by calling model.encode()
+    print("Encoding sentences...")
     embeddings = model.encode(sentences)
 
     # print("Saving embeddings...")
     # save embeddings
     embeddings = pd.DataFrame(embeddings)
     embeddings["submitter_id"] = text_annotations["submitter_id"]
+    embeddings["cancer"] = text_annotations["cancer"]
+
+    # assert that submitter and cancer columns are in the embeddings df
+    assert "submitter_id" in embeddings.columns, "Submitter id column not found in embeddings."
+    assert "cancer" in embeddings.columns, "Cancer column not found in embeddings."
+
+    # create df with submitter id and cancer as a lookup df
+    lookup_df: pd.DataFrame = embeddings[["submitter_id", "cancer"]].drop_duplicates()
+    lookup_df.to_csv(Path("results", "embeddings", "lookup.csv"), index=False)
+
     embeddings.to_csv(Path(save_folder, "embeddings.csv"), index=False)
