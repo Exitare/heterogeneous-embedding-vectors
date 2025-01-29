@@ -6,10 +6,10 @@ import h5py
 import sys
 
 save_folder = Path("results", "embeddings")
-chunk_size = 10000
+chunk_size = 100000
 
 
-def chunked_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
+def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
     """
     Load data from a directory or a single file in chunks.
     """
