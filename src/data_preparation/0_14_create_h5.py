@@ -30,7 +30,7 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
-def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".csv"):
+def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"):
     """
     Load image data from a directory containing cancer-specific subdirectories.
 
