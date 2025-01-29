@@ -82,7 +82,7 @@ def dataframe_to_structured_array(df: pd.DataFrame) -> np.ndarray:
     return structured_array
 
 
-def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_id", chunk_size=10000):
+def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_id", chunk_size=100000):
     """
     Process data in chunks and store them in the HDF5 file, while creating indices.
     """

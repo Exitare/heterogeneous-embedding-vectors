@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Configuration
 SAVE_FOLDER = Path("results", "recognizer", "summed_embeddings", "simple")
 LATENT_SPACE_DIM = 767
-CHUNK_SIZE = 200000  # Number of embeddings per chunk
+CHUNK_SIZE = 100000  # Number of embeddings per chunk
 
 modality_weights = {
     'RNA': 0.25,
@@ -25,90 +25,57 @@ modality_probs = list(modality_weights.values())
 
 
 class EmbeddingBuffer:
-    """
-    A buffer to manage chunks of embeddings for a given modality.
-    Handles both structured and unstructured datasets.
-    """
-
-    def __init__(self, dataset, num_rows, chunk_size, latent_dim):
+    def __init__(self, dataset, num_rows, chunk_size, latent_dim, filter_indices=None):
         self.dataset = dataset
-        self.num_rows = num_rows
         self.chunk_size = chunk_size
         self.latent_dim = latent_dim
-        self.indices = np.random.permutation(num_rows)  # Shuffle indices for randomness
+        self.indices = (
+            np.array(filter_indices) if filter_indices is not None else np.arange(num_rows)
+        )
+        self.num_rows = len(self.indices)
+        np.random.shuffle(self.indices)
         self.current_chunk = None
         self.current_index = 0
         self.chunk_pointer = 0
-        self.total_chunks = int(np.ceil(num_rows / chunk_size))
-
-        # Determine if the dataset is structured
-        if self.dataset.dtype.names:
-            self.structured = True
-            self.field_names = self.dataset.dtype.names[:self.latent_dim]
-            logging.info(f"Dataset '{self.dataset.name}' is structured.")
-        else:
-            self.structured = False
-            logging.info(f"Dataset '{self.dataset.name}' is unstructured.")
+        self.total_chunks = int(np.ceil(self.num_rows / self.chunk_size))
+        self.field_names = dataset.dtype.names[:latent_dim]
 
     def load_next_chunk(self):
         """
-        Loads the next chunk of embeddings into the buffer.
-        Sorts indices to comply with h5py's advanced indexing requirements.
+        Loads the next chunk of embeddings into the buffer, ensuring sorted indices for HDF5 slicing.
         """
         if self.chunk_pointer >= self.total_chunks:
-            # Re-shuffle indices when all chunks have been used
-            self.indices = np.random.permutation(self.num_rows)
+            # Re-shuffle indices only when all chunks have been processed
+            np.random.shuffle(self.indices)
             self.chunk_pointer = 0
-            # logging.info("Reshuffled indices for buffer.")
 
+        # Get the indices for the current chunk
         start = self.chunk_pointer * self.chunk_size
         end = min(start + self.chunk_size, self.num_rows)
         chunk_indices = self.indices[start:end]
 
-        # Sort chunk_indices to satisfy h5py's requirement for increasing order
+        # Sort indices to satisfy HDF5 slicing requirements
         sorted_chunk_indices = np.sort(chunk_indices)
 
-        # Select the rows in sorted order
         try:
             rows = self.dataset[sorted_chunk_indices]
+            # Access fields directly and stack them
+            self.current_chunk = np.stack(
+                [rows[name] for name in self.field_names], axis=1
+            ).astype(np.float32)
         except Exception as e:
             logging.error(f"Error accessing dataset rows: {e}")
             raise
 
-        if self.structured:
-            try:
-                # Extract and stack fields across all rows
-                self.current_chunk = np.stack([rows[field] for field in self.field_names], axis=1).astype(np.float32)
-            except IndexError as e:
-                logging.error(f"Structured indexing error: {e}")
-                logging.error(f"Available fields: {self.dataset.dtype.names}")
-                raise
-            except Exception as e:
-                logging.error(f"Error processing structured dataset: {e}")
-                raise
-        else:
-            try:
-                # Assume rows are 2D numeric arrays; slice columns up to latent_dim
-                self.current_chunk = rows[:, :self.latent_dim].astype(np.float32)
-            except IndexError as e:
-                logging.error(f"Unstructured slicing error: {e}")
-                raise
-            except Exception as e:
-                logging.error(f"Error processing unstructured dataset: {e}")
-                raise
-
         self.chunk_pointer += 1
         self.current_index = 0
-        logging.debug(f"Loaded chunk {self.chunk_pointer}/{self.total_chunks} for dataset '{self.dataset.name}'.")
+        logging.debug(
+            f"Loaded chunk {self.chunk_pointer}/{self.total_chunks} for dataset '{self.dataset.name}'."
+        )
 
     def get_next_embedding(self):
-        """
-        Retrieves the next embedding from the current chunk.
-        Loads a new chunk if the current one is exhausted.
-        """
         if self.current_chunk is None or self.current_index >= self.current_chunk.shape[0]:
             self.load_next_chunk()
-
         embedding = self.current_chunk[self.current_index]
         self.current_index += 1
         return embedding
@@ -132,6 +99,13 @@ def add_random_or_real_embedding(buffer, add_noise, latent_dim):
         return np.random.uniform(-1, 1, size=latent_dim).astype(np.float32)
     else:
         return buffer.get_next_embedding()
+
+
+def adjust_chunk_size(total_rows, default_size=100000):
+    """
+    Adjust the chunk size dynamically based on the dataset size.
+    """
+    return min(total_rows, default_size)
 
 
 def main():
@@ -171,8 +145,6 @@ def main():
     labels_data = {label: np.zeros(amount_of_summed_embeddings, dtype=np.int32)
                    for label in ["Text", "Image", "RNA", "Mutation"]}
 
-    modality_choices = ['RNA', 'Text', 'Image', 'Mutation']
-
     with h5py.File(Path(load_folder, f"{cancers}.h5"), 'r') as f:
         # Get total rows and columns for each modality
         rna_total_rows, rna_columns = get_total_rows_and_columns(f, "rna")
@@ -186,31 +158,30 @@ def main():
 
         logging.info("All modalities have compatible dimensions.")
 
-        # Initialize buffers for each modality
+        logging.info("Initializing buffers...")
+        # Adjust chunk size dynamically for each modality
         buffers = {
-            'RNA': EmbeddingBuffer(f['rna']['embeddings'], rna_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
-            'Text': EmbeddingBuffer(f['annotations']['embeddings'], annotation_total_rows, CHUNK_SIZE,
-                                    LATENT_SPACE_DIM),
-            'Image': EmbeddingBuffer(f['images']['embeddings'], image_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM),
-            'Mutation': EmbeddingBuffer(f['mutations']['embeddings'], mutation_total_rows, CHUNK_SIZE, LATENT_SPACE_DIM)
+            'RNA': EmbeddingBuffer(f['rna']['embeddings'], rna_total_rows, adjust_chunk_size(rna_total_rows), LATENT_SPACE_DIM),
+            'Text': EmbeddingBuffer(f['annotations']['embeddings'], annotation_total_rows, adjust_chunk_size(annotation_total_rows), LATENT_SPACE_DIM),
+            'Image': EmbeddingBuffer(f['images']['embeddings'], image_total_rows, adjust_chunk_size(image_total_rows), LATENT_SPACE_DIM),
+            'Mutation': EmbeddingBuffer(f['mutations']['embeddings'], mutation_total_rows, adjust_chunk_size(mutation_total_rows), LATENT_SPACE_DIM)
         }
-
-        # Pre-load the first chunk for each buffer
-        for buffer in buffers.values():
-            buffer.load_next_chunk()
 
         counts = {modality: 0 for modality in modality_choices}
 
+        # Precompute random choices
+        precomputed_choices = np.random.choice(
+            modality_choices,
+            size=(amount_of_summed_embeddings, walk_distance),
+            p=modality_probs
+        )
+
         for i in tqdm(range(amount_of_summed_embeddings), desc="Generating Summed Embeddings"):
             combined_sum = np.zeros(LATENT_SPACE_DIM, dtype=np.float32)
-            combination_counts = {'Text': 0, 'Image': 0, 'RNA': 0, 'Mutation': 0}
+            combination_counts = {modality: 0 for modality in modality_choices}
 
-            # Weighted sampling of modalities for the current summation
-            random_modalities = np.random.choice(
-                modality_choices,
-                size=walk_distance,
-                p=modality_probs
-            )
+            # Use precomputed random modalities
+            random_modalities = precomputed_choices[i]
             unique, sampled_counts = np.unique(random_modalities, return_counts=True)
             modality_counts = dict(zip(unique, sampled_counts))
 
@@ -237,7 +208,6 @@ def main():
     with h5py.File(output_file, "w") as f_out:
         # Save combined embeddings
         f_out.create_dataset("X", data=combined_data, compression="gzip")
-
         # Save labels
         for label, data in labels_data.items():
             f_out.create_dataset(label, data=data, compression="gzip")
