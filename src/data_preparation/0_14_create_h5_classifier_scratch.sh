@@ -38,7 +38,7 @@ mkdir -p $SCRATCH_PATH/results/embeddings/rna/${combined_cancers}
 mkdir -p $SCRATCH_PATH/results/embeddings/images
 mkdir -p $SCRATCH_PATH/results/embeddings/annotations/${combined_cancers}
 
-echo ls -l
+ls -l
 
 echo "Copying files to path $SCRATCH_PATH"
 
@@ -54,10 +54,10 @@ cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/src/data_preparati
 echo "Copying mutation embeddings..."
 cp /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/mutation_embeddings.csv $SCRATCH_PATH/results/embeddings
 
-echo ls -l $SCRATCH_PATH/results/embeddings
-echo ls -l $SCRATCH_PATH/results/embeddings/images/
-echo ls -l $SCRATCH_PATH/results/embeddings/rna/
-echo ls -l $SCRATCH_PATH/results/embeddings/annotations/
+ls -l $SCRATCH_PATH/results/embeddings
+ls -l $SCRATCH_PATH/results/embeddings/images/
+ls -l $SCRATCH_PATH/results/embeddings/rna/
+ls -l $SCRATCH_PATH/results/embeddings/annotations/
 
 
 echo "Running script from path: $SCRATCH_PATH/0_14_create_h5_classifier.py"
