@@ -38,14 +38,27 @@ mkdir -p $SCRATCH_PATH/results/embeddings/rna/${combined_cancers}
 mkdir -p $SCRATCH_PATH/results/embeddings/images
 mkdir -p $SCRATCH_PATH/results/embeddings/annotations/${combined_cancers}
 
+echo ls -l
 
-echo "Copying files"
+echo "Copying files to path $SCRATCH_PATH"
+
+echo "Copying rna files..."
 # copy embeddings/rna, embeddings/images, annotations
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/rna/${combined_cancers} $SCRATCH_PATH/results/embeddings/rna/
-cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/images/ $SCRATCH_PATH/results/embeddings/
+echo "Copying image files..."
+cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/images/ $SCRATCH_PATH/results/embeddings/images/
+echo "Copying annotation files..."
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/annotations/${combined_cancers}  $SCRATCH_PATH/results/embeddings/annotations
+echo "Copying script file..."
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/src/data_preparation/0_14_create_h5_classifier.py $SCRATCH_PATH/
+echo "Copying mutation embeddings..."
 cp /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/mutation_embeddings.csv $SCRATCH_PATH/results/embeddings
+
+echo ls -l $SCRATCH_PATH/results/embeddings
+echo ls -l $SCRATCH_PATH/results/embeddings/images/
+echo ls -l $SCRATCH_PATH/results/embeddings/rna/
+echo ls -l $SCRATCH_PATH/results/embeddings/annotations/
+
 
 echo "Running script from path: $SCRATCH_PATH/0_14_create_h5_classifier.py"
 
