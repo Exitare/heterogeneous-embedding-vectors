@@ -117,12 +117,11 @@ def main():
         mutation_total_rows, mutation_columns = get_total_rows_and_columns(f, "mutations")
         annotation_total_rows, annotation_columns = get_total_rows_and_columns(f, "annotations")
 
-        assert annotation_columns == image_columns == mutation_columns == LATENT_SPACE_DIM, \
+        assert rna_columns == annotation_columns == image_columns == mutation_columns == LATENT_SPACE_DIM, \
             "All modalities must have the same usable dimensions."
 
         cancer_indices = {}
         rna_dataset = f['rna']
-        print(rna_dataset)
 
         for cancer in selected_cancers:
             indices = filter_rows_by_cancer(rna_dataset, cancer)

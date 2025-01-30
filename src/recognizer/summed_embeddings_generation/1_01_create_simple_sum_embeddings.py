@@ -90,8 +90,20 @@ def main():
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     walk_distance: int = args.walk_distance
     selected_cancers: [] = args.selected_cancers
+
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     noise_ratio: float = args.noise_ratio
     load_folder: Path = Path(args.load_path)
+
+    logging.info(f"Noise ratio: {noise_ratio}")
+    logging.info(f"Walk distance: {walk_distance}")
+    logging.info(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
+    logging.info(f"Selected cancers: {selected_cancers}")
+    logging.info(f"Loading embeddings from {load_folder}")
+    logging.info(f"Load folder: {load_folder}")
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -124,10 +136,10 @@ def main():
         mutation_total_rows, mutation_columns = get_total_rows_and_columns(f, "mutations")
         annotation_total_rows, annotation_columns = get_total_rows_and_columns(f, "annotations")
 
-        print(f"RNA: {rna_total_rows} rows, {rna_columns} columns")
-        print(f"Image: {image_total_rows} rows, {image_columns} columns")
-        print(f"Mutation: {mutation_total_rows} rows, {mutation_columns} columns")
-        print(f"Annotation: {annotation_total_rows} rows, {annotation_columns} columns")
+        logging.info(f"RNA: {rna_total_rows} rows, {rna_columns} columns")
+        logging.info(f"Image: {image_total_rows} rows, {image_columns} columns")
+        logging.info(f"Mutation: {mutation_total_rows} rows, {mutation_columns} columns")
+        logging.info(f"Annotation: {annotation_total_rows} rows, {annotation_columns} columns")
 
         # Ensure all modalities have the same column dimensions
         assert rna_columns == image_columns == mutation_columns == annotation_columns == LATENT_SPACE_DIM, \

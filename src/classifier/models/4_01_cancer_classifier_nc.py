@@ -18,6 +18,7 @@ save_folder = Path("results", "classifier", "classification")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def apply_weights_and_bias(model, loaded_weights_and_biases):
     # Apply the weights and biases to the model
     for layer in model.layers:
@@ -250,19 +251,14 @@ if __name__ == "__main__":
     val_ratio = 0.05
     test_ratio = 0.25
 
-    class_counts = Counter()
-
+    # **LOAD ENTIRE DATASET INTO MEMORY**
     with h5py.File(h5_file_path, "r") as h5_file:
-        y = h5_file["y"]
-        chunk_size = 10000  # Process data in chunks
-        total_samples = y.shape[0]
+        feature_dimension = h5_file.attrs["feature_shape"]
+        unique_classes = h5_file.attrs["classes"]
+        X = h5_file["X"][:]  # Load all features
+        y = np.array([label.decode("utf-8") for label in h5_file["y"][:]])  # Load all labels
 
-        for i in range(0, total_samples, chunk_size):
-            chunk = y[i:i + chunk_size]
-            # convert chunks to utf-8
-            chunk = [label.decode("utf-8") for label in chunk]
-            class_counts.update(chunk)
-
+    class_counts = Counter(y)
     split_sizes = {cls: {
         "train": int(count * train_ratio),
         "val": int(count * val_ratio),
@@ -272,26 +268,17 @@ if __name__ == "__main__":
     # To store indices
     split_indices = {"train": [], "val": [], "test": []}
     allocated = defaultdict(lambda: {"train": 0, "val": 0, "test": 0})
-    chunk_size = 10000
-    with h5py.File(h5_file_path, "r") as h5_file:
-        y = h5_file["y"]
-        feature_dimension = h5_file.attrs["feature_shape"]
-        unique_classes = h5_file.attrs["classes"]
-        for i in range(0, y.shape[0], chunk_size):
-            chunk = y[i:i + chunk_size]  # Load a chunk
-            chunk_indices = np.arange(i, i + len(chunk))  # Indices of the chunk
 
-            for idx, label in zip(chunk_indices, chunk):
-                label = label.decode("utf-8")
-                if allocated[label]["train"] < split_sizes[label]["train"]:
-                    split_indices["train"].append(idx)
-                    allocated[label]["train"] += 1
-                elif allocated[label]["val"] < split_sizes[label]["val"]:
-                    split_indices["val"].append(idx)
-                    allocated[label]["val"] += 1
-                else:
-                    split_indices["test"].append(idx)
-                    allocated[label]["test"] += 1
+    for idx, label in enumerate(y):
+        if allocated[label]["train"] < split_sizes[label]["train"]:
+            split_indices["train"].append(idx)
+            allocated[label]["train"] += 1
+        elif allocated[label]["val"] < split_sizes[label]["val"]:
+            split_indices["val"].append(idx)
+            allocated[label]["val"] += 1
+        else:
+            split_indices["test"].append(idx)
+            allocated[label]["test"] += 1
 
     logging.info(
         f"Train size: {len(split_indices['train'])}, Validation size: {len(split_indices['val'])}, Test size: {len(split_indices['test'])} "
