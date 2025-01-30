@@ -14,13 +14,23 @@
 #SBATCH --gres=disk:2512 # Request scratch space in GB
 
 selected_cancers=$1
-dry_run=$2
+load_images=$2
 combined_cancers=$(echo "${selected_cancers}" | tr ' ' '_')
 output_file="results/embeddings/${combined_cancers}_classifier.h5"
 
 echo $selected_cancers
 echo $combined_cancers
 echo $output_file
+
+if [ -z "$load_images" ]; then
+  load_images="false"
+fi
+
+echo "Load images: $load_images"
+
+if [ "$load_images" = "true" ]; then
+    echo "Loading images for h5 embedding generation"
+fi
 
 # Check if cancers is empty
 if [ -z "$selected_cancers" ]; then
@@ -51,8 +61,12 @@ echo "Copying files to path $SCRATCH_PATH"
 echo "Copying rna files..."
 # copy embeddings/rna, embeddings/images, annotations
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/rna/${combined_cancers} $SCRATCH_PATH/results/embeddings/rna/
-echo "Copying image files..."
-cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/images/ $SCRATCH_PATH/results/embeddings/images/
+
+if [ "$load_images" = "true" ]; then
+    echo "Copying image files..."
+    cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/images/ $SCRATCH_PATH/results/embeddings/images/
+fi
+
 echo "Copying annotation files..."
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/annotations/${combined_cancers}  $SCRATCH_PATH/results/embeddings/annotations
 echo "Copying script file..."
@@ -61,7 +75,9 @@ echo "Copying mutation embeddings..."
 cp /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/mutation_embeddings.csv $SCRATCH_PATH/results/embeddings
 
 ls -l $SCRATCH_PATH/results/embeddings
-ls -l $SCRATCH_PATH/results/embeddings/images/
+if [ "$load_images" = "true" ]; then
+    ls -l $SCRATCH_PATH/results/embeddings/images/
+fi
 ls -l $SCRATCH_PATH/results/embeddings/rna/
 ls -l $SCRATCH_PATH/results/embeddings/annotations/
 

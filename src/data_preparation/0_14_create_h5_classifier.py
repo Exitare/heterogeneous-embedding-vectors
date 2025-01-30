@@ -63,7 +63,8 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"
         for chunk in pd.read_csv(path, chunksize=chunk_size):
             yield chunk
     else:
-        raise ValueError(f"Provided path is neither a file nor a directory: {path}")
+        logging.info(f"Provided path is neither a file nor a directory: {path}. Skipping...")
+        #raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
 def process_and_store_per_submitter(dataset_name, loader, h5_file):
@@ -132,6 +133,10 @@ if __name__ == "__main__":
             rna_loader = chunked_dataframe_loader(rna_load_folder)
             process_and_store_per_submitter("rna", rna_loader, f)
 
+            # Process Image embeddings (chunked)
+            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size, file_extension=".tsv")
+            process_and_store_per_submitter("images", image_loader, f)
+
             # Process Annotation embeddings
             annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
             process_and_store_per_submitter("annotations", annotation_loader, f)
@@ -139,11 +144,6 @@ if __name__ == "__main__":
             # Process Mutation embeddings
             mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
             process_and_store_per_submitter("mutations", mutation_loader, f)
-
-            # Process Image embeddings (chunked)
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size, file_extension=".tsv")
-            process_and_store_per_submitter("images", image_loader, f)
-
 
             logging.info("✅ HDF5 file with submitter-specific datasets created successfully.")
             logging.info(f"Available groups: {list(f.keys())}")
