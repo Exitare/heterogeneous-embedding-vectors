@@ -13,16 +13,18 @@ fig_save_folder = Path("figures", "classifier")
 if __name__ == '__main__':
     parser = ArgumentParser(description='Embedding UMAP')
     parser.add_argument("--selected_cancers", "-c", nargs='+', required=True)
-    parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.", default=5)
-    parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.", default=5)
+    parser.add_argument("--distances", "-d", nargs='+', required=False, type=int, help="The walk distance.", default=[3, 5])
     args = parser.parse_args()
 
     selected_cancers = args.selected_cancers
-    walk_distances = args.walk_distance
-    amount_of_walks = args.amount_of_walks
+    distances = args.distances
+    min_distance = distances[0]
+    max_distance = distances[1]
 
-    walk_distances: [int] = range(3, walk_distances + 1)
-    amount_of_walks: [int] = range(3, amount_of_walks + 1)
+    print(f"Using min_distance: {min_distance} and max_distance: {max_distance}")
+
+    walk_distances: [int] = range(min_distance, max_distance + 1)
+    amount_of_walks: [int] = range(min_distance, max_distance + 1)
 
     cancers = "_".join(selected_cancers)
 
