@@ -22,6 +22,12 @@ echo $selected_cancers
 echo $combined_cancers
 echo $output_file
 
+# Check if cancers is empty
+if [ -z "$selected_cancers" ]; then
+  echo "Error: No cancers provided. Please specify the cancers to classify."
+  exit 1
+fi
+
 # Create working directory in scratch
 echo ""
 echo "************************************"
