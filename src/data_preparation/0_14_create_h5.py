@@ -124,6 +124,9 @@ def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_i
         current_size = new_size
 
     try:
+
+        submitter_id_list = ['-'.join(str(submitter_id, 'utf-8').split('-')[:3]) for submitter_id in submitter_id_list]
+
         # Store metadata as separate datasets
         group.create_dataset("cancer", data=np.array(cancer_list, dtype="S"), compression="gzip")
         group.create_dataset("submitter_id", data=np.array(submitter_id_list, dtype="S"), compression="gzip")
@@ -177,6 +180,7 @@ if __name__ == "__main__":
 
             # Store indices
             submitter_ids = list(rna_indices.keys())
+            submitter_ids = ['-'.join(str(submitter_id, 'utf-8').split('-')[:3]) for submitter_id in submitter_ids]
             submitter_ids.sort()
 
             index_group = f.create_group("indices")
