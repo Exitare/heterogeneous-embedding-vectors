@@ -6,10 +6,12 @@ from tqdm import tqdm
 from typing import Dict, List, Tuple
 from concurrent.futures import ProcessPoolExecutor
 
+LATENT_DIM = 767
+
 
 def extract_submitter_data(
         h5_file_path: str, groups: List[str], submitter_id: str, chunk_size: int = 100000
-) -> Dict[str, np.ndarray]:
+) -> (Dict[str, np.ndarray], str):
     """
     Extract all rows for a specific submitter_id from all groups in an HDF5 file.
 
@@ -23,13 +25,14 @@ def extract_submitter_data(
         Dict[str, np.ndarray]: A dictionary where keys are group names and values are numpy arrays for the submitter_id.
     """
     submitter_data: Dict[str, np.ndarray] = {}
-
+    cancer_type = ""
     with h5py.File(h5_file_path, "r") as h5_file:
         for group_name in groups:
             if group_name not in h5_file:
                 continue
 
             group = h5_file[group_name]
+            cancer_type = group["cancer"][0]
             indices = h5_file["indices"][group_name].get(submitter_id.encode("utf-8"))
             if indices is None:
                 submitter_data[group_name] = np.array([])
@@ -41,11 +44,11 @@ def extract_submitter_data(
                 results.append(group["embeddings"][indices[start:end]])
             submitter_data[group_name] = np.concatenate(results, axis=0) if results else np.array([])
 
-    return submitter_data
+    return submitter_data, cancer_type
 
 
 def sum_random_embeddings(
-        submitter_data: Dict[str, np.ndarray], walk_distance: int, amount_of_walks: int
+        submitter_data: Dict[str, np.ndarray], walk_distance: int, amount_of_walks: int, cancer_type: str,
 ) -> Tuple[np.ndarray, str]:
     """
     Create summed embeddings by selecting random embeddings from random modalities.
@@ -67,15 +70,13 @@ def sum_random_embeddings(
     if "rna" not in submitter_data or submitter_data["rna"].size == 0:
         raise ValueError("No RNA data available to extract cancer type.")
 
-    cancer_type = submitter_data["rna"][0][768].decode("utf-8")
-
     for _ in range(amount_of_walks):
         selected_embeddings: List[np.ndarray] = []
 
         for _ in range(walk_distance):
             modality = np.random.choice(available_modalities)
             modality_data = submitter_data[modality]
-            numeric_part = np.array([modality_data[0][i] for i in range(767)])
+            numeric_part = np.array([modality_data[0][i] for i in range(LATENT_DIM)])
             selected_embeddings.append(numeric_part)
 
         summed_embedding = np.sum(selected_embeddings, axis=0)
@@ -104,10 +105,9 @@ def process_submitter_chunk(
     X_batch, y_batch, submitter_ids_batch = [], [], []
     for submitter_id in submitter_ids:
         try:
-            submitter_data = extract_submitter_data(h5_file_path, groups, submitter_id)
+            submitter_data, cancer_type = extract_submitter_data(h5_file_path, groups, submitter_id)
             summed_embeddings, cancer_type = sum_random_embeddings(
-                submitter_data, walk_distance, amount_of_walks
-            )
+                submitter_data, walk_distance, amount_of_walks, cancer_type)
             X_batch.append(summed_embeddings)
             y_batch.append(cancer_type)
             submitter_ids_batch.append(submitter_id)
@@ -138,7 +138,7 @@ def process_all_submitters(
         ]
 
     with h5py.File(output_path, "w") as out_file:
-        shape = 767 * walk_amount
+        shape = LATENT_DIM * walk_amount
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="f")
         out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
         out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
@@ -150,8 +150,7 @@ def process_all_submitters(
         with ProcessPoolExecutor(max_workers=n_jobs) as executor:
             for X_batch, y_batch, submitter_ids_batch in tqdm(
                     executor.map(process_submitter_chunk, [str(h5_file_path)] * len(chunks), [groups] * len(chunks),
-                                 chunks,
-                                 [walk_distance] * len(chunks), [walk_amount] * len(chunks)),
+                                 chunks, [walk_distance] * len(chunks), [walk_amount] * len(chunks)),
                     desc="Processing Chunks"):
                 current_size = out_file["X"].shape[0]
                 new_size = current_size + len(X_batch)
@@ -171,7 +170,7 @@ def process_all_submitters(
                         unique_classes.append(y)
 
         out_file.attrs["classes"] = unique_classes
-        out_file.attrs["feature_shape"] = 767 * walk_amount
+        out_file.attrs["feature_shape"] = LATENT_DIM * walk_amount
 
 
 def load_groups(h5_file_path: Path) -> List[str]:
