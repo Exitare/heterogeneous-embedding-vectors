@@ -9,7 +9,8 @@ LATENT_DIM = 768
 CHUNK_SIZE = 100000  # For processing large image datasets
 
 
-def sum_random_embeddings(submitter_id: str, submitter_data: Dict[str, np.ndarray], walk_distance: int, walk_amount: int) -> np.ndarray:
+def sum_random_embeddings(submitter_id: str, submitter_data: Dict[str, np.ndarray], walk_distance: int,
+                          walk_amount: int) -> np.ndarray:
     """
     Creates summed embeddings by randomly selecting embeddings from available modalities.
 
@@ -49,13 +50,14 @@ def sum_random_embeddings(submitter_id: str, submitter_data: Dict[str, np.ndarra
 
     return np.concatenate(summed_embeddings, axis=0)
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
-                        choices=[3, 4, 5], default=3)
+                        choices=[3, 4, 5, 6], default=3)
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
-                        choices=[3, 4, 5], default=3)
+                        choices=[3, 4, 5, 6], default=3)
     args = parser.parse_args()
 
     selected_cancers: List[str] = args.cancer
@@ -83,7 +85,8 @@ def main():
 
         # Load cancer types mapped to submitter IDs
         stored_cancer_types = h5_file["rna"]["cancer"][:]
-        cancer_types = {sid.decode("utf-8"): cancer.decode("utf-8") for sid, cancer in zip(stored_submitter_ids, stored_cancer_types)}
+        cancer_types = {sid.decode("utf-8"): cancer.decode("utf-8") for sid, cancer in
+                        zip(stored_submitter_ids, stored_cancer_types)}
 
         # Dictionary to store extracted submitter data
         submitter_data: Dict[str, Dict[str, np.ndarray]] = {}
@@ -135,22 +138,20 @@ def main():
                 "images": submitter_images,
             }
 
-
             # ✅ Print debug info
-            print(f"✔ Submitter {submitter_id} - Cancer Type: {patient_cancer}")
-            print(f"  RNA Shape: {submitter_rna.shape if submitter_rna is not None else 'N/A'}")
-            print(f"  Annotations Shape: {submitter_annotations.shape if submitter_annotations is not None else 'N/A'}")
-            print(f"  Mutations Shape: {submitter_mutations.shape if submitter_mutations is not None else 'N/A'}")
-            print(f"  Images Shape: {submitter_images.shape if submitter_images is not None else 'N/A'}")
+            # print(f"✔ Submitter {submitter_id} - Cancer Type: {patient_cancer}")
+            # print(f"  RNA Shape: {submitter_rna.shape if submitter_rna is not None else 'N/A'}")
+            # print(f"  Annotations Shape: {submitter_annotations.shape if submitter_annotations is not None else 'N/A'}")
+            # print(f"  Mutations Shape: {submitter_mutations.shape if submitter_mutations is not None else 'N/A'}")
+            # print(f"  Images Shape: {submitter_images.shape if submitter_images is not None else 'N/A'}")
 
             # ✅ Sum embeddings for this submitter
             try:
-                summed_embedding = sum_random_embeddings(submitter_id,submitter_data, walk_distance, walk_amount)
+                summed_embedding = sum_random_embeddings(submitter_id, submitter_data, walk_distance, walk_amount)
                 summed_embeddings_data.append((summed_embedding, patient_cancer, submitter_id))
             except ValueError:
                 print(f"❌ Skipping {submitter_id}, no valid embeddings for sum operation.")
                 continue
-
 
         print(mutation_count)
         # ✅ Save summed embeddings to HDF5
@@ -159,7 +160,8 @@ def main():
             out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="float32")
             out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
             out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
-
+            out_file.attrs["classes"] = selected_cancers
+            out_file.attrs["feature_shape"] = LATENT_DIM * walk_amount
             for summed_embedding, cancer, submitter_id in summed_embeddings_data:
                 out_file["X"].resize(out_file["X"].shape[0] + 1, axis=0)
                 out_file["X"][-1] = summed_embedding
