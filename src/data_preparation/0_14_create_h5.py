@@ -4,9 +4,12 @@ import pandas as pd
 import numpy as np
 import h5py
 import sys
+import logging
 
 save_folder = Path("results", "embeddings")
 chunk_size = 100000
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
@@ -18,12 +21,12 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
     if path.is_dir():
         for file_path in path.iterdir():
             if file_path.is_file() and file_path.suffix == file_extension:
-                print(f"Loading file in chunks: {file_path}")
+                logging.info(f"Loading file in chunks: {file_path}")
                 sep = "," if file_extension == ".csv" else "\t"
                 for chunk in pd.read_csv(file_path, chunksize=chunk_size, sep=sep):
                     yield chunk
     elif path.is_file():
-        print(f"Loading single file in chunks: {path}")
+        logging.info(f"Loading single file in chunks: {path}")
         for chunk in pd.read_csv(path, chunksize=chunk_size):
             yield chunk
     else:
@@ -46,18 +49,18 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"
 
     if path.is_dir():
         for file_path in path.iterdir():
-            print(file_path)
+            logging.info(file_path)
             if file_path.is_file():
                 continue  # Skip files at the top level
             for cancer_path in file_path.iterdir():
-                print("cancer_path", cancer_path)
+                logging.info("cancer_path", cancer_path)
                 if cancer_path.is_file() and cancer_path.suffix == file_extension:
-                    print(f"Loading file in chunks: {cancer_path}")
+                    logging.info(f"Loading file in chunks: {cancer_path}")
                     sep = "," if file_extension == ".csv" else "\t"
                     for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
                         yield chunk
     elif path.is_file():
-        print(f"Loading single file in chunks: {path}")
+        logging.info(f"Loading single file in chunks: {path}")
         for chunk in pd.read_csv(path, chunksize=chunk_size):
             yield chunk
     else:
@@ -68,7 +71,7 @@ def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_i
     """
     Process data in chunks and store embeddings in the HDF5 file, while keeping metadata separate.
     """
-    print(f"Processing {dataset_name} in chunks...")
+    logging.info(f"Processing {dataset_name} in chunks...")
 
     group = f.create_group(dataset_name)
     dataset = None
@@ -86,10 +89,10 @@ def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_i
         numeric_data = chunk[numeric_cols].to_numpy(dtype=np.float32)
 
         if dataset_name == "images":
-            print("Loading image cancer column...")
+            logging.info("Loading image cancer column...")
             cancer_values = chunk["cancer_type"].to_numpy(dtype="S")  # Store as byte strings
         else:
-            print("Loading other cancer columns...")
+            logging.info("Loading other cancer columns...")
             cancer_values = chunk["cancer"].to_numpy(dtype="S")  # Store as byte strings
 
         # Extract metadata
@@ -135,10 +138,10 @@ def process_and_store_in_chunks(dataset_name, loader, f, key_column="submitter_i
         assert group["cancer"].shape[0] > 0, "Cancer dataset is empty."
         assert group["submitter_id"].shape[0] > 0, "Submitter ID dataset is empty."
 
-        print(f"Completed processing {dataset_name} with {current_size} rows.")
+        logging.info(f"Completed processing {dataset_name} with {current_size} rows.")
         return indices
     except Exception as e:
-        print(f"Error while storing metadata for {dataset_name}: {e}")
+        logging.info(f"Error while storing metadata for {dataset_name}: {e}")
         raise
 
 
@@ -197,12 +200,12 @@ if __name__ == "__main__":
                         submitter_id, data=np.array(rows, dtype="int64")
                     )
 
-            print("HDF5 file with indices created successfully.")
-            print(f"Available groups: {f.keys()}")
+            logging.info("HDF5 file with indices created successfully.")
+            logging.info(f"Available groups: {f.keys()}")
 
     except Exception as e:
-        print(e)
-        print(f"Error occurred: {e}")
+        logging.info(e)
+        logging.info(f"Error occurred: {e}")
         with open("error.txt", "w") as f:
             f.write(str(e))
         sys.exit(1)
