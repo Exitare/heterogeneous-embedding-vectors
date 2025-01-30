@@ -9,40 +9,78 @@ from concurrent.futures import ProcessPoolExecutor
 LATENT_DIM = 767
 
 
+def load_full_datasets(h5_file_path: str, exclude_group: str = "Image") -> Dict[str, np.ndarray]:
+    """
+    Load all datasets into memory except for the excluded group (e.g., 'Image').
+
+    Parameters:
+        h5_file_path (str): Path to the HDF5 file.
+        exclude_group (str): Group name to exclude from loading.
+
+    Returns:
+        Dict[str, np.ndarray]: Dictionary with dataset names as keys and NumPy arrays as values.
+    """
+    full_data = {}
+
+    with h5py.File(h5_file_path, "r") as h5_file:
+        for group_name in h5_file.keys():
+            if group_name == "indices" or group_name == exclude_group:
+                continue  # Skip index dataset and excluded group (Image)
+
+            # Load the entire dataset into memory
+            full_data[group_name] = np.array(h5_file[group_name]["embeddings"][:])
+
+    return full_data
+
+
 def extract_submitter_data(
         h5_file_path: str, groups: List[str], submitter_id: str, chunk_size: int = 100000
-) -> (Dict[str, np.ndarray], str):
+) -> Tuple[Dict[str, np.ndarray], str]:
     """
-    Extract all rows for a specific submitter_id from all groups in an HDF5 file.
+    Extract submitter-specific data from all groups, loading everything except Image into memory.
 
     Parameters:
         h5_file_path (str): Path to the HDF5 file.
         groups (List[str]): List of group names to extract data from.
         submitter_id (str): The submitter_id to extract data for.
-        chunk_size (int): Size of chunks to read data in.
+        chunk_size (int): Size of chunks to read image data in.
 
     Returns:
-        Dict[str, np.ndarray]: A dictionary where keys are group names and values are numpy arrays for the submitter_id.
+        Tuple[Dict[str, np.ndarray], str]:
+            - Dictionary with extracted embeddings (Image chunked, others loaded in memory).
+            - The submitter's cancer type.
     """
     submitter_data: Dict[str, np.ndarray] = {}
-    cancer_type = ""
+    cancer_type = None
+
     with h5py.File(h5_file_path, "r") as h5_file:
         for group_name in groups:
             if group_name not in h5_file:
                 continue
 
             group = h5_file[group_name]
-            cancer_type = group["cancer"][0]
-            indices = h5_file["indices"][group_name].get(submitter_id.encode("utf-8"))
-            if indices is None:
-                submitter_data[group_name] = np.array([])
-                continue
 
-            results = []
-            for start in range(0, len(indices), chunk_size):
-                end = min(start + chunk_size, len(indices))
-                results.append(group["embeddings"][indices[start:end]])
-            submitter_data[group_name] = np.concatenate(results, axis=0) if results else np.array([])
+            # Extract cancer type from the first group it appears in
+            if cancer_type is None and "cancer" in group:
+                cancer_type = group["cancer"][0]
+                if isinstance(cancer_type, bytes):
+                    cancer_type = cancer_type.decode("utf-8")
+
+            # Process image data in chunks
+            if group_name == "Image":
+                indices = h5_file["indices"][group_name].get(submitter_id.encode("utf-8"))
+                if indices is None:
+                    submitter_data[group_name] = np.array([])
+                    continue
+
+                results = []
+                for start in range(0, len(indices), chunk_size):
+                    end = min(start + chunk_size, len(indices))
+                    results.append(group["embeddings"][indices[start:end]])
+                submitter_data[group_name] = np.concatenate(results, axis=0) if results else np.array([])
+
+    if cancer_type is None:
+        raise ValueError(f"No cancer type found for submitter {submitter_id} in any group.")
 
     return submitter_data, cancer_type
 
@@ -67,16 +105,13 @@ def sum_random_embeddings(
     if not available_modalities:
         raise ValueError("No available modalities with data for the submitter.")
 
-    if "rna" not in submitter_data or submitter_data["rna"].size == 0:
-        raise ValueError("No RNA data available to extract cancer type.")
-
     for _ in range(amount_of_walks):
         selected_embeddings: List[np.ndarray] = []
 
         for _ in range(walk_distance):
             modality = np.random.choice(available_modalities)
             modality_data = submitter_data[modality]
-            numeric_part = np.array([modality_data[0][i] for i in range(LATENT_DIM)])
+            numeric_part = modality_data[0][:LATENT_DIM]
             selected_embeddings.append(numeric_part)
 
         summed_embedding = np.sum(selected_embeddings, axis=0)
@@ -116,78 +151,7 @@ def process_submitter_chunk(
     return X_batch, y_batch, submitter_ids_batch
 
 
-def process_all_submitters(
-        h5_file_path: Path, groups: List[str], output_path: Path, walk_distance: int, walk_amount: int,
-        batch_size: int = 100, n_jobs: int = 4
-) -> None:
-    """
-    Process all submitters using parallel processing.
-
-    Parameters:
-        h5_file_path (Path): Path to the HDF5 file.
-        groups (List[str]): List of group names to process.
-        output_path (Path): Path to save combined data.
-        walk_distance (int): Number of embeddings to sum.
-        walk_amount (int): Number of summed embeddings to create.
-        batch_size (int): Number of submitters in a chunk.
-        n_jobs (int): Number of parallel workers.
-    """
-    with h5py.File(h5_file_path, "r") as h5_file:
-        submitter_ids: List[str] = [
-            submitter_id.decode("utf-8") for submitter_id in h5_file["indices"]["submitter_ids"][:]
-        ]
-
-    with h5py.File(output_path, "w") as out_file:
-        shape = LATENT_DIM * walk_amount
-        out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="f")
-        out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
-        out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
-        out_file.attrs["walk_distance"] = walk_distance
-        out_file.attrs["walk_amount"] = walk_amount
-
-        unique_classes = []
-        chunks = [submitter_ids[i:i + batch_size] for i in range(0, len(submitter_ids), batch_size)]
-        with ProcessPoolExecutor(max_workers=n_jobs) as executor:
-            for X_batch, y_batch, submitter_ids_batch in tqdm(
-                    executor.map(process_submitter_chunk, [str(h5_file_path)] * len(chunks), [groups] * len(chunks),
-                                 chunks, [walk_distance] * len(chunks), [walk_amount] * len(chunks)),
-                    desc="Processing Chunks"):
-                current_size = out_file["X"].shape[0]
-                new_size = current_size + len(X_batch)
-
-                out_file["X"].resize(new_size, axis=0)
-                out_file["X"][current_size:new_size] = np.array(X_batch)
-
-                out_file["y"].resize(new_size, axis=0)
-                out_file["y"][current_size:new_size] = y_batch
-
-                out_file["submitter_ids"].resize(new_size, axis=0)
-                out_file["submitter_ids"][current_size:new_size] = submitter_ids_batch
-
-                # add all unique classes to the unique classes list, if not already in the list
-                for y in y_batch:
-                    if y not in unique_classes:
-                        unique_classes.append(y)
-
-        out_file.attrs["classes"] = unique_classes
-        out_file.attrs["feature_shape"] = LATENT_DIM * walk_amount
-
-
-def load_groups(h5_file_path: Path) -> List[str]:
-    """
-    Load all groups from an HDF5 file.
-
-    Parameters:
-        h5_file_path (Path): Path to the HDF5 file.
-
-    Returns:
-        List[str]: List of group names in the HDF5 file.
-    """
-    with h5py.File(h5_file_path, "r") as h5_file:
-        return [key for key in h5_file.keys() if key != "indices"]
-
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
@@ -205,9 +169,14 @@ if __name__ == "__main__":
     save_folder.mkdir(parents=True, exist_ok=True)
 
     h5_load_path: Path = Path("results", "embeddings", f"{cancers}.h5")
-    groups: List[str] = load_groups(h5_load_path)
-
     output_file = Path(save_folder, "summed_embeddings.h5")
+
+    # Load all non-image datasets into memory
+    full_data = load_full_datasets(str(h5_load_path))
+
+    with h5py.File(h5_load_path, "r") as h5_file:
+        groups = [key for key in h5_file.keys() if key != "indices"]
+
     process_all_submitters(
         h5_file_path=h5_load_path,
         groups=groups,
@@ -215,3 +184,7 @@ if __name__ == "__main__":
         walk_distance=walk_distance,
         walk_amount=walk_amount,
     )
+
+
+if __name__ == "__main__":
+    main()

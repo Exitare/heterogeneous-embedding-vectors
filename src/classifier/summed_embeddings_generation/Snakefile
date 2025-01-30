@@ -19,7 +19,7 @@ rule all:
 rule create_summed_embeddings:
     input:
          expand(
-            f"results/embeddings/{{cancers}}.h5",
+            f"results/embeddings/{{cancers}}_classifier.h5",
             cancers=joined_cancers
         )
 
@@ -38,5 +38,5 @@ rule create_summed_embeddings:
 
         for walk_distance in requested_walk_distance:
             for walk in amount_of_walks:
-                shell(f"python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings.py -c {{cancers}} -a {{walk}} -w {{walk_distance}}")
+                shell(f"python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings_v3.py -c {{cancers}} -a {{walk}} -w {{walk_distance}}")
 
