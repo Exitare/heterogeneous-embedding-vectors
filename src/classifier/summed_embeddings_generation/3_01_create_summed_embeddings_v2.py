@@ -9,7 +9,7 @@ LATENT_DIM = 768
 CHUNK_SIZE = 100000  # For processing large image datasets
 
 
-def sum_random_embeddings(submitter_id: str, submitter_data: Dict[str, np.ndarray], walk_distance: int,
+def sum_random_embeddings(submitter_id: str, submitter_data: Dict[str, dict], walk_distance: int,
                           walk_amount: int) -> np.ndarray:
     """
     Creates summed embeddings by randomly selecting embeddings from available modalities.
