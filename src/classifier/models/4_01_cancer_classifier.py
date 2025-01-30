@@ -11,10 +11,12 @@ import argparse
 from collections import defaultdict
 from collections import Counter
 import math
+import logging
 
 load_folder = Path("results", "classifier", "summed_embeddings")
 save_folder = Path("results", "classifier", "classification")
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def apply_weights_and_bias(model, loaded_weights_and_biases):
     # Apply the weights and biases to the model
@@ -28,9 +30,9 @@ def apply_weights_and_bias(model, loaded_weights_and_biases):
                 layer.set_weights([weights, biases])
             else:
                 layer.set_weights([weights])
-            print(f"Applied weights to layer: {layer.name}")
+            logging.info(f"Applied weights to layer: {layer.name}")
         else:
-            print(f"No weights found for layer: {layer.name}")
+            logging.info(f"No weights found for layer: {layer.name}")
 
     return model
 
@@ -116,7 +118,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
                         ])
 
     loss, accuracy = model.evaluate(test_ds)
-    print(f"Test Loss: {loss}, Test Accuracy: {accuracy}")
+    logging.info(f"Test Loss: {loss}, Test Accuracy: {accuracy}")
 
     # Predict and collect results
     y_test = []
@@ -152,7 +154,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         precision_cancer = precision_score(y_test_cancer, y_pred_cancer, average='weighted')
         recall_cancer = recall_score(y_test_cancer, y_pred_cancer, average='weighted')
 
-        print(
+        logging.info(
             f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}"
         )
 
@@ -173,15 +175,15 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     recall_total = recall_score(y_test, y_pred, average='weighted')
     accuracy_total = (y_test == y_pred).mean()
 
-    print(y_test.shape)
-    print(y_pred.shape)
+    logging.info(y_test.shape)
+    logging.info(y_pred.shape)
     # Assuming the number of classes is known
     num_classes = y_pred_proba.shape[1]  # Infer from probabilities
     y_test_one_hot = label_binarize(y_test, classes=np.arange(num_classes))
     # Compute AUC-ROC score
     auc_score = roc_auc_score(y_test_one_hot, y_pred_proba, multi_class='ovo', average='macro')
 
-    print(
+    logging.info(
         f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f}")
 
     results.append({
@@ -199,13 +201,13 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     # Save results
     results_df = pd.DataFrame(results)
     results_df.to_csv(Path(save_folder, f"results.csv"), index=False)
-    print("Results saved.")
+    logging.info("Results saved.")
 
     # Save model and training history
     model.save(Path(save_folder, f"model.keras"))
     history_df = pd.DataFrame(history.history)
     history_df.to_csv(Path(save_folder, f"history.csv"), index=False)
-    print("Model and history saved.")
+    logging.info("Model and history saved.")
 
 
 if __name__ == "__main__":
@@ -213,10 +215,11 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", "-b", type=int, default=32, help="Batch size for training.")
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--iteration", "-i", type=int, required=True, help="The iteration number.")
-    parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.", choices=[3, 4, 5],
+    parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
+                        choices=[3, 4, 5, 6],
                         default=3)
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
-                        choices=[3, 4, 5], default=3)
+                        choices=[3, 4, 5, 6], default=3)
     args = parser.parse_args()
 
     batch_size = args.batch_size
@@ -225,8 +228,8 @@ if __name__ == "__main__":
     iteration = args.iteration
 
     cancers = "_".join(args.cancer)
-    print(f"Selected cancers: {cancers}")
-    print(f"Walk distance: {walk_distance}, Amount of walks: {walk_amount}")
+    logging.info(f"Selected cancers: {cancers}")
+    logging.info(f"Walk distance: {walk_distance}, Amount of walks: {walk_amount}")
 
     load_folder = Path(load_folder, cancers, f"{walk_distance}_{walk_amount}")
     h5_file_path = Path(load_folder, "summed_embeddings.h5")
@@ -240,6 +243,9 @@ if __name__ == "__main__":
 
     if not iteration_save_folder.exists():
         iteration_save_folder.mkdir(parents=True)
+
+    logging.info(f"Loading data from: {h5_file_path}")
+    logging.info(f"Saving results to: {iteration_save_folder}")
 
     train_ratio = 0.7
     val_ratio = 0.05
@@ -288,11 +294,11 @@ if __name__ == "__main__":
                     split_indices["test"].append(idx)
                     allocated[label]["test"] += 1
 
-    print(
+    logging.info(
         f"Train size: {len(split_indices['train'])}, Validation size: {len(split_indices['val'])}, Test size: {len(split_indices['test'])} "
         f"& total: {len(split_indices['train']) + len(split_indices['val']) + len(split_indices['test'])}")
-    print(f"Loaded {unique_classes}, {len(unique_classes)} classes total")
-    print(f"Feature dimension: {feature_dimension}")
+    logging.info(f"Loaded {unique_classes}, {len(unique_classes)} classes total")
+    logging.info(f"Feature dimension: {feature_dimension}")
 
     # fit label encoder
     label_encoder = LabelEncoder()
@@ -302,7 +308,7 @@ if __name__ == "__main__":
     val_batches = math.ceil(len(split_indices['val']) / batch_size)
     test_batches = math.ceil(len(split_indices['test']) / batch_size)
 
-    print(f"Train batches: {train_batches}, Validation batches: {val_batches}, Test batches: {test_batches}")
+    logging.info(f"Train batches: {train_batches}, Validation batches: {val_batches}, Test batches: {test_batches}")
 
     # Create separate datasets for train, val, and test
     train_ds = create_tf_dataset_specific_indices(
