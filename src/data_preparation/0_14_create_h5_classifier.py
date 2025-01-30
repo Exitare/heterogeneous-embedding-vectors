@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import h5py
 import sys
-from tqdm import tqdm
 import logging
 
 save_folder = Path("results", "embeddings")
@@ -23,10 +22,12 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
                 logging.info(f"Loading file in chunks: {file_path}")
                 sep = "," if file_extension == ".csv" else "\t"
                 for chunk in pd.read_csv(file_path, chunksize=chunk_size, sep=sep):
+                    logging.info(f"Chunk shape: {chunk.shape}")
                     yield chunk
     elif path.is_file():
         logging.info(f"Loading single file in chunks: {path}")
         for chunk in pd.read_csv(path, chunksize=chunk_size):
+            logging.info(f"Chunk shape: {chunk.shape}")
             yield chunk
     else:
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
@@ -55,6 +56,7 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"
                     logging.info(f"Loading file in chunks: {cancer_path}")
                     sep = "," if file_extension == ".csv" else "\t"
                     for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
+                        logging.info(f"Chunk shape: {chunk.shape}")
                         yield chunk
     elif path.is_file():
         logging.info(f"Loading single file in chunks: {path}")
@@ -72,7 +74,7 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
 
     group = h5_file.create_group(dataset_name)
 
-    for chunk in tqdm(loader, desc=f"Processing {dataset_name}"):
+    for chunk in loader:
         # Extract submitter IDs
         submitter_ids = chunk["submitter_id"].astype(str).tolist()
         submitter_ids = ['-'.join(sid.split("-")[:3]) for sid in submitter_ids]  # Replace hyphens with underscores
@@ -145,6 +147,8 @@ if __name__ == "__main__":
 
             logging.info("✅ HDF5 file with submitter-specific datasets created successfully.")
             logging.info(f"Available groups: {list(f.keys())}")
+            logging.info(f"Available submitters: {len(list(f['rna'].keys()))}")
+            logging.info(f"File saved to: {Path(save_folder, f'{cancers}_classifier.h5')}")
 
     except Exception as e:
         logging.info(f"Error occurred: {e}")

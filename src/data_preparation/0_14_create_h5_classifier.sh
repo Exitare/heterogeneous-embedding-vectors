@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=c_h5df
+#SBATCH --job-name=h5_classifier
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=batch
 #SBATCH --qos=long_jobs
@@ -12,5 +12,4 @@
 #SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-
-python3 src/data_preparation/0_14_create_h5.py -c BRCA LUAD STAD BLCA COAD THCA
+python3 src/data_preparation/0_14_create_h5_classifier.py -c BRCA LUAD STAD BLCA COAD THCA
