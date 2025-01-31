@@ -72,7 +72,7 @@ cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings
 echo "Copying script file..."
 cp -r /home/groups/EllrottLab/heterogeneous-embedding-vectors/src/data_preparation/0_14_create_h5_classifier.py $SCRATCH_PATH/
 echo "Copying mutation embeddings..."
-cp /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/mutation_embeddings.csv $SCRATCH_PATH/results/embeddings
+cp /home/groups/EllrottLab/heterogeneous-embedding-vectors/results/embeddings/mutation_embeddings.csv $SCRATCH_PATH/results/embeddings
 
 ls -l $SCRATCH_PATH/results/embeddings
 if [ "$load_images" = "true" ]; then
