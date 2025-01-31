@@ -10,7 +10,7 @@ cancer_embeddings = {}
 submitter_id_counts = {}
 
 if __name__ == '__main__':
-    for file_path in Path("data", "images").iterdir():
+    for file_path in Path("results", "embeddings", "images").iterdir():
         if file_path.is_file():
             continue  # Skip files at the top level
 
