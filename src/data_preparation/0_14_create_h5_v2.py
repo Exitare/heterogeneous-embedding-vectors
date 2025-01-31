@@ -183,6 +183,7 @@ if __name__ == "__main__":
 
             logging.info("HDF5 file with indices created successfully.")
             logging.info(f"Available groups: {f.keys()}")
+            logging.info(f"Saved file to: {Path(save_folder, f'{cancers}.h5')}")
 
     except Exception as e:
         logging.info(e)
