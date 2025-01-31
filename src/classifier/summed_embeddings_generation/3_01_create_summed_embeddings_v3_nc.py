@@ -77,15 +77,13 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
     Collects all unique submitter_ids from the specified modalities.
     """
     submitter_ids = set()
-    for modality in modalities:
-        if modality in h5_file:
-            modality_ids = set(h5_file[modality].keys())
-            submitter_ids.update(modality_ids)
-            logging.info(f"Collected {len(modality_ids)} IDs from modality '{modality}'.")
-        else:
-            logging.warning(f"Modality '{modality}' not found in the HDF5 file.")
-    logging.info(f"Total unique submitter_ids collected: {len(submitter_ids)}.")
-    return list(submitter_ids)
+    # load the submitter ids from the RNA
+    if "rna" in modalities:
+        submitter_ids.update(h5_file["rna"].keys())
+        logging.info(f"RNA modality: {len(submitter_ids)} submitter_ids collected.")
+        return list(submitter_ids)
+    else:
+        raise ValueError("RNA modality is required for processing.")
 
 
 def main():
