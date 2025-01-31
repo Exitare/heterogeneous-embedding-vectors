@@ -49,4 +49,13 @@ if __name__ == '__main__':
     final_df = pd.concat(cancer_embeddings.values(), ignore_index=True)
     # remove TCGA- from the cancer type
     final_df["cancer_type"] = final_df["cancer_type"].str.replace("TCGA-", "")
-    final_df.to_csv(Path("results", "embeddings", "images", "combined_embeddings.tsv"), sep='\t', index=False)
+    try:
+        final_df.to_csv(Path("results", "embeddings", "images", "combined_image_embeddings.tsv"), sep='\t', index=False)
+    except PermissionError as e:
+        logging.error(f"Error saving combined embeddings: {e}")
+        logging.info("Saving combined embeddings to 'combined_embeddings.csv' instead...")
+        final_df.to_csv(Path("results", "embeddings", "combined_image_embeddings.tsv"), sep='\t', index=False)
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        logging.info("Saving combined embeddings to 'combined_embeddings.csv' instead...")
+        final_df.to_csv(Path("results", "embeddings", "combined_image_embeddings.tsv"), sep='\t', index=False)
