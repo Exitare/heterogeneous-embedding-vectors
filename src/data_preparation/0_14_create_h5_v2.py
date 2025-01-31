@@ -33,7 +33,7 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
-def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"):
+def chunked_image_dataframe_loader(path, chunk_size=100000):
     """
     Load image data from a directory containing cancer-specific subdirectories.
 
@@ -45,26 +45,8 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"
     Yields:
         pd.DataFrame: Chunk of data from the cancer-specific subdirectories.
     """
-    path = Path(path)
-
-    if path.is_dir():
-        for file_path in path.iterdir():
-            logging.info(file_path)
-            if file_path.is_file():
-                continue  # Skip files at the top level
-            for cancer_path in file_path.iterdir():
-                logging.info("cancer_path", cancer_path)
-                if cancer_path.is_file() and cancer_path.suffix == file_extension:
-                    logging.info(f"Loading file in chunks: {cancer_path}")
-                    sep = "," if file_extension == ".csv" else "\t"
-                    for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
-                        yield chunk
-    elif path.is_file():
-        logging.info(f"Loading single file in chunks: {path}")
-        for chunk in pd.read_csv(path, chunksize=chunk_size):
-            yield chunk
-    else:
-        raise ValueError(f"Provided path is neither a file nor a directory: {path}")
+    for chunk in pd.read_csv(path, chunksize=chunk_size, sep='\t'):
+        yield chunk
 
 
 def process_and_store_in_chunks(dataset_name, loader, f, chunk_size=100000):
@@ -160,7 +142,7 @@ if __name__ == "__main__":
         "results", "embeddings", "annotations", cancers, "embeddings.csv"
     )
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_folder = Path("results", "embeddings", "images")
+    image_embedding_file = Path("results", "embeddings", "images", "combined_embeddings.tsv")
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
@@ -177,8 +159,7 @@ if __name__ == "__main__":
             mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f, chunk_size=chunk_size)
 
             # Process Image embeddings
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size,
-                                                          file_extension=".tsv")
+            image_loader = chunked_image_dataframe_loader(image_embedding_file, chunk_size=chunk_size)
             image_indices = process_and_store_in_chunks("images", image_loader, f, chunk_size=chunk_size)
 
             # Store indices
