@@ -142,7 +142,7 @@ if __name__ == "__main__":
         "results", "embeddings", "annotations", cancers, "embeddings.csv"
     )
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_file = Path("results", "embeddings", "images", "combined_embeddings.tsv")
+    image_embedding_file = Path("results", "embeddings", "images", "combined_image_embeddings.tsv")
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:

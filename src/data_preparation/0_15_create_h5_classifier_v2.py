@@ -111,7 +111,7 @@ if __name__ == "__main__":
     rna_load_folder = Path("results", "embeddings", "rna", cancers)
     annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_file = Path("results", "embeddings", "images", "combined_embeddings.tsv")
+    image_embedding_file = Path("results", "embeddings", "images", "combined_image_embeddings.tsv")
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}_classifier.h5"), "w") as f:
