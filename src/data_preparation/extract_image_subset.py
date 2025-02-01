@@ -12,11 +12,14 @@ submitter_id_counts = {}
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--count", "-c", help="The total count of embeddings per patient." , type=int, default=20)
+    parser.add_argument("--count", "-c", help="The total count of embeddings per patient.", type=int, default=20)
     args = parser.parse_args()
 
     embedding_count: int = args.count
 
+    file_name: str = f"combined_image_embeddings_{embedding_count}.tsv"
+    logging.info(f"Combining embeddings with a total count of {embedding_count} per patient...")
+    logging.info(f"File name: {file_name}")
 
     for file_path in Path("results", "embeddings", "images").iterdir():
         if file_path.is_file():
@@ -58,12 +61,12 @@ if __name__ == '__main__':
     # remove TCGA- from the cancer type
     final_df["cancer_type"] = final_df["cancer_type"].str.replace("TCGA-", "")
     try:
-        final_df.to_csv(Path("results", "embeddings", "images", f"combined_image_embeddings_{embedding_count}.tsv"), sep='\t', index=False)
+        final_df.to_csv(Path("results", "embeddings", "images", file_name), sep='\t', index=False)
     except PermissionError as e:
         logging.error(f"Error saving combined embeddings: {e}")
         logging.info("Saving combined embeddings to 'combined_embeddings.csv' instead...")
-        final_df.to_csv(Path("results", "embeddings", f"combined_image_embeddings_{embedding_count}.tsv"), sep='\t', index=False)
+        final_df.to_csv(Path("results", "embeddings", file_name), sep='\t', index=False)
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         logging.info("Saving combined embeddings to 'combined_embeddings.csv' instead...")
-        final_df.to_csv(Path("results", "embeddings", f"combined_image_embeddings_{embedding_count}.tsv"), sep='\t', index=False)
+        final_df.to_csv(Path("results", "embeddings", file_name), sep='\t', index=False)
