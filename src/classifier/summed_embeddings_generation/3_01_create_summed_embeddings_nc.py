@@ -110,7 +110,7 @@ def main():
     walk_distance: int = args.walk_distance
     walk_amount: int = args.amount_of_walks
 
-    if len(selected_cancers) == 1 and " " in selected_cancers[0]:
+    if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string with spaces. Splitting into list...")
         selected_cancers = selected_cancers[0].split()
 
