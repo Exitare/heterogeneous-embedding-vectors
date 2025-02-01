@@ -78,11 +78,6 @@ def create_tf_dataset_specific_indices(h5_file_path, indices, batch_size, label_
 
 def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_folder: Path, iteration: int,
                              walk_distance: int, amount_of_walks: int, label_encoder):
-    import pickle
-    # Load the saved weights and biases
-    with open('weights_and_biases.pkl', 'rb') as f:
-        loaded_weights_and_biases = pickle.load(f)
-
     input_layer = tf.keras.layers.Input(shape=(train_ds.element_spec[0].shape[1],))
 
     x = BatchNormalization()(input_layer)
@@ -216,8 +211,7 @@ if __name__ == "__main__":
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--iteration", "-i", type=int, required=True, help="The iteration number.")
     parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
-                        choices=[3, 4, 5, 6],
-                        default=3)
+                        choices=[3, 4, 5, 6],  default=3)
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
                         choices=[3, 4, 5, 6], default=3)
     args = parser.parse_args()
@@ -246,6 +240,7 @@ if __name__ == "__main__":
 
     logging.info(f"Loading data from: {h5_file_path}")
     logging.info(f"Saving results to: {iteration_save_folder}")
+    logging.info(f"Cancer save folder: {cancer_save_folder}")
 
     train_ratio = 0.7
     val_ratio = 0.05
