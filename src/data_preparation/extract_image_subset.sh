@@ -12,4 +12,15 @@
 #SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-python3 src/data_preparation/extract_image_subset.py -c BRCA LUAD STAD BLCA COAD THCA
+embedding_count=$1
+
+# if embedding count is empty default to 20
+if [ -z "$embedding_count" ]
+then
+    echo "embedding count is empty, defaulting to 20"
+    embedding_count=20
+fi
+
+echo "embedding count: $embedding_count"
+
+python3 src/data_preparation/extract_image_subset.py -ec $embedding_count

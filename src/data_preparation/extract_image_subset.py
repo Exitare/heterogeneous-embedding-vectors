@@ -12,10 +12,10 @@ submitter_id_counts = {}
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--count", "-c", help="The total count of embeddings per patient.", type=int, default=20)
+    parser.add_argument("--embedding_count", "-ec", help="The total count of embeddings per patient.", type=int, default=20)
     args = parser.parse_args()
 
-    embedding_count: int = args.count
+    embedding_count: int = args.embedding_count
 
     file_name: str = f"combined_image_embeddings_{embedding_count}.tsv"
     logging.info(f"Combining embeddings with a total count of {embedding_count} per patient...")
