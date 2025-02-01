@@ -5,7 +5,7 @@
 #SBATCH --partition=batch
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
-#SBATCH --mem=128000
+#SBATCH --mem=512000
 #SBATCH --cpus-per-task=2
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
@@ -17,4 +17,4 @@ selected_cancers=$2
 amount_of_summed_embeddings=$3
 noise_ratio=$4
 
-python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings.py  -a "${amount_of_summed_embeddings}" -w "${walk_distance}" -c ${selected_cancers} -n "${noise_ratio}"
+python3 src/recognizer/summed_embeddings_generation/1_02_create_multi_cancer_sum_embeddings_nc.py  -a "${amount_of_summed_embeddings}" -w "${walk_distance}" -c ${selected_cancers} -n "${noise_ratio}"

@@ -12,7 +12,7 @@ if [ -z "$selected_cancers" ]; then
   exit 1
 fi
 
-# if lower bound not set, set to 2
+# if lower bound not set, set to 3
 if [ -z "$lower_bound" ]
 then
   echo "Lower bound not set, setting to 3"
@@ -32,6 +32,8 @@ then
   echo "Amount of summed embeddings not set, setting to 1000000"
   amount_of_summed_embeddings=1000000
 fi
+
+echo $selected_cancers
 
 # iterate through lower_bound to upper_bound
 for walk_distance in $(seq $lower_bound $upper_bound)
