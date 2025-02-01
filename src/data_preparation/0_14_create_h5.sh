@@ -13,4 +13,4 @@
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
 
-python3 src/data_preparation/0_14_create_h5.py -c BRCA LUAD STAD BLCA COAD THCA
+python3 src/data_preparation/0_14_create_h5_v2.py -c BRCA LUAD STAD BLCA COAD THCA
