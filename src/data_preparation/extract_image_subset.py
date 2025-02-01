@@ -27,7 +27,7 @@ if __name__ == '__main__':
                 # Track global counts
                 df["current_count"] = df["submitter_id"].map(lambda x: submitter_id_counts.get(x, 0))
                 df["cumsum"] = df.groupby("submitter_id").cumcount() + 1  # Row index within each submitter_id
-                df = df[df["current_count"] + df["cumsum"] <= 300]  # Only keep rows where total count ≤ 300
+                df = df[df["current_count"] + df["cumsum"] <= 20]  # Only keep rows where total count ≤ 20
 
                 # Update global submitter_id counts
                 new_counts = df["submitter_id"].value_counts().to_dict()
