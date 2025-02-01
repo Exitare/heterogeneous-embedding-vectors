@@ -104,14 +104,28 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--image_embedding_count", "-ec", type=int,
+                        help="The total count of image embeddings per patient.", default=-1)
     args = parser.parse_args()
     selected_cancers = args.cancers
+
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     cancers = "_".join(selected_cancers)
+    image_embedding_counts: int = args.image_embedding_count
+
+    image_file_name: str = f"combined_image_embeddings_{image_embedding_counts}.tsv" if image_embedding_counts != -1 else "combined_image_embeddings.tsv"
+
+    logging.info(f"Selected cancers: {selected_cancers}")
+    logging.info(f"Image embedding count: {image_embedding_counts}")
+    logging.info(f"Image file name: {image_file_name}")
 
     rna_load_folder = Path("results", "embeddings", "rna", cancers)
     annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_file = Path("results", "embeddings", "combined_image_embeddings.tsv")
+    image_embedding_file = Path("results", "embeddings", image_file_name)
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}_classifier.h5"), "w") as f:

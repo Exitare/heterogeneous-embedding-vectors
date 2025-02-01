@@ -12,4 +12,15 @@
 #SBATCH --mail-type=FAIL,BEGIN,END
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-python3 src/data_preparation/0_14_create_h5_classifier_v2.py -c BRCA LUAD STAD BLCA COAD THCA
+image_embedding_count=$1
+
+# if image embedding count is empty default to -1
+if [ -z "$image_embedding_count" ]
+then
+    echo "image embedding count is empty, defaulting to -1"
+    image_embedding_count=-1
+fi
+
+echo "image embedding count: $image_embedding_count"
+
+python3 src/data_preparation/0_15_create_h5_classifier_v2.py -c BRCA LUAD STAD BLCA COAD THCA -ec $image_embedding_count
