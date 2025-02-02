@@ -2,6 +2,9 @@ import pandas as pd
 import os, argparse
 from pathlib import Path
 from argparse import ArgumentParser
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 save_folder = Path("results", "recognizer", "aggregated_metrics")
 
@@ -13,7 +16,7 @@ if __name__ == '__main__':
 
     data_folder: Path = args.data_folder
 
-    print(f"Using data folder: {data_folder}")
+    logging.info(f"Using data folder: {data_folder}")
 
     # assert last path element must be a number
     assert data_folder.parts[-1].isdigit(), "Last path element must be a number"
@@ -21,7 +24,7 @@ if __name__ == '__main__':
     # extract last two pieces of data_folder
     appendix = Path(*data_folder.parts[-2:])
     save_folder = Path(save_folder, appendix)
-    print(f"Using save folder: {save_folder}")
+    logging.info(f"Using save folder: {save_folder}")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
@@ -31,12 +34,12 @@ if __name__ == '__main__':
     for root, dirs, files in os.walk(data_folder):
         for file in files:
             if file == "metrics.csv":
-                print("Processing", Path(root, file))
+                logging.info("Processing", Path(root, file))
                 metrics = pd.read_csv(Path(root, file))
                 results.append(metrics)
 
             if file == 'split_metrics.csv':
-                print("Processing", Path(root, file))
+                logging.info("Processing", Path(root, file))
                 split_metrics.append(pd.read_csv(Path(root, file)))
 
     # concatenate all metrics

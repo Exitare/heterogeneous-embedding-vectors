@@ -127,12 +127,14 @@ def main():
     selected_cancers: [] = args.selected_cancers
 
     if selected_cancers is not None:
+        logging.info("Merging multi-cancer embeddings.")
         cancers = "_".join(selected_cancers)
         input_dir = Path("results", "recognizer", "summed_embeddings", "multi", cancers,
                          str(amount_of_summed_embeddings),
                          str(noise_ratio))
         walk_counts = range(3, 16)
     else:
+        logging.info("Merging single-cancer embeddings.")
         input_dir = Path("results", "recognizer", "summed_embeddings", "simple", str(amount_of_summed_embeddings),
                          str(noise_ratio))
         walk_counts = range(3, 31)

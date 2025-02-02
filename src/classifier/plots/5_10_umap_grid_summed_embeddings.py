@@ -1,11 +1,13 @@
 import pandas as pd
 import h5py
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 from argparse import ArgumentParser
 import umap
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_folder = Path("results", "classifier", "summed_embeddings")
 fig_save_folder = Path("figures", "classifier")
@@ -21,7 +23,7 @@ if __name__ == '__main__':
     min_distance = distances[0]
     max_distance = distances[1]
 
-    print(f"Using min_distance: {min_distance} and max_distance: {max_distance}")
+    logging.info(f"Using min_distance: {min_distance} and max_distance: {max_distance}")
 
     walk_distances: [int] = range(min_distance, max_distance + 1)
     amount_of_walks: [int] = range(min_distance, max_distance + 1)
@@ -41,7 +43,7 @@ if __name__ == '__main__':
 
     # Loop over each combination of walk distance and amount of walks
     plot_idx = 0
-    print("Creating figure...")
+    logging.info("Creating figure...")
     for walk_distance in walk_distances:
         for amount_of_walk in amount_of_walks:
             subfolder = Path(load_folder, f"{walk_distance}_{amount_of_walk}")
@@ -53,7 +55,7 @@ if __name__ == '__main__':
 
             # Check if data is empty
             if data.size == 0 or cancer_types.size == 0:
-                print(f"No data in {h5_file_path}. Skipping.")
+                logging.warning(f"No data in {h5_file_path}. Skipping.")
                 continue
 
             # Apply UMAP to reduce dimensions to 2D for visualization

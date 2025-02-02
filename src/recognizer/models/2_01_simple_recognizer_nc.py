@@ -1,3 +1,4 @@
+import logging
 import tensorflow as tf
 import pandas as pd
 from pathlib import Path
@@ -14,6 +15,8 @@ import h5py
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "simple")
 load_path = Path("results", "recognizer", "summed_embeddings", "simple")
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def build_model(input_dim):
@@ -144,17 +147,18 @@ if __name__ == '__main__':
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
 
-    print(f"Total walk distance: {walk_distance}")
-    print(f"Batch size: {batch_size}")
-    print(f"Run iteration: {run_iteration}")
-    print(f"Summed embedding count: {amount_of_summed_embeddings}")
-    print(f"Noise ratio: {noise_ratio}")
+    logging.info("Running file simple_recognizer_nc")
+    logging.info(f"Total walk distance: {walk_distance}")
+    logging.info(f"Batch size: {batch_size}")
+    logging.info(f"Run iteration: {run_iteration}")
+    logging.info(f"Summed embedding count: {amount_of_summed_embeddings}")
+    logging.info(f"Noise ratio: {noise_ratio}")
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
         if noise_ratio == 0.0:
             train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings.h5")
-            print(f"Loading data from {train_file}...")
+            logging.info(f"Loading data from {train_file}...")
         else:
             train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"combined_embeddings.h5")
             test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings.h5")
@@ -164,7 +168,7 @@ if __name__ == '__main__':
         if noise_ratio == 0.0:
             train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
                          f"{walk_distance}_embeddings.h5")
-            print(f"Loading data from {train_file}...")
+            logging.info(f"Loading data from {train_file}...")
         else:
             # Load the test file, which is noisy
             test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
@@ -172,13 +176,13 @@ if __name__ == '__main__':
             # Load the train file, which is not noisy
             train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"{walk_distance}_embeddings.h5")
 
-            print(f"Loading data from {train_file} and {test_file}...")
+            logging.info(f"Loading data from {train_file} and {test_file}...")
 
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings",
                          run_name)
 
 
-    print(f"Saving results to {save_path}")
+    logging.info(f"Saving results to {save_path}")
 
     if not save_path.exists():
         save_path.mkdir(parents=True)
@@ -189,14 +193,14 @@ if __name__ == '__main__':
             num_samples = f["X"].shape[0]
             label_keys = embeddings
 
-    print(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
+    logging.info(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
 
     if walk_distance != -1:
         max_embedding = walk_distance
     else:
         with h5py.File(train_file, "r") as f:
             max_embedding = f["meta_information"].attrs["max_embedding"]
-            print(f"Max embedding: {max_embedding}")
+            logging.info(f"Max embedding: {max_embedding}")
 
     # Calculate train-test split indices
     if noise_ratio != 0.0:
@@ -208,7 +212,7 @@ if __name__ == '__main__':
         train_end = int(0.8 * num_samples)
         test_start = train_end
 
-    print("Building model....")
+    logging.info("Building model....")
     model = build_model(input_dim)
     model.compile(optimizer='adam',
                   loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse', 'output_mutation': 'mse'},
@@ -235,7 +239,7 @@ if __name__ == '__main__':
         train_steps = max(1, num_samples // batch_size) # Ensure at least 1 step
         test_steps = max(1, num_samples // batch_size)  # Ensure at least 1 step
 
-    print(f"Training on {train_steps} steps and testing on {test_steps} steps.")
+    logging.info(f"Training on {train_steps} steps and testing on {test_steps} steps.")
 
     # Train the model
     early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
@@ -284,5 +288,5 @@ if __name__ == '__main__':
     # Save metrics
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-    print("Metrics saved.")
-    print("Done.")
+    logging.info("Metrics saved.")
+    logging.info("Done.")

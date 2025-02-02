@@ -1,5 +1,5 @@
 #!/bin/bash
-#./src/classifier/4_01_schedule_cancer_classifier.sh "BRCA BLCA LUAD STAD THCA COAD"
+#./src/classifier/models/4_01_schedule_cancer_classifier.sh "BRCA LUAD STAD BLCA COAD THCA"
 cancers=$1
 walk_distance=$2
 walk_amount=$3
@@ -26,5 +26,5 @@ fi
 for i in {1..30}
 do
   # call script
-  sbatch src/classifier/4_01_cancer_classifier.sh ${cancers} -i ${i} -w ${walk_distance} -a ${walk_amount}
+  src/classifier/models/4_01_cancer_classifier.sh "${cancers}" ${walk_distance} ${walk_amount} ${i}
 done

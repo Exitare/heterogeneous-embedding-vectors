@@ -8,6 +8,6 @@ for walk_distance in "${walk_distance[@]}"
 do
   for amount in "${amount_of_walks[@]}"
   do
-    python ./src/classifier/3_01_create_summed_embeddings_nc.py -c ${selected_cancers} -w $walk_distance -a $amount_of_walks
+    sbatch python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings_nc.py -c ${selected_cancers} -w $walk_distance -a $amount_of_walks
   done
 done

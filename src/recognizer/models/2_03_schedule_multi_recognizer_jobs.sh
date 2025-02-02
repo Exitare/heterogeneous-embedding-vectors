@@ -1,4 +1,4 @@
-# ./src/recognizer/2_03_schedule_multi_recognizer_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
+# ./src/recognizer/models/2_03_schedule_multi_recognizer_jobs.sh "BRCA LUAD STAD BLCA COAD THCA"
 cancer_types=$1
 amount_of_summed_embeddings=$2
 upper_walk_distance=$3
@@ -29,6 +29,6 @@ do
   # run it 30 times
   for iteration in $(seq 1 30)
   do
-    sbatch ./src/recognizer/models/2_03_run_multi_recognizer.sh $walk_distance $iteration "${cancer_types}" $amount_of_summed_embeddings
+      sbatch ./src/recognizer/models/2_03_run_multi_recognizer.sh $walk_distance $iteration "${cancer_types}" $amount_of_summed_embeddings
   done
 done

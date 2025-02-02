@@ -38,5 +38,10 @@ if [ -z "$walk_amount" ]; then
   echo "walk_amount is empty, setting to 3"
 fi
 
+echo "cancers: $cancers"
+echo "walk_distance: $walk_distance"
+echo "walk_amount: $walk_amount"
+echo "iteration: $iteration"
+
 # call script
-python src/classifier/4_01_cancer_classifier.py -c ${cancers} -i ${iteration} -w ${walk_distance} -a ${walk_amount}
+python ./src/classifier/models/4_01_cancer_classifier_nc.py -c ${cancers} -i ${iteration} -w ${walk_distance} -a ${walk_amount}

@@ -248,7 +248,7 @@ if __name__ == '__main__':
     noise_ratio: float = args.noise_ratio
     cancers = "_".join(selected_cancers)
 
-    logging.info("Selected cancers: ", selected_cancers)
+    logging.info(f"Selected cancers: {selected_cancers}")
     logging.info(f"Total walk distance: {walk_distance}")
     logging.info(f"Batch size: {batch_size}")
     logging.info(f"Run iteration: {run_iteration}")

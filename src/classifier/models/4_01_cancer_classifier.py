@@ -225,8 +225,13 @@ if __name__ == "__main__":
     walk_distance = args.walk_distance
     walk_amount = args.amount_of_walks
     iteration = args.iteration
+    selected_cancers = args.cancer
 
-    cancers = "_".join(args.cancer)
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string with spaces. Splitting into list...")
+        selected_cancers = selected_cancers[0].split()
+
+    cancers = "_".join(selected_cancers)
     logging.info(f"Selected cancers: {cancers}")
     logging.info(f"Walk distance: {walk_distance}, Amount of walks: {walk_amount}")
 

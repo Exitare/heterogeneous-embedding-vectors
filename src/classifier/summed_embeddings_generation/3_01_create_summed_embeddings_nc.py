@@ -110,9 +110,12 @@ def main():
     walk_distance: int = args.walk_distance
     walk_amount: int = args.amount_of_walks
 
+
+
     if len(selected_cancers) == 1:
-        logging.info("Selected cancers is a single string with spaces. Splitting into list...")
-        selected_cancers = selected_cancers[0].split()
+        logging.info(f"Selected cancers {selected_cancers} is a single string with spaces. Splitting into list...")
+        selected_cancers = selected_cancers[0].split(" ")
+
 
     cancers: str = "_".join(selected_cancers)
     load_path: Path = Path(args.load_path)

@@ -5,7 +5,7 @@
 #SBATCH --partition=batch
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
-#SBATCH --mem=128000
+#SBATCH --mem=256000
 #SBATCH --cpus-per-task=4
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
@@ -18,4 +18,4 @@ amount_of_summed_embeddings=$3
 noise_ratio=$4
 
 
-python3 src/recognizer/models/2_01_simple_recognizer.py -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
+python3 src/recognizer/models/2_01_simple_recognizer_nc.py -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"

@@ -6,7 +6,7 @@ joined_cancers = '_'.join(config['cancers'])
 requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
 requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
 distance_metrics = config['distance_metrics']
-max_iterations = range(0,config['run_iterations'])
+max_iterations = range(1,config['run_iterations'])
 
 rule all:
     input:
@@ -117,7 +117,7 @@ rule generate_combined_umap_embeddings:
         cancers=all_cancers
         amount_of_walks=config['classifier_max_walk_amounts']
         walk_distances=config['classifier_max_walk_distance']
-        shell(f"python ./src/classifier/plots/5_10_umap_grid_summed_embeddings.py -c {{cancers}} -a {{amount_of_walks}} -w {{walk_distances}}")
+        shell(f"python ./src/classifier/plots/5_10_umap_grid_summed_embeddings.py -c {{cancers}} -d 3 {config['classifier_max_walk_amounts']}")
 
 
 rule generate_generic_polar_plots:
