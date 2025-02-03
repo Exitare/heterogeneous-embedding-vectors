@@ -304,6 +304,10 @@ if __name__ == "__main__":
         h5_file_path, split_indices['test'], batch_size, label_encoder
     ).prefetch(tf.data.AUTOTUNE)
 
+    assert set(np.unique(y[split_indices["train"]])) == set(np.unique(y)), "Missing classes in training set!"
+    assert set(np.unique(y[split_indices["val"]])) == set(np.unique(y)), "Missing classes in validation set!"
+    assert set(np.unique(y[split_indices["test"]])) == set(np.unique(y)), "Missing classes in test set!"
+
     # Train and evaluate model
     train_and_evaluate_model(
         train_ds=train_ds,
