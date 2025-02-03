@@ -4,18 +4,18 @@ upper_bound=$1
 amount_of_summed_embeddings=$2
 
 
-# if upper bound not set, set to 30
+# if upper bound not set, set to 15
 if [ -z "$upper_bound" ]
 then
-  echo "Upper bound not set, setting to 30"
-  upper_bound=30
+  echo "Upper bound not set, setting to 15"
+  upper_bound=15
 fi
 
-# if summed embeddings count not set, set to 1000000
+# if summed embeddings count not set, set to 100000
 if [ -z "$amount_of_summed_embeddings" ]
 then
-  echo "Amount of summed embeddings count not set, setting to 1000000"
-  amount_of_summed_embeddings=1000000
+  echo "Amount of summed embeddings count not set, set to 100000"
+  amount_of_summed_embeddings=100000
   exit 1
 fi
 

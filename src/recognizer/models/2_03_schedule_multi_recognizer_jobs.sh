@@ -17,11 +17,11 @@ then
   upper_walk_distance=10
 fi
 
-# if no summed embeddings count is provided, set to 1000000
+# if no summed embeddings count is provided, set to 100000
 if [ -z "$amount_of_summed_embeddings" ]
 then
-  echo "Amount of summed embeddings not set, setting to 1000000"
-  amount_of_summed_embeddings=1000000
+  echo "Amount of summed embeddings not set, setting to 100000"
+  amount_of_summed_embeddings=100000
 fi
 
 for walk_distance in $(seq 3 $upper_walk_distance)

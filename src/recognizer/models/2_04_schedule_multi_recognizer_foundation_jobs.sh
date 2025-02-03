@@ -12,11 +12,11 @@ then
   upper_bound=10
 fi
 
-# if summed embeddings count not set, exit
+# if summed embeddings count not set, set to 100000
 if [ -z "$amount_of_summed_embeddings" ]
 then
-  echo "Amount of summed embeddings count not set, setting to 1000000."
-  amount_of_summed_embeddings=1000000
+  echo "Amount of summed embeddings count not set, setting to 100000."
+  amount_of_summed_embeddings=100000
 fi
 
 # run it 30 times
