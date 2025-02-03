@@ -1,5 +1,5 @@
 import pandas as pd
-import os, argparse
+import os
 from pathlib import Path
 from argparse import ArgumentParser
 import logging
@@ -16,14 +16,13 @@ if __name__ == '__main__':
 
     data_folder: Path = args.data_folder
 
-    logging.info(f"Using data folder: {data_folder}")
-
     # assert last path element must be a number
     assert data_folder.parts[-1].isdigit(), "Last path element must be a number"
 
     # extract last two pieces of data_folder
     appendix = Path(*data_folder.parts[-2:])
     save_folder = Path(save_folder, appendix)
+    logging.info(f"Using data folder: {data_folder}")
     logging.info(f"Using save folder: {save_folder}")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
