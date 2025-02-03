@@ -5,7 +5,7 @@
 #SBATCH --partition=batch
 #SBATCH --qos=long_jobs
 #SBATCH --ntasks=1
-#SBATCH --mem=256000
+#SBATCH --mem=128000
 #SBATCH --cpus-per-task=4
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
