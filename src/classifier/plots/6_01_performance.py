@@ -3,10 +3,10 @@ import pandas as pd
 import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
-from click import style
+import logging
 
 save_folder = Path("figures", "classifier")
-
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def create_grid_plot(df: pd.DataFrame, metric: str):
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
@@ -40,28 +40,80 @@ def create_hue_performance_plot(df: pd.DataFrame, metric: str):
 
 
 def create_performance_overview_plot(df: pd.DataFrame):
-    df = df[df["cancer"] == "All"].copy()
+    sub_df = df[df["cancer"] == "All"].copy()
+
     # df melt
-    df = df.melt(id_vars=["cancer"], value_vars=["precision", "recall", "auc"], var_name="metric", value_name="score")
+    sub_df = sub_df.melt(id_vars=["cancer"], value_vars=["precision", "recall", "auc"], var_name="metric", value_name="score")
+    # rename precision to Precision, recall to Recall and auc to AUC
+    sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(data=df, x="cancer", y="score", hue="metric", ax=ax)
+    sns.barplot(data=sub_df, x="cancer", y="score", hue="metric", ax=ax)
     ax.set_title(f"Overview scores")
     ax.set_ylabel(f"Overview scores")
 
     ax.set_xlabel("")
-    plt.legend(title="Metrics", loc='upper left')
+    plt.legend(title="Metrics", loc='upper left')  #
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"overview_scores.png"), dpi=300)
     plt.close('all')
 
 
+def create_performance_overview_plot_per_combination(df: pd.DataFrame):
+    sub_df = df[df["cancer"] == "All"].copy()
+    # df melt
+    sub_df = sub_df.melt(id_vars=["walks"], value_vars=["precision", "recall", "auc"], var_name="metric", value_name="score")
+    # rename precision to Precision, recall to Recall and auc to AUC
+    sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.lineplot(data=sub_df, x="walks", y="score", hue="metric", ax=ax)
+    ax.set_title(f"Overview scores")
+    ax.set_ylabel(f"Overview scores")
+
+    ax.set_xlabel("")
+    plt.legend(title="Metrics", loc='upper left')  #
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"overview_scores_by_walks.png"), dpi=300)
+    plt.close('all')
+
+def create_performance_overview_heatmap(df: pd.DataFrame):
+    # Filter for "All" cancer type
+    sub_df = df[df["cancer"] == "All"].copy()
+
+    # Melt the DataFrame to convert metrics into a single column
+    sub_df = sub_df.melt(id_vars=["walk_distance", "amount_of_walks"],
+                          value_vars=["precision", "recall", "auc"],
+                          var_name="metric", value_name="score")
+
+    # Rename metrics for better readability
+    sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
+
+    # Create a heatmap for each metric
+    for metric in ["Precision", "Recall", "AUC"]:
+        metric_data = sub_df[sub_df["metric"] == metric].pivot_table(
+            index="walk_distance", columns="amount_of_walks", values="score", aggfunc="mean"
+        )
+
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5)
+        plt.title(f"{metric} Scores Heatmap")
+        plt.xlabel("Amount of Walks")
+        plt.ylabel("Walk Distance")
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.savefig(Path(save_folder, f"overview_scores_heatmap_{metric}.png"), dpi=300, bbox_inches="tight")
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     args = parser.parse_args()
 
     selected_cancers = args.cancer
+
+    logging.info(f"Using cancer types: {selected_cancers}")
+
     cancers = "_".join(selected_cancers)
 
     save_folder = Path(save_folder, cancers, "performance")
@@ -81,7 +133,7 @@ if __name__ == '__main__':
             if iteration.is_file():
                 continue
 
-            print(iteration)
+            logging.info(iteration)
             try:
                 df = pd.read_csv(Path(iteration, "results.csv"))
                 # load the results from the run
@@ -93,11 +145,12 @@ if __name__ == '__main__':
     results = pd.concat(results)
     # create new column walks by combining walk distance and amount_of_walk using an underscore
     results["walks"] = results["walk_distance"].astype(str) + "_" + results["amount_of_walks"].astype(str)
-    print(results)
 
     create_hue_performance_plot(results, "accuracy")
     create_hue_performance_plot(results, "f1")
     create_performance_overview_plot(results)
+    create_performance_overview_plot_per_combination(results)
+    create_performance_overview_heatmap(results)
 
     create_grid_plot(results, "accuracy")
     create_grid_plot(results, "f1")
