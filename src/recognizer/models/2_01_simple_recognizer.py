@@ -243,7 +243,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=1,
+                        epochs=100,
                         callbacks=[early_stopping])
 
     # save history
@@ -274,7 +274,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=1,
+                        epochs=100,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
