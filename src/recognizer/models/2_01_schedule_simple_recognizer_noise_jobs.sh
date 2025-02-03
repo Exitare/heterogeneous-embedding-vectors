@@ -16,7 +16,6 @@ if [ -z "$amount_of_summed_embeddings" ]
 then
   echo "Amount of summed embeddings count not set, set to 100000"
   amount_of_summed_embeddings=100000
-  exit 1
 fi
 
 
