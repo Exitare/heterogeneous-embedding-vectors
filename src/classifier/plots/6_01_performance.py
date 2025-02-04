@@ -8,6 +8,7 @@ import logging
 save_folder = Path("figures", "classifier")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def create_grid_plot(df: pd.DataFrame, metric: str):
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -43,7 +44,8 @@ def create_performance_overview_plot(df: pd.DataFrame):
     sub_df = df[df["cancer"] == "All"].copy()
 
     # df melt
-    sub_df = sub_df.melt(id_vars=["cancer"], value_vars=["precision", "recall", "auc"], var_name="metric", value_name="score")
+    sub_df = sub_df.melt(id_vars=["cancer"], value_vars=["precision", "recall", "auc"], var_name="metric",
+                         value_name="score")
     # rename precision to Precision, recall to Recall and auc to AUC
     sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -61,7 +63,8 @@ def create_performance_overview_plot(df: pd.DataFrame):
 def create_performance_overview_plot_per_combination(df: pd.DataFrame):
     sub_df = df[df["cancer"] == "All"].copy()
     # df melt
-    sub_df = sub_df.melt(id_vars=["walks"], value_vars=["precision", "recall", "auc"], var_name="metric", value_name="score")
+    sub_df = sub_df.melt(id_vars=["walks"], value_vars=["precision", "recall", "auc"], var_name="metric",
+                         value_name="score")
     # rename precision to Precision, recall to Recall and auc to AUC
     sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
 
@@ -76,20 +79,22 @@ def create_performance_overview_plot_per_combination(df: pd.DataFrame):
     plt.savefig(Path(save_folder, f"overview_scores_by_walks.png"), dpi=300)
     plt.close('all')
 
+
 def create_performance_overview_heatmap(df: pd.DataFrame):
     # Filter for "All" cancer type
     sub_df = df[df["cancer"] == "All"].copy()
 
     # Melt the DataFrame to convert metrics into a single column
     sub_df = sub_df.melt(id_vars=["walk_distance", "amount_of_walks"],
-                          value_vars=["precision", "recall", "auc"],
-                          var_name="metric", value_name="score")
+                         value_vars=["precision", "recall", "auc", "accuracy", "f1"],
+                         var_name="metric", value_name="score")
 
     # Rename metrics for better readability
-    sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
+    sub_df["metric"] = sub_df["metric"].replace(
+        {"precision": "Precision", "recall": "Recall", "auc": "AUC", "accuracy": "Accuracy", "f1": "F1 Score"})
 
     # Create a heatmap for each metric
-    for metric in ["Precision", "Recall", "AUC"]:
+    for metric in ["Precision", "Recall", "AUC", "Accuracy", "F1 Score"]:
         metric_data = sub_df[sub_df["metric"] == metric].pivot_table(
             index="walk_distance", columns="amount_of_walks", values="score", aggfunc="mean"
         )
@@ -102,6 +107,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig(Path(save_folder, f"overview_scores_heatmap_{metric}.png"), dpi=300, bbox_inches="tight")
+
 
 if __name__ == '__main__':
 
