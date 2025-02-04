@@ -68,28 +68,48 @@ def create_train_val_indices(hdf5_file_path, walk_distance: int, test_size=0.2, 
         indices, test_size=test_size, random_state=random_state, stratify=walk_distances
     )
 
-def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
-    with h5py.File(hdf5_file_path, 'r') as f:
-        X = f["X"][:]
-        walk_distances = f["WalkDistances"][:] if walk_distance == -1 else None
-        label_keys = [key for key in f.keys() if key not in ["X", "meta_information", "WalkDistances"]]
-        labels = {key: f[key][:] for key in label_keys}
 
-    while True:
-        np.random.shuffle(indices)
-        for start_idx in range(0, len(indices), batch_size):
-            end_idx = min(start_idx + batch_size, len(indices))
-            batch_indices = np.sort(indices[start_idx:end_idx])
+def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance, chunk_size=1000):
+    """
+    Efficient generator that loads only required data chunks from an HDF5 file instead of reading everything into memory.
+    Ensures that batches are always yielded correctly.
+    """
+    while True:  # Infinite loop to prevent premature termination
+        with h5py.File(hdf5_file_path, 'r') as f:
+            label_keys = [key for key in f.keys() if key not in ["X", "meta_information", "WalkDistances"]]
 
-            X_batch = X[batch_indices]
-            y_batch = {key: labels[key][batch_indices] for key in labels}
+            num_samples = len(indices)
+            np.random.shuffle(indices)  # Ensure randomness every epoch
 
-            if walk_distance == -1:
-                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
-                yield X_batch, y_batch, walk_distances[batch_indices]
-            else:
-                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
-                yield X_batch, y_batch
+            for chunk_start in range(0, num_samples, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, num_samples)
+                chunk_indices = np.sort(indices[chunk_start:chunk_end])  # Ensure sorted order
+
+                if len(chunk_indices) == 0:
+                    continue  # Skip empty chunks
+
+                X_chunk = f["X"][chunk_indices]  # Load chunk of X
+                y_chunk = {key: f[key][chunk_indices] for key in label_keys}  # Load chunk of labels
+
+                if walk_distance == -1:
+                    walk_distances_chunk = f["WalkDistances"][chunk_indices]
+
+                # Yield batches within this chunk
+                for batch_start in range(0, len(chunk_indices), batch_size):
+                    batch_end = min(batch_start + batch_size, len(chunk_indices))
+
+                    if batch_end <= batch_start:
+                        continue  # Skip invalid batch
+
+                    batch_indices = np.arange(batch_start, batch_end)  # Index within the chunk
+
+                    X_batch = X_chunk[batch_indices]  # Proper batch selection
+                    y_batch = {key: y_chunk[key][batch_indices] for key in label_keys}  # Labels
+
+                    if walk_distance == -1:
+                        yield X_batch, y_batch, walk_distances_chunk[batch_indices]
+                    else:
+                        yield X_batch, y_batch
 
 
 def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, walk_distance: int, noise: float):
@@ -193,6 +213,7 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
 
     return metrics_df
 
+
 def build_model(input_dim, cancer_list: []):
     """
     Build a multi-output model for embeddings.
@@ -228,7 +249,7 @@ def build_model(input_dim, cancer_list: []):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
+    parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--walk_distance', "-w", type=int, required=True,
                         help='The number of the walk distance to work with.', choices=list(range(3, 16)) + [-1])
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
@@ -313,19 +334,18 @@ if __name__ == '__main__':
             test_indices = np.arange(f['X'].shape[0])
 
     if noise_ratio == 0.0:
-        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
-        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
-        test_gen = hdf5_generator(train_file, batch_size, test_indices, walk_distance)
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance, chunk_size=5000)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance, chunk_size=5000)
+        test_gen = hdf5_generator(train_file, batch_size, test_indices, walk_distance, chunk_size=5000)
     else:
-        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
-        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
-        test_gen = hdf5_generator(test_file, batch_size, test_indices, walk_distance)
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance, chunk_size=5000)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance, chunk_size=5000)
+        test_gen = hdf5_generator(test_file, batch_size, test_indices, walk_distance, chunk_size=5000)
 
     with h5py.File(train_file, 'r') as f:
         input_dim = f['X'].shape[1]
 
     model = build_model(input_dim, selected_cancers)
-
 
     # Set up a list of metrics
     loss = {'Text': 'mae', 'Image': 'mae', 'RNA': 'mae', 'Mutation': 'mae'}
@@ -352,10 +372,13 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
 
+    train_steps = max(1, len(train_indices) // batch_size)
+    val_steps = max(1, len(val_indices) // batch_size)
+    test_steps = max(1, len(test_indices) // batch_size)
+
     # Initial Training
-    history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
-                        callbacks=[early_stopping])
+    history = model.fit(train_gen, steps_per_epoch=train_steps, validation_data=val_gen,
+                        validation_steps=val_steps, epochs=100, callbacks=[early_stopping])
 
     # Save training history
     pd.DataFrame(history.history).to_csv(Path(save_path, "initial_training_history.csv"), index=False)
@@ -380,21 +403,18 @@ if __name__ == '__main__':
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
     reduce_lr = ReduceLROnPlateau(monitor='val_Text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
-    model.compile(optimizer=optimizer,
-                  loss=loss,
-                  loss_weights=loss_weights,
-                  metrics=metrics)
-    history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
+    model.compile(optimizer=optimizer, loss=loss, loss_weights=loss_weights, metrics=metrics)
+    history = model.fit(train_gen, steps_per_epoch=train_steps, validation_data=val_gen,
+                        validation_steps=val_steps, epochs=100,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Save fine-tuning history
     pd.DataFrame(history.history).to_csv(Path(save_path, "fine_tuning_history.csv"), index=False)
 
     # Final Evaluation
-    metrics_df = evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
+    metrics_df = evaluate_model_in_batches(model, test_gen, test_steps, embeddings, save_path,
                                            walk_distance=walk_distance, noise=noise_ratio)
 
     # Calculate and save accuracy per embedding and walk distance
-    #accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
+    # accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
     logging.info("Fine-tuning and evaluation complete!")

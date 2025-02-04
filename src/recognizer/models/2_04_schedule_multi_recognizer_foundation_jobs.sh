@@ -1,8 +1,9 @@
 
 cancer_types=$1
+amount_of_summed_embeddings=$2
 # upper bound is the maximum walk distance
-upper_bound=$2
-amount_of_summed_embeddings=$3
+upper_bound=$3
+
 
 
 # if upper bound not set, set to 10

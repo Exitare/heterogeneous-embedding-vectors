@@ -12,10 +12,11 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=kirchgae@ohsu.edu
 
-walk_distance=$1
-run_iteration=$2
-amount_of_summed_embeddings=$3
-noise_ratio=$4
+cancer_types=$1
+walk_distance=$2
+run_iteration=$3
+amount_of_summed_embeddings=$4
+noise_ratio=$5
 
 
-python3 src/recognizer/models/2_01_simple_recognizer_nc.py -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
+python3 src/recognizer/models/2_01_simple_recognizer_nc.py  -c ${cancer_types}  -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
