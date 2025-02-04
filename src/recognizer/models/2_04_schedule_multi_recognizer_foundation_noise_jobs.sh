@@ -28,6 +28,9 @@ else
   echo "Running locally"
 fi
 
+echo "cancer types: $cancer_types"
+echo "Amount of summed embeddings: $amount_of_summed_embeddings"
+echo "Upper bound: $upper_bound"
 
 for noise in 0.1 0.2 0.3 0.4 0.5 0.6
 do
