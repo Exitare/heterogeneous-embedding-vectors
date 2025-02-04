@@ -22,5 +22,5 @@ fi
 # run it 30 times
 for iteration in $(seq 1 30)
 do
-    sbatch ./src/recognizer/models/2_03_run_multi_recognizer.sh -1 $iteration "${cancer_types}" $amount_of_summed_embeddings 0.0
+    ./src/recognizer/models/2_03_run_multi_recognizer.sh -1 $iteration "${cancer_types}" $amount_of_summed_embeddings 0.0
 done

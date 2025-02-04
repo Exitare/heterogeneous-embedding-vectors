@@ -96,6 +96,8 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
                 walk_dataset = f_out["WalkDistances"]
                 walk_dataset.resize(walk_dataset.shape[0] + num_rows, axis=0)
                 walk_dataset[-num_rows:] = walk_distance
+                if max_embedding < walk_distance:
+                    max_embedding = walk_distance
 
     with h5py.File(output_file, 'a') as f_out:
         # Add a metadata group with the maximum embedding value
@@ -110,6 +112,7 @@ def merge_h5_files(input_files, output_file, dataset_names, chunk_size=10000):
     logging.info(f"Total embeddings per dataset: {total_sizes}")
     logging.info(f"Output file size: {Path(output_file).stat().st_size / 1e6:.2f} MB")
     logging.info(f"Available Keys: {available_keys}")
+    logging.info(f"Max embedding: {max_embedding}")
     logging.info("Merge complete.")
 
 

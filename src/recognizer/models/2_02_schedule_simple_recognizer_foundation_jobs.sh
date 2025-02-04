@@ -21,5 +21,5 @@ fi
 # run it 30 times
 for iteration in $(seq 1 30)
 do
-   sbatch ./src/recognizer/models/2_01_run_simple_recognizer.sh -1 $iteration $amount_of_summed_embeddings 0.0
+  ./src/recognizer/models/2_01_run_simple_recognizer.sh -1 $iteration $amount_of_summed_embeddings 0.0
 done

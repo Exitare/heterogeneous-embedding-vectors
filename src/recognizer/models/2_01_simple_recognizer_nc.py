@@ -11,12 +11,62 @@ from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 import h5py
+from sklearn.model_selection import train_test_split
 
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "simple")
 load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+def create_indices(hdf5_file_path, walk_distance: int, test_size=0.2, random_state=42):
+    """
+    Create random train-test split indices with stratification based on class labels.
+    """
+    with h5py.File(hdf5_file_path, 'r') as hdf5_file:
+        num_samples = hdf5_file['X'].shape[0]
+        if walk_distance == -1:
+            walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
+
+    indices = np.arange(num_samples)
+
+    if walk_distance != -1:
+        train_indices, test_indices = train_test_split(indices, test_size=test_size, random_state=random_state)
+        train_indices, val_indices = train_test_split(train_indices, test_size=0.2, random_state=random_state)
+        return train_indices, val_indices, test_indices
+
+    # Stratify by walk distances
+    train_indices, test_indices = train_test_split(
+        indices, test_size=test_size, random_state=random_state, stratify=walk_distances
+    )
+
+    # Further split train into train and validation
+    train_indices, val_indices = train_test_split(
+        train_indices, test_size=0.2, random_state=random_state,
+        stratify=walk_distances[train_indices]
+    )
+
+    return train_indices, val_indices, test_indices
+
+
+def create_train_val_indices(hdf5_file_path, walk_distance: int, test_size=0.2, random_state=42):
+    """
+    Create random train-test split indices with stratification based on class labels.
+    """
+    with h5py.File(hdf5_file_path, 'r') as hdf5_file:
+        num_samples = hdf5_file['X'].shape[0]
+        if walk_distance == -1:
+            walk_distances = hdf5_file["WalkDistances"][:]  # Load walk distances for stratification
+
+    indices = np.arange(num_samples)
+    if walk_distance != -1:
+        return train_test_split(indices, test_size=test_size, random_state=random_state)
+
+        # Stratify by walk distances
+    return train_test_split(
+        indices, test_size=test_size, random_state=random_state, stratify=walk_distances
+    )
 
 
 def build_model(input_dim):
@@ -42,12 +92,12 @@ def build_model(input_dim):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_text')(text_x)
+    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Text')(text_x)
 
     # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_rna')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_mutation')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Image')(x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='RNA')(x)
+    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Mutation')(x)
 
     # Separate output layers for each count
     outputs = [text_output, image_output, rna_output, mutation_output]
@@ -57,75 +107,147 @@ def build_model(input_dim):
     return model
 
 
-def hdf5_generator(hdf5_file, batch_size, input_key="X", label_keys=None, start_idx=0, end_idx=None):
-    """
-    HDF5 generator that yields batches of data in TensorFlow-compatible format.
-    """
-    with h5py.File(hdf5_file, "r") as f:
-        num_samples = f[input_key].shape[0]
-        if end_idx is None:
-            end_idx = num_samples
-        while True:
-            indices = np.arange(start_idx, end_idx)
-            np.random.shuffle(indices)  # Shuffle the entire range of indices
-            for start in range(0, len(indices), batch_size):
-                batch_indices = indices[start:start + batch_size]
-                sorted_indices = np.sort(batch_indices)  # Ensure indices are in increasing order
-                X_batch = f[input_key][sorted_indices]
-                y_batch = [f[key][sorted_indices] for key in label_keys]
-                # Shuffle the data in memory to restore randomness
-                shuffle_order = np.random.permutation(len(X_batch))
-                X_batch = X_batch[shuffle_order]
-                y_batch = [y[shuffle_order] for y in y_batch]
-                yield X_batch, tuple(y_batch)  # Return labels as a tuple of arrays
+def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
+    with h5py.File(hdf5_file_path, 'r') as f:
+        X = f["X"][:]
+        walk_distances = f["WalkDistances"][:] if walk_distance == -1 else None
+        label_keys = [key for key in f.keys() if key not in ["X", "meta_information", "WalkDistances"]]
+        labels = {key: f[key][:] for key in label_keys}
+        labels = {key: labels[key] for key in embeddings}
+
+    while True:
+        np.random.shuffle(indices)
+        for start_idx in range(0, len(indices), batch_size):
+            end_idx = min(start_idx + batch_size, len(indices))
+            batch_indices = np.sort(indices[start_idx:end_idx])
+
+            X_batch = X[batch_indices]
+            y_batch = {key: labels[key][batch_indices] for key in labels}
+
+            if walk_distance == -1:
+                yield X_batch, y_batch, walk_distances[batch_indices]
+            else:
+                yield X_batch, y_batch
 
 
-def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, noise: float,
-                              walk_distance: int) -> []:
-    all_metrics = {embedding: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for embedding in embeddings}
-    all_predictions = {embedding: [] for embedding in embeddings}
-    all_ground_truth = {embedding: [] for embedding in embeddings}
+def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, noise: float, walk_distance: int):
+    """
+    Evaluate the model using a generator and save predictions, ground truth, and metrics.
+    If walk_distance == -1, tracks metrics per walk distance and generates two files:
+        - `metrics.csv` for aggregated results
+        - `split_metrics.csv` for detailed results per walk distance
+    """
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    all_metrics = {}
+    all_predictions = {}
+    all_ground_truth = {}
+    all_walk_distances_seen = set()  # Track all seen walk distances
 
     for _ in range(steps):
-        X_batch, y_batch = next(generator)
+        try:
+            if walk_distance == -1:
+                X_batch, y_batch, walk_distance_batch = next(generator)  # ✅ Handle 3-value output
+            else:
+                X_batch, y_batch = next(generator)  # ✅ Handle 2-value output
+                walk_distance_batch = np.full(len(X_batch), walk_distance)  # Fixed walk distance array
+        except ValueError as e:
+            logging.error(f"Generator error: {e}")
+            continue  # Skip iteration if there's an issue
+
         y_pred_batch = model.predict(X_batch)
 
+        # Track all unique walk distances seen
+        all_walk_distances_seen.update(np.unique(walk_distance_batch))
+
         for i, embedding in enumerate(embeddings):
-            y_true = y_batch[i]
+            y_true = y_batch[embedding]  # ✅ Use embedding names directly
             y_pred = np.rint(y_pred_batch[i])
 
-            # Save predictions and ground truth for later CSV output
-            all_predictions[embedding].extend(y_pred.flatten())
-            all_ground_truth[embedding].extend(y_true.flatten())
+            for wd in np.unique(walk_distance_batch):
+                if wd not in all_metrics:
+                    all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
+                    all_predictions[wd] = {emb: [] for emb in embeddings}
+                    all_ground_truth[wd] = {emb: [] for emb in embeddings}
 
-            # Calculate metrics for the current embedding and batch
-            all_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
-            all_metrics[embedding]['precision'].append(
-                precision_score(y_true, y_pred, average='macro', zero_division=0))
-            all_metrics[embedding]['recall'].append(recall_score(y_true, y_pred, average='macro', zero_division=0))
-            all_metrics[embedding]['f1'].append(f1_score(y_true, y_pred, average='macro', zero_division=0))
+                mask = walk_distance_batch == wd
+                y_true_wd = y_true[mask]
+                y_pred_wd = y_pred[mask]
 
-    # Average metrics across batches for each embedding
-    averaged_metrics = []
+                if len(y_true_wd) > 0:
+                    all_predictions[wd][embedding].extend(y_pred_wd.flatten())
+                    all_ground_truth[wd][embedding].extend(y_true_wd.flatten())
+
+                    all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
+                    all_metrics[wd][embedding]['precision'].append(
+                        precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                    all_metrics[wd][embedding]['recall'].append(
+                        recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                    all_metrics[wd][embedding]['f1'].append(
+                        f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+
+    # ✅ Save results
+    detailed_metrics = []
+    aggregated_metrics = []
+
+    if walk_distance == -1:
+        for wd in sorted(all_walk_distances_seen):  # Ensure all walk distances appear
+            for embedding in embeddings:
+                if wd in all_metrics and embedding in all_metrics[wd]:
+                    values = all_metrics[wd][embedding]
+                    detailed_metrics.append({
+                        "walk_distance": wd,
+                        "embedding": embedding,
+                        "accuracy": np.mean(values['accuracy']) if values['accuracy'] else 0,
+                        "precision": np.mean(values['precision']) if values['precision'] else 0,
+                        "recall": np.mean(values['recall']) if values['recall'] else 0,
+                        "f1": np.mean(values['f1']) if values['f1'] else 0,
+                        "noise": noise
+                    })
+                else:
+                    detailed_metrics.append({
+                        "walk_distance": wd,
+                        "embedding": embedding,
+                        "accuracy": 0.0,
+                        "precision": 0.0,
+                        "recall": 0.0,
+                        "f1": 0.0,
+                        "noise": noise
+                    })
+
+        split_metrics_df = pd.DataFrame(detailed_metrics)
+        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+        logging.info(f"Detailed metrics saved to {Path(save_path, 'split_metrics.csv')}")
+
+    # ✅ Aggregate Metrics
     for embedding in embeddings:
-        metrics = {
-            "walk_distance": walk_distance,
+        all_acc = []
+        all_prec = []
+        all_rec = []
+        all_f1 = []
+
+        for wd in all_walk_distances_seen:
+            if wd in all_metrics:
+                all_acc.extend(all_metrics[wd][embedding]['accuracy'])
+                all_prec.extend(all_metrics[wd][embedding]['precision'])
+                all_rec.extend(all_metrics[wd][embedding]['recall'])
+                all_f1.extend(all_metrics[wd][embedding]['f1'])
+
+        aggregated_metrics.append({
+            "walk_distance": -1 if walk_distance == -1 else walk_distance,
             "embedding": embedding,
-            "accuracy": np.mean(all_metrics[embedding]['accuracy']),
-            "precision": np.mean(all_metrics[embedding]['precision']),
-            "recall": np.mean(all_metrics[embedding]['recall']),
-            "f1": np.mean(all_metrics[embedding]['f1']),
+            "accuracy": np.mean(all_acc) if all_acc else 0,
+            "precision": np.mean(all_prec) if all_prec else 0,
+            "recall": np.mean(all_rec) if all_rec else 0,
+            "f1": np.mean(all_f1) if all_f1 else 0,
             "noise": noise
-        }
-        averaged_metrics.append(metrics)
+        })
 
-        # Save predictions and ground truth for this embedding
-        pd.DataFrame({
-            f'predicted_{embedding.lower()}': all_predictions[embedding],
-            f'true_{embedding.lower()}': all_ground_truth[embedding]
-        }).to_csv(Path(save_path, f"{embedding}_predictions.csv"), index=False)
+    metrics_df = pd.DataFrame(aggregated_metrics)
+    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
+    logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}")
 
-    return averaged_metrics
+    return metrics_df
 
 
 if __name__ == '__main__':
@@ -148,7 +270,7 @@ if __name__ == '__main__':
     run_iteration: int = args.run_iteration
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
-    selected_cancers = args.cancer
+    selected_cancers: [str] = args.cancer
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -164,9 +286,9 @@ if __name__ == '__main__':
     logging.info(f"Summed embedding count: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
 
-    load_path = Path(load_path, cancers)
+    load_path: Path = Path(load_path, cancers)
 
-    run_name = f"run_{run_iteration}"
+    run_name: str = f"run_{run_iteration}"
 
     if walk_distance == -1:
         if noise_ratio == 0.0:
@@ -176,16 +298,18 @@ if __name__ == '__main__':
             train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"combined_embeddings.h5")
             test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings.h5")
 
+            logging.info(f"Loading data from {train_file} and {test_file}...")
+
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
     else:
         if noise_ratio == 0.0:
             train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
-                         f"{walk_distance}_embeddings.h5")
+                              f"{walk_distance}_embeddings.h5")
             logging.info(f"Loading data from {train_file}...")
         else:
             # Load the test file, which is noisy
             test_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
-                         f"{walk_distance}_embeddings.h5")
+                             f"{walk_distance}_embeddings.h5")
             # Load the train file, which is not noisy
             train_file = Path(load_path, str(amount_of_summed_embeddings), "0.0", f"{walk_distance}_embeddings.h5")
 
@@ -194,7 +318,6 @@ if __name__ == '__main__':
         save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings",
                          run_name)
 
-
     logging.info(f"Saving results to {save_path}")
 
     if not save_path.exists():
@@ -202,9 +325,9 @@ if __name__ == '__main__':
 
     # Load data dimensions
     with h5py.File(train_file, "r") as f:
-            input_dim = f["X"].shape[1]
-            num_samples = f["X"].shape[0]
-            label_keys = embeddings
+        input_dim = f["X"].shape[1]
+        num_samples = f["X"].shape[0]
+        label_keys = embeddings
 
     logging.info(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
 
@@ -215,52 +338,46 @@ if __name__ == '__main__':
             max_embedding = f["meta_information"].attrs["max_embedding"]
             logging.info(f"Max embedding: {max_embedding}")
 
-    # Calculate train-test split indices
-    if noise_ratio != 0.0:
-        # train end is always 100 of sample of train data
-        train_end = num_samples
-        test_start = num_samples
-    else:
-        # split original file in an 80-20 split
-        train_end = int(0.8 * num_samples)
-        test_start = train_end
-
     logging.info("Building model....")
     model = build_model(input_dim)
     model.compile(optimizer='adam',
-                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse', 'output_mutation': 'mse'},
-                  loss_weights={'output_text': 3.0, 'output_image': 1., 'output_rna': 1., 'output_mutation': 1.},
+                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss_weights={'Text': 3.0, 'Image': 1., 'RNA': 1., 'Mutation': 1.},
                   metrics=['mae', 'mae', 'mae', 'mae'])
     model.summary()
 
-    # Train and test generators
     if noise_ratio == 0.0:
-        train_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
-                                     end_idx=train_end)
-        test_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=test_start,
-                                    end_idx=num_samples)
+        train_indices, val_indices, test_indices = create_indices(train_file, walk_distance=walk_distance)
     else:
-        train_generator = hdf5_generator(train_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
-                                     end_idx=num_samples)
-        test_generator = hdf5_generator(test_file, batch_size, input_key="X", label_keys=label_keys, start_idx=0,
-                                    end_idx=num_samples)
+        train_indices, val_indices = create_train_val_indices(train_file, walk_distance=walk_distance)
+        with h5py.File(test_file, "r") as f:
+            test_indices = np.arange(f['X'].shape[0])
 
     if noise_ratio == 0.0:
-        train_steps = max(1, train_end // batch_size)  # Ensure at least 1 step
-        test_steps = max(1, (num_samples - train_end) // batch_size)  # Ensure at least 1 step
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
+        test_gen = hdf5_generator(train_file, batch_size, test_indices, walk_distance)
     else:
-        train_steps = max(1, num_samples // batch_size) # Ensure at least 1 step
-        test_steps = max(1, num_samples // batch_size)  # Ensure at least 1 step
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
+        test_gen = hdf5_generator(test_file, batch_size, test_indices, walk_distance)
+
+    with h5py.File(train_file, 'r') as f:
+        input_dim = f['X'].shape[1]
+
+    train_steps = max(1, len(train_indices) // batch_size)  # Ensure at least 1 step
+    val_steps = max(1, len(val_indices) // batch_size)  # Ensure at least 1 step
+    test_steps = max(1, len(test_indices) // batch_size)  # Ensure at least 1 step
 
     logging.info(f"Training on {train_steps} steps and testing on {test_steps} steps.")
 
     # Train the model
     early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
-    history = model.fit(train_generator,
+    history = model.fit(train_gen,
                         steps_per_epoch=train_steps,
-                        validation_data=test_generator,
+                        validation_data=val_gen,
                         validation_steps=test_steps,
-                        epochs=1,
+                        epochs=100,
                         callbacks=[early_stopping])
 
     # save history
@@ -269,7 +386,7 @@ if __name__ == '__main__':
     # fine tune the model
     # freeze all layer except the one containing text in the layer name
     for layer in model.layers:
-        if 'text' not in layer.name:
+        if 'Text' not in layer.name:
             layer.trainable = False
 
     fine_tuning_early_stopping = tf.keras.callbacks.EarlyStopping(
@@ -279,27 +396,23 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
-    reduce_lr = ReduceLROnPlateau(monitor='val_output_text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
+    reduce_lr = ReduceLROnPlateau(monitor='val_Text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
     model.compile(optimizer=optimizer,
-                  loss={'output_text': 'mse', 'output_image': 'mse', 'output_rna': 'mse', 'output_mutation': 'mse'},
-                  loss_weights={'output_text': 4., 'output_image': 0.1, 'output_rna': 0.1, 'output_mutation': 0.1},
+                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss_weights={'Text': 4., 'Image': 0.1, 'RNA': 0.1, 'Mutation': 0.1},
                   metrics=['mae', 'mae', 'mae', 'mae'])
     model.summary()
 
-    history = model.fit(train_generator,
+    history = model.fit(train_gen,
                         steps_per_epoch=train_steps,
-                        validation_data=test_generator,
+                        validation_data=val_gen,
                         validation_steps=test_steps,
-                        epochs=1,
+                        epochs=100,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
-    metrics: [] = evaluate_model_in_batches(model, test_generator, test_steps, embeddings=embeddings,
+    metrics: [] = evaluate_model_in_batches(model, test_gen, test_steps, embeddings=embeddings,
                                             save_path=save_path, noise=noise_ratio, walk_distance=walk_distance)
 
-    # Save metrics
-    metrics_df = pd.DataFrame(metrics)
-    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-    logging.info(f"Metrics saved to folder {save_path}.")
     logging.info("Done.")

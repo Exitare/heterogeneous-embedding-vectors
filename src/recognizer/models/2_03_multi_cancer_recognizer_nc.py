@@ -68,124 +68,130 @@ def create_train_val_indices(hdf5_file_path, walk_distance: int, test_size=0.2, 
         indices, test_size=test_size, random_state=random_state, stratify=walk_distances
     )
 
-
-def hdf5_generator(hdf5_file_path, batch_size, indices):
-    """
-    HDF5 data generator for summed embeddings and labels.
-    This version loads the entire h5 file into memory.
-    """
-    # Load all data into memory
+def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
     with h5py.File(hdf5_file_path, 'r') as f:
         X = f["X"][:]
-        # Exclude non-datasets like "meta_information" and "WalkDistances"
-        label_keys = [key for key in f.keys() if key not in ["X", "meta_information", "WalkDistances"] and isinstance(f[key], h5py.Dataset)]
-        labels = {key: f[key][:] for key in label_keys}  # Load all labels into memory
+        walk_distances = f["WalkDistances"][:] if walk_distance == -1 else None
+        label_keys = [key for key in f.keys() if key not in ["X", "meta_information", "WalkDistances"]]
+        labels = {key: f[key][:] for key in label_keys}
 
     while True:
-        np.random.shuffle(indices)  # Shuffle indices for randomness
+        np.random.shuffle(indices)
         for start_idx in range(0, len(indices), batch_size):
             end_idx = min(start_idx + batch_size, len(indices))
-            batch_indices = indices[start_idx:end_idx]
-            batch_indices = np.sort(batch_indices)  # Ensure ascending order for consistency
-            X_batch = X[batch_indices]  # Slice the in-memory X
+            batch_indices = np.sort(indices[start_idx:end_idx])
 
-            # Create y_batch with renamed keys
-            y_batch = {}
-            for key in labels:
-                if key == "Text":
-                    output_key = "output_text"
-                elif key == "Image":
-                    output_key = "output_image"
-                elif key == "Mutation":
-                    output_key = "output_mutation"
-                elif key == "RNA":
-                    output_key = "output_rna"
-                else:
-                    output_key = f"output_cancer_{key}"
-                y_batch[output_key] = labels[key][batch_indices]
+            X_batch = X[batch_indices]
+            y_batch = {key: labels[key][batch_indices] for key in labels}
 
-            yield X_batch, y_batch
+            if walk_distance == -1:
+                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
+                yield X_batch, y_batch, walk_distances[batch_indices]
+            else:
+                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
+                yield X_batch, y_batch
 
 
 def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, walk_distance: int, noise: float):
     """
     Evaluate the model using a generator and save predictions, ground truth, and metrics.
+    If walk_distance == -1, track metrics per walk distance and generate an additional split_metrics.csv file.
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
-    # Initialize metrics storage
-    all_metrics = {embedding: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for embedding in embeddings}
-    all_predictions = {embedding: [] for embedding in embeddings}
-    all_ground_truth = {embedding: [] for embedding in embeddings}
+    all_metrics = {}
+    global_metrics = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
 
-    for _ in range(steps):
-        X_batch, y_batch = next(generator)
-        y_pred_batch = model.predict(X_batch)
+    logging.info(f"Evaluating on {steps} batches.")
 
-        # Iterate over embeddings
-        for embedding in embeddings:
-            # Determine the correct output name
-            if embedding in ["Text", "Image", "RNA", "Mutation"]:
-                output_name = f"output_{embedding.lower()}"
+    for step in range(steps):
+        try:
+            if walk_distance == -1:
+                X_batch, y_batch, walk_distance_batch = next(generator)
             else:
-                output_name = f"output_cancer_{embedding}"
+                X_batch, y_batch = next(generator)
 
-            # Match predictions and ground truths for the embedding
-            output_index = model.output_names.index(output_name)  # Find the correct index for this output
-            y_true = y_batch[output_name]
-            y_pred = np.rint(y_pred_batch[output_index]).astype(int)
+            y_pred_batch = model.predict(X_batch)
 
-            # Append predictions and ground truth
-            all_predictions[embedding].extend(y_pred.flatten())
-            all_ground_truth[embedding].extend(y_true.flatten())
+            for embedding in embeddings:
+                if embedding not in y_batch:
+                    logging.warning(f"Missing label: {embedding}, skipping")
+                    continue
 
-            # Calculate and store metrics
-            all_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
-            all_metrics[embedding]['precision'].append(
-                precision_score(y_true, y_pred, average='macro', zero_division=0))
-            all_metrics[embedding]['recall'].append(recall_score(y_true, y_pred, average='macro', zero_division=0))
-            all_metrics[embedding]['f1'].append(f1_score(y_true, y_pred, average='macro', zero_division=0))
+                output_index = model.output_names.index(embedding)
+                y_true = y_batch[embedding]
+                y_pred = np.rint(y_pred_batch[output_index]).astype(int)
 
-    # Aggregate metrics for each embedding
-    metrics = []
-    for embedding in embeddings:
-        metrics.append({
-            "walk_distance": walk_distance,
-            "embedding": embedding,
-            "accuracy": np.mean(all_metrics[embedding]['accuracy']),
-            "precision": np.mean(all_metrics[embedding]['precision']),
-            "recall": np.mean(all_metrics[embedding]['recall']),
-            "f1": np.mean(all_metrics[embedding]['f1']),
-            "noise": noise
-        })
-        # Save predictions and ground truth for this embedding
-        df_predictions = pd.DataFrame({
-            f'predicted_{embedding.lower()}': all_predictions[embedding],
-            f'true_{embedding.lower()}': all_ground_truth[embedding]
-        })
-        df_predictions.to_csv(Path(save_path, f"{embedding}_predictions.csv"), index=False)
+                if len(y_true) == 0 or len(y_pred) == 0:
+                    logging.warning(f"Empty predictions or ground truth for {embedding}, skipping")
+                    continue
 
-    # Save overall metrics to a CSV
-    metrics_df = pd.DataFrame(metrics)
-    metrics_df.to_csv(Path(save_path ,"metrics.csv"), index=False)
-    logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}")
+                if walk_distance == -1:
+                    # Track per-walk-distance metrics
+                    for wd in np.unique(walk_distance_batch):
+                        if wd not in all_metrics:
+                            all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in
+                                               embeddings}
+
+                        mask = walk_distance_batch == wd
+                        y_true_wd = y_true[mask]
+                        y_pred_wd = y_pred[mask]
+
+                        if len(y_true_wd) > 0:
+                            all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
+                            all_metrics[wd][embedding]['precision'].append(
+                                precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                            all_metrics[wd][embedding]['recall'].append(
+                                recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                            all_metrics[wd][embedding]['f1'].append(
+                                f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+
+                # Track global metrics
+                for metric in ['accuracy', 'precision', 'recall', 'f1']:
+                    global_metrics[embedding][metric].append(np.mean(y_true == y_pred))
+
+        except StopIteration:
+            logging.error("Generator ran out of data earlier than expected.")
+            break
+
+    # Save global metrics (metrics.csv)
+    if global_metrics:
+        metrics = []
+        for embedding, values in global_metrics.items():
+            metrics.append({
+                "walk_distance": walk_distance,
+                "embedding": embedding,
+                "accuracy": np.mean(values['accuracy']),
+                "precision": np.mean(values['precision']),
+                "recall": np.mean(values['recall']),
+                "f1": np.mean(values['f1']),
+                "noise": noise
+            })
+
+        metrics_df = pd.DataFrame(metrics)
+        metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
+        logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}.")
+
+    # Save split metrics (split_metrics.csv) if walk_distance == -1
+    if walk_distance == -1 and all_metrics:
+        split_metrics = []
+        for wd, embedding_data in all_metrics.items():
+            for embedding, values in embedding_data.items():
+                split_metrics.append({
+                    "walk_distance": wd,
+                    "embedding": embedding,
+                    "accuracy": np.mean(values['accuracy']),
+                    "precision": np.mean(values['precision']),
+                    "recall": np.mean(values['recall']),
+                    "f1": np.mean(values['f1']),
+                    "noise": noise
+                })
+
+        split_metrics_df = pd.DataFrame(split_metrics)
+        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+        logging.info(f"Split metrics saved to {Path(save_path, 'split_metrics.csv')}.")
+
     return metrics_df
-
-
-def evaluate_accuracy_per_walk_distance(metrics_df: pd.DataFrame, save_path: Path):
-    """
-    Calculate the accuracy per embedding and walk distance.
-    """
-    # Group by walk_distance and embedding to calculate mean accuracy
-    grouped_metrics = metrics_df.groupby(['walk_distance', 'embedding']).agg({
-        'accuracy': 'mean'
-    }).reset_index()
-
-    # Save results to CSV
-    grouped_metrics.to_csv(Path(save_path, "split_metrics.csv"), index=False)
-    logging.info(f"Split metrics saved to path {Path(save_path, 'split_metrics.csv')}")
-    return grouped_metrics
-
 
 def build_model(input_dim, cancer_list: []):
     """
@@ -205,17 +211,17 @@ def build_model(input_dim, cancer_list: []):
     x = Dense(64, activation='relu', name='base_dense4')(x)
     x = BatchNormalization()(x)
 
-    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_text')(x)
-    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_image')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_mutation')(x)
+    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Text')(x)
+    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Image')(x)
+    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Mutation')(x)
 
     rna_x = Dense(128, activation='relu', name='rna_dense1')(x)
     rna_x = Dropout(0.2)(rna_x)
     rna_x = Dense(64, activation='relu', name='rna_dense2')(rna_x)
-    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='output_rna')(rna_x)
+    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='RNA')(rna_x)
 
-    cancer_outputs = [Dense(1, activation=ReLU(max_value=max_embedding), name=f'output_cancer_{cancer}')(x)
-                      for cancer in cancer_list]
+    # Ensure cancer labels match dataset keys (no 'output_cancer_' prefix)
+    cancer_outputs = [Dense(1, activation='relu', name=cancer)(x) for cancer in cancer_list]
     outputs = [text_output, image_output, mutation_output, rna_output] + cancer_outputs
     return Model(inputs=inputs, outputs=outputs, name="multi_output_model")
 
@@ -307,27 +313,29 @@ if __name__ == '__main__':
             test_indices = np.arange(f['X'].shape[0])
 
     if noise_ratio == 0.0:
-        train_gen = hdf5_generator(train_file, batch_size, train_indices)
-        val_gen = hdf5_generator(train_file, batch_size, val_indices)
-        test_gen = hdf5_generator(train_file, batch_size, test_indices)
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
+        test_gen = hdf5_generator(train_file, batch_size, test_indices, walk_distance)
     else:
-        train_gen = hdf5_generator(train_file, batch_size, train_indices)
-        val_gen = hdf5_generator(train_file, batch_size, val_indices)
-        test_gen = hdf5_generator(test_file, batch_size, test_indices)
+        train_gen = hdf5_generator(train_file, batch_size, train_indices, walk_distance)
+        val_gen = hdf5_generator(train_file, batch_size, val_indices, walk_distance)
+        test_gen = hdf5_generator(test_file, batch_size, test_indices, walk_distance)
 
     with h5py.File(train_file, 'r') as f:
         input_dim = f['X'].shape[1]
 
     model = build_model(input_dim, selected_cancers)
+
+
     # Set up a list of metrics
-    loss = {'output_text': 'mae', 'output_image': 'mae', 'output_rna': 'mae', 'output_mutation': 'mae'}
-    loss_weights = {'output_text': 3.0, 'output_image': 1., 'output_rna': 1., 'output_mutation': 1.}
+    loss = {'Text': 'mae', 'Image': 'mae', 'RNA': 'mae', 'Mutation': 'mae'}
+    loss_weights = {'Text': 3.0, 'Image': 1., 'RNA': 1., 'Mutation': 1.}
     metrics = ['mae', 'mae', 'mae', 'mae']
 
     # Adding dynamic metrics for cancer outputs based on their number
     for cancer in selected_cancers:  # Assuming selected_cancers is defined
-        loss[f'output_cancer_{cancer}'] = 'mae'
-        loss_weights[f'output_cancer_{cancer}'] = 1.
+        loss[f'{cancer}'] = 'mae'
+        loss_weights[f'{cancer}'] = 1.
         metrics.append('mae')
         embeddings.append(cancer)
 
@@ -354,14 +362,14 @@ if __name__ == '__main__':
 
     # Fine-Tuning
     for layer in model.layers:
-        if 'text' not in layer.name:
+        if 'Text' not in layer.name:
             layer.trainable = False
 
     # adjust the text loss weight
-    loss_weights["output_text"] = 4.0
-    loss_weights["output_image"] = 0.1
-    loss_weights["output_rna"] = 0.1
-    loss_weights["output_mutation"] = 0.1
+    loss_weights["Text"] = 4.0
+    loss_weights["Image"] = 0.1
+    loss_weights["RNA"] = 0.1
+    loss_weights["Mutation"] = 0.1
     fine_tuning_early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss',
         patience=20,
@@ -370,7 +378,7 @@ if __name__ == '__main__':
     )
 
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
-    reduce_lr = ReduceLROnPlateau(monitor='val_output_text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
+    reduce_lr = ReduceLROnPlateau(monitor='val_Text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
     model.compile(optimizer=optimizer,
                   loss=loss,
@@ -388,5 +396,5 @@ if __name__ == '__main__':
                                            walk_distance=walk_distance, noise=noise_ratio)
 
     # Calculate and save accuracy per embedding and walk distance
-    accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
+    #accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
     logging.info("Fine-tuning and evaluation complete!")
