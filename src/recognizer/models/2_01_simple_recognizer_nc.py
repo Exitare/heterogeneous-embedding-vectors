@@ -14,7 +14,7 @@ import h5py
 
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "simple")
-load_path = Path("results", "recognizer", "summed_embeddings", "simple")
+load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -139,6 +139,8 @@ if __name__ == '__main__':
                         help="The size of the generated summed embeddings count.")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0,
                         help="Ratio of random noise added to the sum embeddings")
+    parser.add_argument("--cancer", "-c", nargs="+", required=True,
+                        help="The cancer types to work with, e.g. blca brca")
     args = parser.parse_args()
 
     batch_size: int = args.batch_size
@@ -146,13 +148,24 @@ if __name__ == '__main__':
     run_iteration: int = args.run_iteration
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
+    selected_cancers = args.cancer
+
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
+    cancers = "_".join(selected_cancers)
 
     logging.info("Running file simple_recognizer_nc")
+    logging.info(f"Selected cancers: {selected_cancers}")
     logging.info(f"Total walk distance: {walk_distance}")
     logging.info(f"Batch size: {batch_size}")
     logging.info(f"Run iteration: {run_iteration}")
     logging.info(f"Summed embedding count: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
+
+    load_path = Path(load_path, cancers)
+
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
@@ -247,7 +260,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=1,
                         callbacks=[early_stopping])
 
     # save history
@@ -278,7 +291,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=test_generator,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=1,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
@@ -288,5 +301,5 @@ if __name__ == '__main__':
     # Save metrics
     metrics_df = pd.DataFrame(metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-    logging.info("Metrics saved.")
+    logging.info(f"Metrics saved to folder {save_path}.")
     logging.info("Done.")
