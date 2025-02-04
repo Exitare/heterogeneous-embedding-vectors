@@ -228,7 +228,7 @@ def build_model(input_dim, cancer_list: []):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--batch_size', "-bs", type=int, default=32, help='The batch size to train the model')
+    parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--walk_distance', "-w", type=int, required=True,
                         help='The number of the walk distance to work with.', choices=list(range(3, 16)) + [-1])
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,

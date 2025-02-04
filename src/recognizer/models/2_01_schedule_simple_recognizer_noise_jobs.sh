@@ -24,6 +24,9 @@ then
   amount_of_summed_embeddings=100000
 fi
 
+echo "Upper bound: $upper_bound"
+echo "Amount of summed embeddings: $amount_of_summed_embeddings"
+echo "cancer types: $cancer_types"
 
 for walk_distance in $(seq 3 $upper_bound)
 do
@@ -32,7 +35,7 @@ do
     # run it 30 times
     for iteration in $(seq 1 30)
     do
-      sbatch ./src/recognizer/models/2_01_run_simple_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings $noise
+      ./src/recognizer/models/2_01_run_simple_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings $noise
     done
   done
 done
