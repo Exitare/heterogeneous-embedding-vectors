@@ -33,7 +33,6 @@ echo "Amount of summed embeddings: $amount_of_summed_embeddings"
 echo "Upper bound: $upper_bound"
 
 
-
 # run it 30 times
 for iteration in $(seq 1 30)
 do

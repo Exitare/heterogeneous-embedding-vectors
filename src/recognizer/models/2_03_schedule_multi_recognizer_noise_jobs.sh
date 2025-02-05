@@ -2,7 +2,7 @@
 cancer_types=$1
 amount_of_summed_embeddings=$2
 upper_walk_distance=$3
-
+local=$4
 
 # if cancer_types is not provided, then exit
 if [ -z "$cancer_types" ]; then
@@ -24,6 +24,17 @@ then
   amount_of_summed_embeddings=100000
 fi
 
+if [ -z "$local" ]
+then
+  echo "Running on cluster"
+else
+  echo "Running locally"
+fi
+
+echo "cancer types: $cancer_types"
+echo "Amount of summed embeddings: $amount_of_summed_embeddings"
+echo "Upper walk distance: $upper_walk_distance"
+
 for noise in 0.1 0.2 0.3 0.4 0.5 0.6
 do
   for walk_distance in $(seq 3 $upper_walk_distance)
@@ -31,7 +42,12 @@ do
   # run it 30 times
     for iteration in $(seq 1 30)
     do
-       sbatch ./src/recognizer/models/2_03_run_multi_recognizer.sh $walk_distance $iteration "${cancer_types}" $amount_of_summed_embeddings
+      if [ -z "$local" ]
+      then
+        sbatch ./src/recognizer/models/2_03_run_multi_recognizer.sh $walk_distance $iteration "${cancer_types}" $amount_of_summed_embeddings $noise
+      else
+        ./src/recognizer/models/2_03_run_multi_recognizer.sh $walk_distance $iteration "${cancer_types}" $amount_of_summed_embeddings $noise
+      fi
     done
   done
 done
