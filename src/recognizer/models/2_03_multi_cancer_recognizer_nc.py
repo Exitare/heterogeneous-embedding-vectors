@@ -147,8 +147,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                                 f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
 
                 # Track global metrics
-                for metric in ['accuracy', 'precision', 'recall', 'f1']:
-                    global_metrics[embedding][metric].append(np.mean(y_true == y_pred))
+                global_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
+                global_metrics[embedding]['precision'].append(
+                    precision_score(y_true, y_pred, average='macro', zero_division=0))
+                global_metrics[embedding]['recall'].append(
+                    recall_score(y_true, y_pred, average='macro', zero_division=0))
+                global_metrics[embedding]['f1'].append(f1_score(y_true, y_pred, average='macro', zero_division=0))
 
         except StopIteration:
             logging.error("Generator ran out of data earlier than expected.")
@@ -187,7 +191,22 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     "noise": noise
                 })
 
-        split_metrics_df = pd.DataFrame(split_metrics)
+        data = []
+
+        for wd in all_metrics:
+            for embedding in all_metrics[wd]:
+                row = {
+                    'walk_distance': wd,
+                    'embedding': embedding,
+                    'accuracy': np.mean(all_metrics[wd][embedding]['accuracy']),
+                    'precision': np.mean(all_metrics[wd][embedding]['precision']),
+                    'recall': np.mean(all_metrics[wd][embedding]['recall']),
+                    'f1': np.mean(all_metrics[wd][embedding]['f1']),
+                }
+                data.append(row)
+
+        # Convert list of dictionaries to DataFrame
+        split_metrics_df = pd.DataFrame(data)
         split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
         logging.info(f"Split metrics saved to {Path(save_path, 'split_metrics.csv')}.")
 
@@ -354,7 +373,7 @@ if __name__ == '__main__':
 
     # Initial Training
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
+                        validation_steps=len(val_indices) // batch_size, epochs=1,
                         callbacks=[early_stopping])
 
     # Save training history
@@ -385,7 +404,7 @@ if __name__ == '__main__':
                   loss_weights=loss_weights,
                   metrics=metrics)
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
+                        validation_steps=len(val_indices) // batch_size, epochs=1,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Save fine-tuning history
