@@ -373,7 +373,7 @@ if __name__ == '__main__':
 
     # Initial Training
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=1,
+                        validation_steps=len(val_indices) // batch_size, epochs=100,
                         callbacks=[early_stopping])
 
     # Save training history
@@ -404,7 +404,7 @@ if __name__ == '__main__':
                   loss_weights=loss_weights,
                   metrics=metrics)
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=1,
+                        validation_steps=len(val_indices) // batch_size, epochs=100,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Save fine-tuning history
