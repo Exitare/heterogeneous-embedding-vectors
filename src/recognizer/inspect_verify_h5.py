@@ -87,3 +87,12 @@ if violations.any():
     print(df[violations])
 else:
     print("No violations. The condition is satisfied.")
+
+
+# ✅ Ensure each cancer type has at least one non-zero row
+missing_cancers = [cancer for cancer in cancers if (df[cancer] > 0).sum() == 0]
+
+if missing_cancers:
+    print(f"❌ Error: The following cancers have no occurrences in the dataset: {', '.join(missing_cancers)}")
+else:
+    print("✅ All cancer types have at least one occurrence in the dataset.")
