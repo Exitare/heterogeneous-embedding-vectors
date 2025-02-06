@@ -243,11 +243,35 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
             "noise": noise
         })
 
+    # ✅ Save all predictions and ground truth
+    prediction_records = []
+    for wd in sorted(all_walk_distances_seen):  # Iterate over all walk distances
+        for embedding in embeddings:
+            if wd in all_predictions and embedding in all_predictions[wd]:
+                y_preds = all_predictions[wd][embedding]
+                y_trues = all_ground_truth[wd][embedding]
+
+                # Ensure y_true and y_pred lengths match
+                if len(y_preds) == len(y_trues):
+                    for y_true, y_pred in zip(y_trues, y_preds):
+                        prediction_records.append({
+                            "walk_distance": wd,
+                            "embedding": embedding,
+                            "y_true": y_true,
+                            "y_pred": y_pred,
+                            "noise": noise
+                        })
+                else:
+                    logging.warning(f"Length mismatch for walk_distance {wd}, embedding {embedding}")
+
+    # Convert to DataFrame and save
+    predictions_df = pd.DataFrame(prediction_records)
+    predictions_df.to_csv(Path(save_path, "predictions.csv"), index=False)
+    logging.info(f"Predictions saved to {Path(save_path, 'predictions.csv')}")
+
     metrics_df = pd.DataFrame(aggregated_metrics)
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
     logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}")
-
-    return metrics_df
 
 
 if __name__ == '__main__':
