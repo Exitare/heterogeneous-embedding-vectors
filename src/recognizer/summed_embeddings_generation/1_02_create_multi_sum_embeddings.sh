@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --job-name=m_e_g
-#SBATCH --time=9-00:00:00
+#SBATCH --time=23:00:00
 #SBATCH --partition=batch
 #SBATCH --qos=normal
 #SBATCH --ntasks=1
-#SBATCH --mem=512000
+#SBATCH --mem=128000
 #SBATCH --cpus-per-task=2
 #SBATCH --output=./output_reports/slurm.%N.%j.out
 #SBATCH --error=./error_reports/slurm.%N.%j.err
