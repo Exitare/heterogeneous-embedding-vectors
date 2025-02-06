@@ -224,8 +224,14 @@ def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_pat
         "walk_distance": -1,  # ✅ Ensure global metrics are labeled as -1
         "embedding": embedding,
         "accuracy": np.mean(values['accuracy']) if len(values['accuracy']) > 0 else np.nan,
+        "accuracy_zeros": np.nanmean(values['accuracy_zeros']) if len(values['accuracy_zeros']) > 0 else np.nan,
+        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if len(values['accuracy_nonzeros']) > 0 else np.nan,
         "precision": np.mean(values['precision']) if len(values['precision']) > 0 else np.nan,
+        "precision_zeros": np.nanmean(values['precision_zeros']) if len(values['precision_zeros']) > 0 else np.nan,
+        "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if len(values['precision_nonzeros']) > 0 else np.nan,
         "recall": np.mean(values['recall']) if len(values['recall']) > 0 else np.nan,
+        "recall_zeros": np.nanmean(values['recall_zeros']) if len(values['recall_zeros']) > 0 else np.nan,
+        "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if len(values['recall_nonzeros']) > 0 else np.nan,
         "f1": np.mean(values['f1']) if len(values['f1']) > 0 else np.nan,
         "f1_zeros": np.nanmean(values['f1_zeros']) if len(values['f1_zeros']) > 0 else np.nan,
         "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if len(values['f1_nonzeros']) > 0 else np.nan,
@@ -553,8 +559,13 @@ if __name__ == '__main__':
 
     # Fine-Tuning
     for layer in model.layers:
-        if 'Text' not in layer.name:
-            layer.trainable = False
+        if walk_distance == -1:
+            key_words = selected_cancers + ["Text"]
+            if layer.name not in key_words:
+                layer.trainable = False
+        else:
+            if 'Text' not in layer.name:
+                layer.trainable = False
 
     # adjust the text loss weight
     loss_weights["Text"] = 4.0
