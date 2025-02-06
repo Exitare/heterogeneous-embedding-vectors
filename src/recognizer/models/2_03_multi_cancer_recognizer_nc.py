@@ -93,24 +93,24 @@ def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
                 yield X_batch, y_batch
 
 
-def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, walk_distance: int, noise: float):
+def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_path: Path, noise: float):
     """
-    Evaluate the model using a generator and save predictions, ground truth, and metrics.
-    If walk_distance == -1, track metrics per walk distance and generate an additional split_metrics.csv file.
+    Evaluate the model in walk distance mode (walk_distance == -1).
     """
     save_path.mkdir(parents=True, exist_ok=True)
 
     all_metrics = {}
     global_metrics = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
-    all_predictions = []  # List to store all predictions and ground truth values
+    all_predictions = []  # ✅ Store all predictions
+
+    non_cancer_keys = {'Text', 'Image', 'RNA', 'Mutation'}
+    cancer_embeddings = [emb for emb in embeddings if emb not in non_cancer_keys]
+
     logging.info(f"Evaluating on {steps} batches.")
 
     for step in range(steps):
         try:
-            if walk_distance == -1:
-                X_batch, y_batch, walk_distance_batch = next(generator)
-            else:
-                X_batch, y_batch = next(generator)
+            X_batch, y_batch, walk_distance_batch = next(generator)
 
             y_pred_batch = model.predict(X_batch)
 
@@ -127,112 +127,182 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     logging.warning(f"Empty predictions or ground truth for {embedding}, skipping")
                     continue
 
-                if walk_distance == -1:
-                    # Store predictions and ground truth
-                    for i in range(len(y_true)):
-                        all_predictions.append({
-                            "walk_distance": walk_distance_batch[i],
-                            "embedding": embedding,
-                            "y_true": y_true[i],
-                            "y_pred": y_pred[i][0],
-                            "noise": noise
-                        })
-                else:
-                    # Store predictions and ground truth
-                    for i in range(len(y_true)):
-                        all_predictions.append({
-                            "walk_distance": walk_distance,
-                            "embedding": embedding,
-                            "y_true": y_true[i],
-                            "y_pred": y_pred[i][0],
-                            "noise": noise
-                        })
+                if y_pred.ndim > 1:
+                    y_pred = y_pred.flatten()
 
-                if walk_distance == -1:
-                    # Track per-walk-distance metrics
-                    for wd in np.unique(walk_distance_batch):
+                for wd in np.unique(walk_distance_batch):
+                    mask = walk_distance_batch == wd
+                    y_true_wd = y_true[mask]
+                    y_pred_wd = y_pred[mask]
+
+                    if embedding in cancer_embeddings:
+                        valid_indices = np.where(y_true_wd > 0)[0]
+                        if len(valid_indices) == 0:
+                            # logging.warning(
+                            #    f"Skipping {embedding} batch for walk distance {wd}, no valid indices found.")
+                            continue
+                        y_true_wd = y_true_wd[valid_indices]
+                        y_pred_wd = y_pred_wd[valid_indices]
+
+                    if len(y_true_wd) > 0:
                         if wd not in all_metrics:
                             all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in
                                                embeddings}
 
-                        mask = walk_distance_batch == wd
-                        y_true_wd = y_true[mask]
-                        y_pred_wd = y_pred[mask]
+                        all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
+                        all_metrics[wd][embedding]['precision'].append(
+                            precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        all_metrics[wd][embedding]['recall'].append(
+                            recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        all_metrics[wd][embedding]['f1'].append(
+                            f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
 
-                        if len(y_true_wd) > 0:
-                            all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
-                            all_metrics[wd][embedding]['precision'].append(
-                                precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
-                            all_metrics[wd][embedding]['recall'].append(
-                                recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
-                            all_metrics[wd][embedding]['f1'].append(
-                                f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        # ✅ Also accumulate in global metrics
+                        global_metrics[embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
+                        global_metrics[embedding]['precision'].append(
+                            precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        global_metrics[embedding]['recall'].append(
+                            recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        global_metrics[embedding]['f1'].append(
+                            f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
 
-                # Track global metrics
-                global_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
-                global_metrics[embedding]['precision'].append(
-                    precision_score(y_true, y_pred, average='macro', zero_division=0))
-                global_metrics[embedding]['recall'].append(
-                    recall_score(y_true, y_pred, average='macro', zero_division=0))
-                global_metrics[embedding]['f1'].append(f1_score(y_true, y_pred, average='macro', zero_division=0))
+                        # ✅ Store Predictions
+                        for i in range(len(y_true_wd)):
+                            all_predictions.append({
+                                "walk_distance": wd,
+                                "embedding": embedding,
+                                "y_true": y_true_wd[i],
+                                "y_pred": y_pred_wd[i],
+                                "noise": noise
+                            })
 
         except StopIteration:
             logging.error("Generator ran out of data earlier than expected.")
             break
 
-    # Save global metrics (metrics.csv)
-    if global_metrics:
-        metrics = []
-        for embedding, values in global_metrics.items():
-            metrics.append({
-                "walk_distance": walk_distance,
-                "embedding": embedding,
-                "accuracy": np.mean(values['accuracy']),
-                "precision": np.mean(values['precision']),
-                "recall": np.mean(values['recall']),
-                "f1": np.mean(values['f1']),
-                "noise": noise
-            })
+    # ✅ Save per-walk-distance metrics
+    split_metrics = [{
+        "walk_distance": wd,
+        "embedding": embedding,
+        "accuracy": np.mean(values['accuracy']),
+        "precision": np.mean(values['precision']),
+        "recall": np.mean(values['recall']),
+        "f1": np.mean(values['f1']),
+        "noise": noise
+    } for wd, embedding_data in all_metrics.items() for embedding, values in embedding_data.items()]
 
-        metrics_df = pd.DataFrame(metrics)
-        metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-        logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}.")
+    split_metrics_df = pd.DataFrame(split_metrics)
+    split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+    logging.info(f"Split metrics saved to {Path(save_path, 'split_metrics.csv')}.")
 
-    # Save split metrics (split_metrics.csv) if walk_distance == -1
-    if walk_distance == -1 and all_metrics:
-        split_metrics = []
-        for wd, embedding_data in all_metrics.items():
-            for embedding, values in embedding_data.items():
-                split_metrics.append({
-                    "walk_distance": wd,
-                    "embedding": embedding,
-                    "accuracy": np.mean(values['accuracy']),
-                    "precision": np.mean(values['precision']),
-                    "recall": np.mean(values['recall']),
-                    "f1": np.mean(values['f1']),
-                    "noise": noise
-                })
+    # ✅ Generate **Global Metrics**
+    aggregated_metrics = [{
+        "walk_distance": -1,  # ✅ Ensure global metrics are labeled as -1
+        "embedding": embedding,
+        "accuracy": np.mean(values['accuracy']) if len(values['accuracy']) > 0 else np.nan,
+        "precision": np.mean(values['precision']) if len(values['precision']) > 0 else np.nan,
+        "recall": np.mean(values['recall']) if len(values['recall']) > 0 else np.nan,
+        "f1": np.mean(values['f1']) if len(values['f1']) > 0 else np.nan,
+        "noise": noise
+    } for embedding, values in global_metrics.items()]
 
-        data = []
+    metrics_df = pd.DataFrame(aggregated_metrics)
+    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
+    logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}.")
 
-        for wd in all_metrics:
-            for embedding in all_metrics[wd]:
-                row = {
-                    'walk_distance': wd,
-                    'embedding': embedding,
-                    'accuracy': np.mean(all_metrics[wd][embedding]['accuracy']),
-                    'precision': np.mean(all_metrics[wd][embedding]['precision']),
-                    'recall': np.mean(all_metrics[wd][embedding]['recall']),
-                    'f1': np.mean(all_metrics[wd][embedding]['f1']),
-                }
-                data.append(row)
+    # ✅ Save Predictions
+    if all_predictions:
+        predictions_df = pd.DataFrame(all_predictions)
+        predictions_df.to_csv(Path(save_path, "predictions.csv"), index=False)
+        logging.info(f"Predictions saved to {Path(save_path, 'predictions.csv')}.")
 
-        # Convert list of dictionaries to DataFrame
-        split_metrics_df = pd.DataFrame(data)
-        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
-        logging.info(f"Split metrics saved to {Path(save_path, 'split_metrics.csv')}.")
 
-        # ✅ Save all predictions
+def evaluate_normal_batches(model, generator, steps, embeddings, save_path: Path, walk_distance: int, noise: float):
+    """
+    Evaluate the model in normal mode (walk_distance != -1).
+    """
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    global_metrics = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
+    all_predictions = []  # Store all predictions and ground truth values
+
+    non_cancer_keys = {'Text', 'Image', 'RNA', 'Mutation'}
+    cancer_embeddings = [emb for emb in embeddings if emb not in non_cancer_keys]
+
+    logging.info(f"Evaluating on {steps} batches.")
+
+    for step in range(steps):
+        try:
+            X_batch, y_batch = next(generator)
+            walk_distance_batch = np.full(len(X_batch), walk_distance)
+
+            y_pred_batch = model.predict(X_batch)
+
+            for embedding in embeddings:
+                if embedding not in y_batch:
+                    logging.warning(f"Missing label: {embedding}, skipping")
+                    continue
+
+                output_index = model.output_names.index(embedding)
+                y_true = y_batch[embedding]
+                y_pred = np.rint(y_pred_batch[output_index]).astype(int)
+
+                if len(y_true) == 0 or len(y_pred) == 0:
+                    logging.warning(f"Empty predictions or ground truth for {embedding}, skipping")
+                    continue
+
+                # ✅ Filter out rows where cancer embeddings have y_true == 0
+                if embedding in cancer_embeddings:
+                    valid_indices = np.where(y_true > 0)[0]
+                    if len(valid_indices) == 0:
+                        logging.warning(f"Skipping {embedding} batch, no valid (non-zero) y_true values found.")
+                        continue
+
+                    y_true = y_true[valid_indices]
+                    y_pred = y_pred[valid_indices]
+
+                if y_pred.ndim > 1:
+                    y_pred = y_pred.flatten()
+
+                # ✅ Store predictions
+                for i in range(len(y_true)):
+                    all_predictions.append({
+                        "walk_distance": walk_distance,
+                        "embedding": embedding,
+                        "y_true": y_true[i],
+                        "y_pred": y_pred[i],
+                        "noise": noise
+                    })
+
+                # ✅ Store global metrics
+                global_metrics[embedding]['accuracy'].append(accuracy_score(y_true, y_pred))
+                global_metrics[embedding]['precision'].append(
+                    precision_score(y_true, y_pred, average='macro', zero_division=0))
+                global_metrics[embedding]['recall'].append(
+                    recall_score(y_true, y_pred, average='macro', zero_division=0))
+                global_metrics[embedding]['f1'].append(
+                    f1_score(y_true, y_pred, average='macro', zero_division=0))
+
+        except StopIteration:
+            logging.error("Generator ran out of data earlier than expected.")
+            break
+
+    # ✅ Save global metrics
+    metrics = [{
+        "walk_distance": walk_distance,
+        "embedding": embedding,
+        "accuracy": np.mean(values['accuracy']),
+        "precision": np.mean(values['precision']),
+        "recall": np.mean(values['recall']),
+        "f1": np.mean(values['f1']),
+        "noise": noise
+    } for embedding, values in global_metrics.items()]
+
+    metrics_df = pd.DataFrame(metrics)
+    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
+    logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}.")
+
+    # ✅ Save all predictions
     if all_predictions:
         predictions_df = pd.DataFrame(all_predictions)
         predictions_df.to_csv(Path(save_path, "predictions.csv"), index=False)
@@ -440,9 +510,15 @@ if __name__ == '__main__':
     # Save fine-tuning history
     pd.DataFrame(history.history).to_csv(Path(save_path, "fine_tuning_history.csv"), index=False)
 
+    if walk_distance != -1:
+        evaluate_normal_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
+                                walk_distance=walk_distance, noise=noise_ratio)
+    else:
+        evaluate_walk_distance_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
+                                       noise=noise_ratio)
     # Final Evaluation
-    evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
-                                           walk_distance=walk_distance, noise=noise_ratio)
+    # evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
+    #                          walk_distance=walk_distance, noise=noise_ratio)
 
     # Calculate and save accuracy per embedding and walk distance
     # accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
