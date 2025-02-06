@@ -166,8 +166,13 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
 
             for wd in np.unique(walk_distance_batch):
                 if wd not in all_metrics:
-                    all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in
-                                       embeddings}
+                    all_metrics[wd] = {
+                        emb: {
+                            'accuracy': [], 'precision': [], 'recall': [], 'f1': [],
+                            'accuracy_zeros': [], 'precision_zeros': [], 'recall_zeros': [], 'f1_zeros': [],
+                            'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': []
+                        } for emb in embeddings
+                    }
                     all_predictions[wd] = {emb: [] for emb in embeddings}
                     all_ground_truth[wd] = {emb: [] for emb in embeddings}
 
@@ -179,6 +184,32 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     all_predictions[wd][embedding].extend(y_pred_wd.flatten())
                     all_ground_truth[wd][embedding].extend(y_true_wd.flatten())
 
+                    # ✅ Compute separate F1-scores
+                    y_true_zeros = (y_true_wd == 0)
+                    y_true_nonzeros = (y_true_wd > 0)
+
+                    if np.any(y_true_zeros):
+                        acc_zeros = accuracy_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
+                        prec_zeros = precision_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
+                                                     average='macro', zero_division=0)
+                        rec_zeros = recall_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
+                                                 average='macro', zero_division=0)
+                        f1_zeros = f1_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
+                                            average='macro', zero_division=0)
+                    else:
+                        acc_zeros, prec_zeros, rec_zeros, f1_zeros = np.nan, np.nan, np.nan, np.nan
+
+                    if np.any(y_true_nonzeros):
+                        acc_nonzeros = accuracy_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
+                        prec_nonzeros = precision_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
+                                                        average='macro', zero_division=0)
+                        rec_nonzeros = recall_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
+                                                    average='macro', zero_division=0)
+                        f1_nonzeros = f1_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
+                                               average='macro', zero_division=0)
+                    else:
+                        acc_nonzeros, prec_nonzeros, rec_nonzeros, f1_nonzeros = np.nan, np.nan, np.nan, np.nan
+
                     all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
                     all_metrics[wd][embedding]['precision'].append(
                         precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
@@ -186,6 +217,16 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
                     all_metrics[wd][embedding]['f1'].append(
                         f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+
+                    all_metrics[wd][embedding]['accuracy_zeros'].append(acc_zeros)
+                    all_metrics[wd][embedding]['precision_zeros'].append(prec_zeros)
+                    all_metrics[wd][embedding]['recall_zeros'].append(rec_zeros)
+                    all_metrics[wd][embedding]['f1_zeros'].append(f1_zeros)
+
+                    all_metrics[wd][embedding]['accuracy_nonzeros'].append(acc_nonzeros)
+                    all_metrics[wd][embedding]['precision_nonzeros'].append(prec_nonzeros)
+                    all_metrics[wd][embedding]['recall_nonzeros'].append(rec_nonzeros)
+                    all_metrics[wd][embedding]['f1_nonzeros'].append(f1_nonzeros)
 
     # ✅ Save results
     detailed_metrics = []
@@ -200,9 +241,17 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "walk_distance": wd,
                         "embedding": embedding,
                         "accuracy": np.mean(values['accuracy']) if values['accuracy'] else 0,
+                        "accuracy_zeros": np.nanmean(values['accuracy_zeros']) if values['accuracy_zeros'] else np.nan,
+                        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if values['accuracy_nonzeros'] else np.nan,
                         "precision": np.mean(values['precision']) if values['precision'] else 0,
+                        "precision_zeros": np.nanmean(values['precision_zeros']) if values['precision_zeros'] else np.nan,
+                        "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if values['precision_nonzeros'] else np.nan,
                         "recall": np.mean(values['recall']) if values['recall'] else 0,
+                        "recall_zeros": np.nanmean(values['recall_zeros']) if values['recall_zeros'] else np.nan,
+                        "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values['recall_nonzeros'] else np.nan,
                         "f1": np.mean(values['f1']) if values['f1'] else 0,
+                        "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
+                        "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
                         "noise": noise
                     })
                 else:
@@ -210,9 +259,17 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "walk_distance": wd,
                         "embedding": embedding,
                         "accuracy": 0.0,
+                        "accuracy_zeros": np.nan,
+                        "accuracy_nonzeros": np.nan,
                         "precision": 0.0,
+                        "precision_zeros": np.nan,
+                        "precision_nonzeros": np.nan,
                         "recall": 0.0,
+                        "recall_zeros": np.nan,
+                        "recall_nonzeros": np.nan,
                         "f1": 0.0,
+                        "f1_zeros": np.nan,
+                        "f1_nonzeros": np.nan,
                         "noise": noise
                     })
 
@@ -226,6 +283,8 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
         all_prec = []
         all_rec = []
         all_f1 = []
+        all_f1_zeros = []
+        all_f1_nonzeros = []
 
         for wd in all_walk_distances_seen:
             if wd in all_metrics:
@@ -233,14 +292,24 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                 all_prec.extend(all_metrics[wd][embedding]['precision'])
                 all_rec.extend(all_metrics[wd][embedding]['recall'])
                 all_f1.extend(all_metrics[wd][embedding]['f1'])
+                all_f1_zeros.extend(all_metrics[wd][embedding]['f1_zeros'])
+                all_f1_nonzeros.extend(all_metrics[wd][embedding]['f1_nonzeros'])
 
         aggregated_metrics.append({
             "walk_distance": -1 if walk_distance == -1 else walk_distance,
             "embedding": embedding,
             "accuracy": np.mean(all_acc) if all_acc else 0,
+            "accuracy_zeros": np.nanmean(all_metrics[wd][embedding]['accuracy_zeros']) if all_acc else np.nan,
+            "accuracy_nonzeros": np.nanmean(all_metrics[wd][embedding]['accuracy_nonzeros']) if all_acc else np.nan,
             "precision": np.mean(all_prec) if all_prec else 0,
+            "precision_zeros": np.nanmean(all_metrics[wd][embedding]['precision_zeros']) if all_prec else np.nan,
+            "precision_nonzeros": np.nanmean(all_metrics[wd][embedding]['precision_nonzeros']) if all_prec else np.nan,
             "recall": np.mean(all_rec) if all_rec else 0,
+            "recall_zeros": np.nanmean(all_metrics[wd][embedding]['recall_zeros']) if all_rec else np.nan,
+            "recall_nonzeros": np.nanmean(all_metrics[wd][embedding]['recall_nonzeros']) if all_rec else np.nan,
             "f1": np.mean(all_f1) if all_f1 else 0,
+            "f1_zeros": np.nanmean(all_f1_zeros) if all_f1_zeros else np.nan,
+            "f1_nonzeros": np.nanmean(all_f1_nonzeros) if all_f1_nonzeros else np.nan,
             "noise": noise
         })
 
