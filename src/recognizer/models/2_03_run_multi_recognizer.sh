@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --job-name=m_r
-#SBATCH --time=9-00:00:00
+#SBATCH --time=23:00:00
 #SBATCH --partition=batch
 #SBATCH --qos=normal
 #SBATCH --ntasks=1
