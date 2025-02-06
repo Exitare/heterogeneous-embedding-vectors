@@ -3,7 +3,7 @@
 #SBATCH --job-name=m_e_g
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=batch
-#SBATCH --qos=long_jobs
+#SBATCH --qos=normal
 #SBATCH --ntasks=1
 #SBATCH --mem=512000
 #SBATCH --cpus-per-task=2
