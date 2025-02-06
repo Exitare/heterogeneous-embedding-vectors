@@ -68,6 +68,7 @@ def create_train_val_indices(hdf5_file_path, walk_distance: int, test_size=0.2, 
         indices, test_size=test_size, random_state=random_state, stratify=walk_distances
     )
 
+
 def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
     with h5py.File(hdf5_file_path, 'r') as f:
         X = f["X"][:]
@@ -85,10 +86,10 @@ def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
             y_batch = {key: labels[key][batch_indices] for key in labels}
 
             if walk_distance == -1:
-                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
+                # logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
                 yield X_batch, y_batch, walk_distances[batch_indices]
             else:
-                #logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
+                # logging.info(f"Generated batch with {len(X_batch)} samples and {len(y_batch)} labels.")
                 yield X_batch, y_batch
 
 
@@ -101,7 +102,7 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
 
     all_metrics = {}
     global_metrics = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
-
+    all_predictions = []  # List to store all predictions and ground truth values
     logging.info(f"Evaluating on {steps} batches.")
 
     for step in range(steps):
@@ -125,6 +126,27 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                 if len(y_true) == 0 or len(y_pred) == 0:
                     logging.warning(f"Empty predictions or ground truth for {embedding}, skipping")
                     continue
+
+                if walk_distance == -1:
+                    # Store predictions and ground truth
+                    for i in range(len(y_true)):
+                        all_predictions.append({
+                            "walk_distance": walk_distance_batch[i],
+                            "embedding": embedding,
+                            "y_true": y_true[i],
+                            "y_pred": y_pred[i][0],
+                            "noise": noise
+                        })
+                else:
+                    # Store predictions and ground truth
+                    for i in range(len(y_true)):
+                        all_predictions.append({
+                            "walk_distance": walk_distance,
+                            "embedding": embedding,
+                            "y_true": y_true[i],
+                            "y_pred": y_pred[i][0],
+                            "noise": noise
+                        })
 
                 if walk_distance == -1:
                     # Track per-walk-distance metrics
@@ -210,7 +232,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
         split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
         logging.info(f"Split metrics saved to {Path(save_path, 'split_metrics.csv')}.")
 
-    return metrics_df
+        # ✅ Save all predictions
+    if all_predictions:
+        predictions_df = pd.DataFrame(all_predictions)
+        predictions_df.to_csv(Path(save_path, "predictions.csv"), index=False)
+        logging.info(f"Predictions saved to {Path(save_path, 'predictions.csv')}.")
+
 
 def build_model(input_dim, cancer_list: []):
     """
@@ -249,21 +276,23 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
     parser.add_argument('--walk_distance', "-w", type=int, required=True,
-                        help='The number of the walk distance to work with.', choices=list(range(3, 16)) + [-1])
+                        help='The number of the walk distance to work with.', choices=list(range(3, 1000)) + [-1])
     parser.add_argument("--run_iteration", "-ri", type=int, required=False,
                         help="The iteration number for the run. Used for saving the results and validation.", default=1)
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
-                        help="The cancer types to work with, e.g. blca brca")
+                        help="The cancer types to work with, e.g. BRCA LUAD STAD BLCA COAD THCA")
     parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, required=True,
                         help="The amount of summed embeddings to work with.")
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0,
                         help="Ratio of random noise added to the sum embeddings")
+    parser.add_argument("--epochs", "-e", type=int, default=100, help="Number of epochs to train the model")
     args = parser.parse_args()
 
     batch_size = args.batch_size
     walk_distance = args.walk_distance
     run_iteration = args.run_iteration
     selected_cancers = args.cancer
+    epochs: int = args.epochs
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -279,6 +308,8 @@ if __name__ == '__main__':
     logging.info(f"Run iteration: {run_iteration}")
     logging.info(f"Amount of summed embeddings: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
+    logging.info(f"Epochs: {epochs}")
+
     run_name = f"run_{run_iteration}"
 
     if walk_distance == -1:
@@ -345,7 +376,6 @@ if __name__ == '__main__':
 
     model = build_model(input_dim, selected_cancers)
 
-
     # Set up a list of metrics
     loss = {'Text': 'mae', 'Image': 'mae', 'RNA': 'mae', 'Mutation': 'mae'}
     loss_weights = {'Text': 3.0, 'Image': 1., 'RNA': 1., 'Mutation': 1.}
@@ -373,7 +403,7 @@ if __name__ == '__main__':
 
     # Initial Training
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
+                        validation_steps=len(val_indices) // batch_size, epochs=epochs,
                         callbacks=[early_stopping])
 
     # Save training history
@@ -404,16 +434,16 @@ if __name__ == '__main__':
                   loss_weights=loss_weights,
                   metrics=metrics)
     history = model.fit(train_gen, steps_per_epoch=len(train_indices) // batch_size, validation_data=val_gen,
-                        validation_steps=len(val_indices) // batch_size, epochs=100,
+                        validation_steps=len(val_indices) // batch_size, epochs=epochs,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Save fine-tuning history
     pd.DataFrame(history.history).to_csv(Path(save_path, "fine_tuning_history.csv"), index=False)
 
     # Final Evaluation
-    metrics_df = evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
+    evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
                                            walk_distance=walk_distance, noise=noise_ratio)
 
     # Calculate and save accuracy per embedding and walk distance
-    #accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
+    # accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
     logging.info("Fine-tuning and evaluation complete!")
