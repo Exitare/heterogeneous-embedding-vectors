@@ -166,7 +166,8 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
 
             for wd in np.unique(walk_distance_batch):
                 if wd not in all_metrics:
-                    all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in embeddings}
+                    all_metrics[wd] = {emb: {'accuracy': [], 'precision': [], 'recall': [], 'f1': []} for emb in
+                                       embeddings}
                     all_predictions[wd] = {emb: [] for emb in embeddings}
                     all_ground_truth[wd] = {emb: [] for emb in embeddings}
 
@@ -287,6 +288,7 @@ if __name__ == '__main__':
                         help="Ratio of random noise added to the sum embeddings")
     parser.add_argument("--cancer", "-c", nargs="+", required=True,
                         help="The cancer types to work with, e.g. blca brca")
+    parser.add_argument("--epochs", "-e", type=int, default=100, help="The number of epochs to train the model.")
     args = parser.parse_args()
 
     batch_size: int = args.batch_size
@@ -295,6 +297,7 @@ if __name__ == '__main__':
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
     selected_cancers: [str] = args.cancer
+    epochs: int = args.epochs
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -309,6 +312,7 @@ if __name__ == '__main__':
     logging.info(f"Run iteration: {run_iteration}")
     logging.info(f"Summed embedding count: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
+    logging.info(f"Epochs: {epochs}")
 
     load_path: Path = Path(load_path, cancers)
 
@@ -401,7 +405,7 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=val_gen,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=epochs,
                         callbacks=[early_stopping])
 
     # save history
@@ -432,11 +436,11 @@ if __name__ == '__main__':
                         steps_per_epoch=train_steps,
                         validation_data=val_gen,
                         validation_steps=test_steps,
-                        epochs=100,
+                        epochs=epochs,
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
-    metrics: [] = evaluate_model_in_batches(model, test_gen, test_steps, embeddings=embeddings,
-                                            save_path=save_path, noise=noise_ratio, walk_distance=walk_distance)
+    evaluate_model_in_batches(model, test_gen, test_steps, embeddings=embeddings,
+                              save_path=save_path, noise=noise_ratio, walk_distance=walk_distance)
 
     logging.info("Done.")
