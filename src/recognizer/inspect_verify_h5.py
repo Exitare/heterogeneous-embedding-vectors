@@ -16,6 +16,8 @@ with h5py.File(file) as h5_file:
     print(h5_file.keys())
     for key in h5_file.keys():
         print(f"Key: {key}")
+        if key == "meta_information":
+            continue
         print(f"Shape: {h5_file[key].shape}")
         print(f"Type: {h5_file[key].dtype}")
         print(f"Value: {h5_file[key][()]}")
@@ -77,6 +79,8 @@ if not set(cancers).issubset(df.columns):
     sys.exit("Not all cancer types are present in the dataset.")
 
 
+# print all unique total amounts
+print(f"Unique total amounts: {df['Total'].unique()}")
 
 # Validate unique cancer condition
 violations = df[cancers].apply(lambda row: (row > 0).sum() > 1, axis=1)
@@ -96,3 +100,11 @@ if missing_cancers:
     print(f"❌ Error: The following cancers have no occurrences in the dataset: {', '.join(missing_cancers)}")
 else:
     print("✅ All cancer types have at least one occurrence in the dataset.")
+
+if len(df['Total'].unique()) > 1:
+    for total in df['Total'].unique():
+        missing_cancers = [cancer for cancer in cancers if (df[cancer] > 0).sum() == 0 and df['Total'] == total]
+        if missing_cancers:
+            print(f"❌ Error: The following cancers have no occurrences in the dataset: {', '.join(missing_cancers)}")
+        else:
+            print("✅ All cancer types have at least one occurrence in the dataset.")
