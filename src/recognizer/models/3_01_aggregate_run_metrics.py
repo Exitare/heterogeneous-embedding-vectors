@@ -20,7 +20,7 @@ if __name__ == '__main__':
     assert data_folder.parts[-1].isdigit(), "Last path element must be a number"
 
     # extract last two pieces of data_folder
-    appendix = Path(*data_folder.parts[-2:])
+    appendix = Path(*data_folder.parts[-3:])
     save_folder = Path(save_folder, appendix)
     logging.info(f"Using data folder: {data_folder}")
     logging.info(f"Using save folder: {save_folder}")
@@ -33,12 +33,12 @@ if __name__ == '__main__':
     for root, dirs, files in os.walk(data_folder):
         for file in files:
             if file == "metrics.csv":
-                logging.info("Processing", Path(root, file))
+                logging.info(f"Processing {Path(root, file)}")
                 metrics = pd.read_csv(Path(root, file))
                 results.append(metrics)
 
             if file == 'split_metrics.csv':
-                logging.info("Processing", Path(root, file))
+                logging.info(f"Processing {Path(root, file)}")
                 split_metrics.append(pd.read_csv(Path(root, file)))
 
     # concatenate all metrics
@@ -50,3 +50,4 @@ if __name__ == '__main__':
 
     # save the concatenated metrics
     results.to_csv(Path(save_folder, "metrics.csv"), index=False)
+    logging.info(f"Saved metrics to {save_folder}")

@@ -3,63 +3,77 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from argparse import ArgumentParser
+import logging
+
+from seaborn import color_palette
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 save_folder = Path("figures", "recognizer")
 load_folder = Path("results", "recognizer", "aggregated_metrics")
+
+metric_mappings = {
+    "A": "Accuracy",
+    "P": "Precision",
+    "R": "Recall",
+    "F1": "f1_nonzeros"
+}
 
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
-    parser.add_argument("--file_name", "-fn", type=Path, required=False, help="File name to save the plot")
     parser.add_argument("-c", "--cancer", required=False, nargs='+')
-    parser.add_argument("--foundation", "-f", action="store_true", help="Plot for foundation model")
-    parser.add_argument("--multi", "-m", action="store_true", help="Plot for multi recognizer")
+    parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
+                        required=False, default=15000)
+    parser.add_argument("--multi", "-m", action="store_true", help="Use of the multi recognizer metrics")
+    parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
+    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1"], default="A")
+    parser.add_argument("--noise", "-n", type=float, default=0.0, help="The noise to filter")
 
     args = parser.parse_args()
-    multi = args.multi
-    file_name: Path = args.file_name
-    cancers: [] = args.cancer
+    multi: bool = args.multi
+    amount_of_walk_embeddings: int = args.amount_of_walk_embeddings
+    cancers: [str] = args.cancer
     foundation: bool = args.foundation
+    metric: str = args.metric
+    noise: float = args.noise
+    selected_cancers: [str] = '_'.join(cancers)
 
-    print(f"Loading data for multi: {multi}, cancers: {cancers}, foundation: {foundation}")
+    metric: str = metric_mappings[metric]
+
+    logging.info(
+        f"Loading data for multi: {multi}, cancers: {cancers}, foundation: {foundation}, metric: {metric},"
+        f" amount_of_walk_embeddings: {amount_of_walk_embeddings}, noise: {noise}")
 
     if multi:
-        selected_cancers = '_'.join(cancers)
-        if foundation:
-            load_folder = Path(load_folder, "mrf", selected_cancers)
-            file = Path(load_folder, "split_metrics.csv")
-        else:
-            load_folder = Path(load_folder, "mr", selected_cancers)
-            file = Path(load_folder, "metrics.csv")
+        file_path = Path(load_folder, "multi", selected_cancers, str(amount_of_walk_embeddings),
+                         "metrics.csv" if not foundation else "split_metrics.csv")
+
     else:
-        if foundation:
-            load_folder = Path(load_folder, "srf")
-            file = Path(load_folder, "split_metrics.csv")
-        else:
-            load_folder = Path(load_folder, "sr")
-            file = Path(load_folder, "metrics.csv")
+        file_path = Path(load_folder, "simple", selected_cancers, str(amount_of_walk_embeddings),
+                         "metrics.csv" if not foundation else "split_metrics.csv")
 
-    print(f"Loading file {file}...")
-    df = pd.read_csv(file)
+    logging.info(f"Loading file using {file_path}...")
+    df = pd.read_csv(file_path)
 
-    print(df)
+    df = df[df["noise"] == noise]
+    logging.info(df)
+    assert df["noise"].unique() == noise, "Noise is not unique"
+
     # calculate mean of embeddings
     df = df.groupby(["walk_distance", "embedding"]).mean(numeric_only=True)
     # embeddings,iteration,embedding,accuracy,precision,recall,f1
     # plot the accuracy for each embeddings, hue by embeddings
-    df = df.sort_values(by=["accuracy"], ascending=False)
+    df = df.sort_values(by=[metric], ascending=False)
 
     # plot line plot for embeddings, embeddings and accuracy
     df = df.reset_index()
 
     # print mean accuracy for each embedding
-    print(df[["embedding", "accuracy"]].groupby("embedding").mean(numeric_only=True))
-    df_mean = df.groupby("walk_distance", as_index=False)["accuracy"].mean()
-
-    # upper case all embedding
-    df["embedding"] = df["embedding"].str.upper()
+    logging.info(df[["embedding", metric]].groupby("embedding").mean(numeric_only=True))
+    df_mean = df.groupby("walk_distance", as_index=False)[metric].mean()
 
     title = ''
 
@@ -73,14 +87,17 @@ if __name__ == '__main__':
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
 
+    color_palette = {"Text": "blue", "Image": "red", "RNA": "green", "Mutation": "purple", "BRCA": "orange",
+                     "LUAD": "lime", "BLCA": "pink", "THCA": "brown", "STAD": "black", "COAD": "grey"}
+
     # Plot individual embeddings
-    sns.lineplot(data=df, x="walk_distance", y="accuracy", hue="embedding", palette="tab10", alpha=0.6)
+    sns.lineplot(data=df, x="walk_distance", y=metric, hue="embedding", palette=color_palette, alpha=0.6)
 
     # Plot mean line
-    sns.lineplot(data=df_mean, x="walk_distance", y="accuracy", color='black', marker='o', linestyle='--', label='Mean')
+    #sns.lineplot(data=df_mean, x="walk_distance", y=metric, color='black', marker='o', linestyle='--', label='Mean')
 
     plt.title(title)
-    plt.ylabel("Accuracy")
+    plt.ylabel(metric)
     plt.xlabel("Walk Distance")
     plt.xticks(rotation=45)
     plt.legend(title="Embedding")
@@ -89,14 +106,20 @@ if __name__ == '__main__':
     plt.ylim(0.2, 1)
     # if multi set x ticks starting at 2 to 20
     if multi:
-        plt.xticks(range(2, 21))
-        plt.xlim(2, 20)
+        plt.xticks(range(3, 11))
+        plt.xlim(3, 10)
     else:
-        plt.xticks(range(2, 31))
-        plt.xlim(2, 30)
+        plt.xticks(range(3, 11))
+        plt.xlim(3, 10)
 
-
-    if file_name is None:
-        plt.show()
+    if multi:
+        save_path = Path(save_folder, selected_cancers, str(amount_of_walk_embeddings), str(noise))
+        save_file_name: str = "multi" if not foundation else "multi_foundation.png"
     else:
-        plt.savefig(Path(save_folder, file_name))
+        save_path = Path(save_folder, selected_cancers, str(amount_of_walk_embeddings), str(noise))
+        save_file_name: str = "simple" if not foundation else "simple_foundation.png"
+
+    if not save_path.exists():
+        save_path.mkdir(parents=True)
+
+    plt.savefig(Path(save_path, save_file_name), dpi=150)
