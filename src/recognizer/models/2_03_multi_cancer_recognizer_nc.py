@@ -599,10 +599,5 @@ if __name__ == '__main__':
     else:
         evaluate_walk_distance_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
                                        noise=noise_ratio)
-    # Final Evaluation
-    # evaluate_model_in_batches(model, test_gen, len(test_indices) // batch_size, embeddings, save_path,
-    #                          walk_distance=walk_distance, noise=noise_ratio)
 
-    # Calculate and save accuracy per embedding and walk distance
-    # accuracy_metrics_df = evaluate_accuracy_per_walk_distance(metrics_df=metrics_df, save_path=save_path)
     logging.info("Fine-tuning and evaluation complete!")
