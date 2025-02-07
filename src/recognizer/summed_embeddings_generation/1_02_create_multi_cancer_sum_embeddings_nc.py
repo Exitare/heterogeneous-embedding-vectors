@@ -46,7 +46,6 @@ def generate_noise(embedding_length: int, scale: float = 0.1) -> np.ndarray:
 
 
 def main():
-    image_chunk: int = 0
     # Argument Parsing
     parser = ArgumentParser(description='Sum embeddings from different sources.')
     parser.add_argument("--walk_distance", "-w", type=int, help="Number of embeddings to sum", required=True)
