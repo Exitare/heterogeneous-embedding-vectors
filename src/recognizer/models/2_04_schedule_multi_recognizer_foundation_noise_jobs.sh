@@ -34,6 +34,7 @@ echo "Upper bound: $upper_bound"
 
 for noise in 0.1 0.2 0.3 0.4 0.5 0.6
 do
+  echo "Noise: $noise"
   # run it 30 times
   for iteration in $(seq 1 30)
   do
