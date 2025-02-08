@@ -242,13 +242,17 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "embedding": embedding,
                         "accuracy": np.mean(values['accuracy']) if values['accuracy'] else 0,
                         "accuracy_zeros": np.nanmean(values['accuracy_zeros']) if values['accuracy_zeros'] else np.nan,
-                        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if values['accuracy_nonzeros'] else np.nan,
+                        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if values[
+                            'accuracy_nonzeros'] else np.nan,
                         "precision": np.mean(values['precision']) if values['precision'] else 0,
-                        "precision_zeros": np.nanmean(values['precision_zeros']) if values['precision_zeros'] else np.nan,
-                        "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if values['precision_nonzeros'] else np.nan,
+                        "precision_zeros": np.nanmean(values['precision_zeros']) if values[
+                            'precision_zeros'] else np.nan,
+                        "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if values[
+                            'precision_nonzeros'] else np.nan,
                         "recall": np.mean(values['recall']) if values['recall'] else 0,
                         "recall_zeros": np.nanmean(values['recall_zeros']) if values['recall_zeros'] else np.nan,
-                        "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values['recall_nonzeros'] else np.nan,
+                        "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values[
+                            'recall_nonzeros'] else np.nan,
                         "f1": np.mean(values['f1']) if values['f1'] else 0,
                         "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
                         "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
@@ -397,7 +401,8 @@ if __name__ == '__main__':
 
             logging.info(f"Loading data from {train_file} and {test_file}...")
 
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
+        save_path = Path(save_path, selected_cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         "combined_embeddings", run_name)
     else:
         if noise_ratio == 0.0:
             train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
@@ -412,8 +417,8 @@ if __name__ == '__main__':
 
             logging.info(f"Loading data from {train_file} and {test_file}...")
 
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings",
-                         run_name)
+        save_path = Path(save_path, selected_cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings", run_name)
 
     logging.info(f"Saving results to {save_path}")
 
