@@ -9,6 +9,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 modalities = ["RNA", "Mutation", "Image", "Text"]
 
+save_folder = Path("figures", "recognizer")
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
     parser.add_argument("-c", "--cancer", required=False, nargs='+',
@@ -30,6 +32,10 @@ if __name__ == '__main__':
     logging.info(f"Amount of walk embeddings: {amount_of_walk_embeddings}")
     logging.info(f"Noise: {noise}")
     logging.info(f"Walk distance: {walk_distance}")
+
+    save_folder = Path(save_folder, cancers, str(amount_of_walk_embeddings), str(noise), str(walk_distance))
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
 
     h5_file_path = Path(
         f"results/recognizer/summed_embeddings/multi/{cancers}/{amount_of_walk_embeddings}/{noise}/{walk_distance}_embeddings.h5")
@@ -56,7 +62,7 @@ if __name__ == '__main__':
                     autopct='%1.1f%%',
                     startangle=90,
                     pctdistance=1.2,  # Move percentages outside the pie
-                    textprops={'fontsize': 10, 'color': 'black', 'weight': 'bold'}  # Improve readability
+                    textprops={'fontsize': 8, 'color': 'black'}  # Improve readability
                 )
 
                 # Rotate the percentage labels by 90 degrees
@@ -66,6 +72,9 @@ if __name__ == '__main__':
                 # Use a legend instead of direct labels
                 plt.legend(wedges, unique, title=key, loc="center left", bbox_to_anchor=(1, 0.5))
                 plt.title(f"Distribution of {key}")
+                plt.tight_layout()
+                plt.savefig(Path(save_folder, f"{key}_distribution.png"), dpi=150)
+
 
             else:
                 # Use a histogram for continuous or high-cardinality data
@@ -82,16 +91,20 @@ if __name__ == '__main__':
             plt.figure(figsize=(8, 8))
             wedges, _, autotexts = plt.pie(
                 [zero_count, non_zero_count],
-                labels=["Zero", "Non-Zero"],
                 autopct='%1.1f%%',
-                startangle=90,
+                startangle=0,
                 pctdistance=1.2,
-                textprops={'fontsize': 10, 'color': 'black', 'weight': 'bold'}
+                textprops={'fontsize': 8, 'color': 'black'}
             )
 
             # Rotate percentage labels
             for autotext in autotexts:
-                autotext.set_rotation(90)
+                autotext.set_rotation(0)
+
+            # Use a legend instead of direct labels
+            plt.legend(wedges, ["Zero", "Non-Zero"], title="Value", loc="center right", bbox_to_anchor=(1, 1))
 
             plt.title(f"Zero vs. Non-Zero Distribution in {key}")
-            plt.show()
+            plt.tight_layout()
+            plt.savefig(Path(save_folder, f"{key}_zero_distribution.png"), dpi=150)
+            plt.close('all')
