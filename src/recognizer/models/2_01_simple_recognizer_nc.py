@@ -5,13 +5,16 @@ from pathlib import Path
 from tensorflow.keras.layers import Input, Dense, BatchNormalization, Dropout, ReLU
 from tensorflow.keras.models import Model
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score, \
+    matthews_corrcoef, roc_auc_score
 from argparse import ArgumentParser
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 import h5py
 from sklearn.model_selection import train_test_split
+import scipy.special
+from tensorflow.keras.utils import to_categorical
 
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "simple")
@@ -92,12 +95,12 @@ def build_model(input_dim):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Text')(text_x)
+    text_output = Dense(num_classes, activation='softmax', name='Text')(text_x)
 
     # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='RNA')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Mutation')(x)
+    image_output = Dense(num_classes, activation='softmax', name='Image')(x)
+    rna_output = Dense(num_classes, activation='softmax', name='RNA')(x)
+    mutation_output = Dense(num_classes, activation='softmax', name='Mutation')(x)
 
     # Separate output layers for each count
     outputs = [text_output, image_output, rna_output, mutation_output]
@@ -107,7 +110,7 @@ def build_model(input_dim):
     return model
 
 
-def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
+def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance: int):
     with h5py.File(hdf5_file_path, 'r') as f:
         X = f["X"][:]
         walk_distances = f["WalkDistances"][:] if walk_distance == -1 else None
@@ -122,8 +125,9 @@ def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
             batch_indices = np.sort(indices[start_idx:end_idx])
 
             X_batch = X[batch_indices]
-            y_batch = {key: labels[key][batch_indices] for key in labels}
 
+            # Convert labels to one-hot encoded format
+            y_batch = {key: to_categorical(labels[key][batch_indices], num_classes=num_classes) for key in labels}
             if walk_distance == -1:
                 yield X_batch, y_batch, walk_distances[batch_indices]
             else:
@@ -142,6 +146,7 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
     all_metrics = {}
     all_predictions = {}
     all_ground_truth = {}
+    all_probabilities = {}  # Store probabilities for AUC calculation
     all_walk_distances_seen = set()  # Track all seen walk distances
 
     for _ in range(steps):
@@ -156,6 +161,10 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
             continue  # Skip iteration if there's an issue
 
         y_pred_batch = model.predict(X_batch)
+        y_pred_proba_batch = scipy.special.softmax(model.predict(X_batch), axis=-1)
+
+        if y_pred_proba_batch.shape[-1] > 1:  # If model outputs logits, apply softmax
+            y_pred_proba_batch = scipy.special.softmax(y_pred_proba_batch, axis=-1)
 
         # Track all unique walk distances seen
         all_walk_distances_seen.update(np.unique(walk_distance_batch))
@@ -170,19 +179,29 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         emb: {
                             'accuracy': [], 'precision': [], 'recall': [], 'f1': [],
                             'accuracy_zeros': [], 'precision_zeros': [], 'recall_zeros': [], 'f1_zeros': [],
-                            'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': []
+                            'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': [],
+                            'balanced_accuracy': [], 'mcc': [], "auc": []
                         } for emb in embeddings
                     }
                     all_predictions[wd] = {emb: [] for emb in embeddings}
                     all_ground_truth[wd] = {emb: [] for emb in embeddings}
+                    all_probabilities[wd] = {emb: [] for emb in embeddings}
 
                 mask = walk_distance_batch == wd
-                y_true_wd = y_true[mask]
-                y_pred_wd = y_pred[mask]
+
+                y_true_wd_one_hot = y_true[mask]
+                y_pred_wd_one_hot = y_pred[mask]
+
+                # Convert from one-hot encoding to categorical labels
+                y_true_wd = np.argmax(y_true_wd_one_hot, axis=1)
+                y_pred_wd = np.argmax(y_pred_wd_one_hot, axis=1)
+
+                y_pred_proba_wd = y_pred_proba_batch[i][mask]  # Extract class probabilities
 
                 if len(y_true_wd) > 0:
                     all_predictions[wd][embedding].extend(y_pred_wd.flatten())
                     all_ground_truth[wd][embedding].extend(y_true_wd.flatten())
+                    all_probabilities[wd][embedding].extend(y_pred_proba_wd)
 
                     # ✅ Compute separate F1-scores
                     y_true_zeros = (y_true_wd == 0)
@@ -191,32 +210,56 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     if np.any(y_true_zeros):
                         acc_zeros = accuracy_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
                         prec_zeros = precision_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                                     average='macro', zero_division=0)
+                                                     average='weighted', zero_division=0)
                         rec_zeros = recall_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                                 average='macro', zero_division=0)
+                                                 average='weighted', zero_division=0)
                         f1_zeros = f1_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                            average='macro', zero_division=0)
+                                            average='weighted', zero_division=0)
                     else:
                         acc_zeros, prec_zeros, rec_zeros, f1_zeros = np.nan, np.nan, np.nan, np.nan
 
                     if np.any(y_true_nonzeros):
                         acc_nonzeros = accuracy_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
                         prec_nonzeros = precision_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                                        average='macro', zero_division=0)
+                                                        average='weighted', zero_division=0)
                         rec_nonzeros = recall_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                                    average='macro', zero_division=0)
+                                                    average='weighted', zero_division=0)
                         f1_nonzeros = f1_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                               average='macro', zero_division=0)
+                                               average='weighted', zero_division=0)
                     else:
                         acc_nonzeros, prec_nonzeros, rec_nonzeros, f1_nonzeros = np.nan, np.nan, np.nan, np.nan
 
+                        # ✅ Compute Balanced Accuracy and MCC
+                    balanced_acc = balanced_accuracy_score(y_true_wd, y_pred_wd) if len(
+                        np.unique(y_true_wd)) > 1 else np.nan
+                    mcc = matthews_corrcoef(y_true_wd, y_pred_wd) if len(np.unique(y_true_wd)) > 1 else np.nan
+
+                    try:
+                        unique_classes = np.unique(y_true_wd)  # Extract unique classes from y_true_wd
+                        num_unique_classes = len(unique_classes)
+
+                        # Ensure y_pred_proba_wd has the correct number of classes
+                        y_pred_proba_adjusted = y_pred_proba_wd[:, :num_unique_classes]
+
+                        # Normalize probabilities
+                        y_pred_proba_adjusted = y_pred_proba_adjusted / np.sum(y_pred_proba_adjusted, axis=1,
+                                                                               keepdims=True)
+
+                        # Compute AUC
+                        auc = roc_auc_score(y_true_wd, y_pred_proba_adjusted, multi_class="ovr",
+                                            labels=unique_classes) if num_unique_classes > 1 else np.nan
+
+                    except ValueError as e:
+                        logging.info(e)
+                        auc = np.nan  # Fallback if AUC computation fails
+
                     all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
                     all_metrics[wd][embedding]['precision'].append(
-                        precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        precision_score(y_true_wd, y_pred_wd, average='weighted', zero_division=0))
                     all_metrics[wd][embedding]['recall'].append(
-                        recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        recall_score(y_true_wd, y_pred_wd, average='weighted', zero_division=0))
                     all_metrics[wd][embedding]['f1'].append(
-                        f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
+                        f1_score(y_true_wd, y_pred_wd, average='weighted', zero_division=0))
 
                     all_metrics[wd][embedding]['accuracy_zeros'].append(acc_zeros)
                     all_metrics[wd][embedding]['precision_zeros'].append(prec_zeros)
@@ -227,6 +270,9 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     all_metrics[wd][embedding]['precision_nonzeros'].append(prec_nonzeros)
                     all_metrics[wd][embedding]['recall_nonzeros'].append(rec_nonzeros)
                     all_metrics[wd][embedding]['f1_nonzeros'].append(f1_nonzeros)
+                    all_metrics[wd][embedding]['balanced_accuracy'].append(balanced_acc)
+                    all_metrics[wd][embedding]['mcc'].append(mcc)
+                    all_metrics[wd][embedding]['auc'].append(auc)
 
     # ✅ Save results
     detailed_metrics = []
@@ -256,6 +302,10 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "f1": np.mean(values['f1']) if values['f1'] else 0,
                         "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
                         "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
+                        "balanced_accuracy": np.nanmean(values['balanced_accuracy']) if values[
+                            'balanced_accuracy'] else np.nan,
+                        "mcc": np.nanmean(values['mcc']) if values['mcc'] else np.nan,
+                        "auc": np.nanmean(values['auc']) if values['auc'] else np.nan,
                         "noise": noise
                     })
                 else:
@@ -274,6 +324,9 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "f1": 0.0,
                         "f1_zeros": np.nan,
                         "f1_nonzeros": np.nan,
+                        "balanced_accuracy": np.nan,
+                        "mcc": np.nan,
+                        "auc": np.nan,
                         "noise": noise
                     })
 
@@ -289,31 +342,56 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
         all_f1 = []
         all_f1_zeros = []
         all_f1_nonzeros = []
+        all_acc_zeros = []
+        all_acc_nonzeros = []
+        all_prec_zeros = []
+        all_prec_nonzeros = []
+        all_rec_zeros = []
+        all_rec_nonzeros = []
+        all_bal_acc = []
+        all_mcc = []
+        all_auc = []
 
         for wd in all_walk_distances_seen:
-            if wd in all_metrics:
-                all_acc.extend(all_metrics[wd][embedding]['accuracy'])
-                all_prec.extend(all_metrics[wd][embedding]['precision'])
-                all_rec.extend(all_metrics[wd][embedding]['recall'])
-                all_f1.extend(all_metrics[wd][embedding]['f1'])
-                all_f1_zeros.extend(all_metrics[wd][embedding]['f1_zeros'])
-                all_f1_nonzeros.extend(all_metrics[wd][embedding]['f1_nonzeros'])
+            if wd in all_metrics and embedding in all_metrics[wd]:
+                values = all_metrics[wd][embedding]
+
+                all_bal_acc.extend(values['balanced_accuracy'])
+                all_mcc.extend(values['mcc'])
+                all_acc.extend(values['accuracy'])
+                all_prec.extend(values['precision'])
+                all_rec.extend(values['recall'])
+                all_f1.extend(values['f1'])
+                all_f1_zeros.extend(values['f1_zeros'])
+                all_f1_nonzeros.extend(values['f1_nonzeros'])
+
+                # Ensure separate collection of zero and nonzero metrics
+                all_acc_zeros.extend(values['accuracy_zeros'])
+                all_acc_nonzeros.extend(values['accuracy_nonzeros'])
+                all_prec_zeros.extend(values['precision_zeros'])
+                all_prec_nonzeros.extend(values['precision_nonzeros'])
+                all_rec_zeros.extend(values['recall_zeros'])
+                all_rec_nonzeros.extend(values['recall_nonzeros'])
+                all_auc.extend(values['auc'])
 
         aggregated_metrics.append({
             "walk_distance": -1 if walk_distance == -1 else walk_distance,
             "embedding": embedding,
             "accuracy": np.mean(all_acc) if all_acc else 0,
-            "accuracy_zeros": np.nanmean(all_metrics[wd][embedding]['accuracy_zeros']) if all_acc else np.nan,
-            "accuracy_nonzeros": np.nanmean(all_metrics[wd][embedding]['accuracy_nonzeros']) if all_acc else np.nan,
+            "accuracy_zeros": np.nanmean(all_acc_zeros) if all_acc_zeros else np.nan,
+            "accuracy_nonzeros": np.nanmean(all_acc_nonzeros) if all_acc_nonzeros else np.nan,
             "precision": np.mean(all_prec) if all_prec else 0,
-            "precision_zeros": np.nanmean(all_metrics[wd][embedding]['precision_zeros']) if all_prec else np.nan,
-            "precision_nonzeros": np.nanmean(all_metrics[wd][embedding]['precision_nonzeros']) if all_prec else np.nan,
+            "precision_zeros": np.nanmean(all_prec_zeros) if all_prec_zeros else np.nan,
+            "precision_nonzeros": np.nanmean(all_prec_nonzeros) if all_prec_nonzeros else np.nan,
             "recall": np.mean(all_rec) if all_rec else 0,
-            "recall_zeros": np.nanmean(all_metrics[wd][embedding]['recall_zeros']) if all_rec else np.nan,
-            "recall_nonzeros": np.nanmean(all_metrics[wd][embedding]['recall_nonzeros']) if all_rec else np.nan,
+            "recall_zeros": np.nanmean(all_rec_zeros) if all_rec_zeros else np.nan,
+            "recall_nonzeros": np.nanmean(all_rec_nonzeros) if all_rec_nonzeros else np.nan,
             "f1": np.mean(all_f1) if all_f1 else 0,
             "f1_zeros": np.nanmean(all_f1_zeros) if all_f1_zeros else np.nan,
             "f1_nonzeros": np.nanmean(all_f1_nonzeros) if all_f1_nonzeros else np.nan,
+            "balanced_accuracy": np.nanmean(all_bal_acc) if all_bal_acc else np.nan,
+            "mcc": np.nanmean(all_mcc) if all_mcc else np.nan,
+            "auc": np.nanmean(all_auc) if all_auc else np.nan,
             "noise": noise
         })
 
@@ -369,14 +447,14 @@ if __name__ == '__main__':
     run_iteration: int = args.run_iteration
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
-    selected_cancers: [str] = args.cancer
+    cancers: [str] = args.cancer
     epochs: int = args.epochs
 
-    if len(selected_cancers) == 1:
+    if len(cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
-        selected_cancers = selected_cancers[0].split(" ")
+        cancers = cancers[0].split(" ")
 
-    cancers = "_".join(selected_cancers)
+    selected_cancers = "_".join(cancers)
 
     logging.info("Running file simple_recognizer_nc")
     logging.info(f"Selected cancers: {selected_cancers}")
@@ -387,7 +465,7 @@ if __name__ == '__main__':
     logging.info(f"Noise ratio: {noise_ratio}")
     logging.info(f"Epochs: {epochs}")
 
-    load_path: Path = Path(load_path, cancers)
+    load_path: Path = Path(load_path, selected_cancers)
 
     run_name: str = f"run_{run_iteration}"
 
@@ -438,14 +516,17 @@ if __name__ == '__main__':
     else:
         with h5py.File(train_file, "r") as f:
             max_embedding = f["meta_information"].attrs["max_embedding"]
-            logging.info(f"Max embedding: {max_embedding}")
 
+    num_classes: int = max_embedding + 1
+    logging.info(f"Max embedding: {max_embedding}")
+    logging.info(f"Number of classes: {num_classes}")
     logging.info("Building model....")
     model = build_model(input_dim)
     model.compile(optimizer='adam',
-                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss={'Text': 'categorical_crossentropy', 'Image': 'categorical_crossentropy',
+                        'RNA': 'categorical_crossentropy', 'Mutation': 'categorical_crossentropy'},
                   loss_weights={'Text': 3.0, 'Image': 1., 'RNA': 1., 'Mutation': 1.},
-                  metrics=['mae', 'mae', 'mae', 'mae'])
+                  metrics=['accuracy', 'accuracy', 'accuracy', 'accuracy'])
     model.summary()
 
     if noise_ratio == 0.0:
@@ -498,12 +579,13 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
-    reduce_lr = ReduceLROnPlateau(monitor='val_Text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
+    reduce_lr = ReduceLROnPlateau(monitor='val_Text_accuracy', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
     model.compile(optimizer=optimizer,
-                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss={'Text': 'categorical_crossentropy', 'Image': 'categorical_crossentropy',
+                        'RNA': 'categorical_crossentropy', 'Mutation': 'categorical_crossentropy'},
                   loss_weights={'Text': 4., 'Image': 0.1, 'RNA': 0.1, 'Mutation': 0.1},
-                  metrics=['mae', 'mae', 'mae', 'mae'])
+                  metrics=['accuracy', 'accuracy', 'accuracy', 'accuracy'])
     model.summary()
 
     history = model.fit(train_gen,
