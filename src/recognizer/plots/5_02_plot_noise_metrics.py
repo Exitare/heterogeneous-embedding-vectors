@@ -18,7 +18,8 @@ metric_mappings = {
     "A": "Accuracy",
     "P": "Precision",
     "R": "Recall",
-    "F1": "f1_nonzeros"
+    "F1NZ": "f1_nonzeros",
+    "F1Z": "f1_zeros"
 }
 
 
@@ -81,7 +82,7 @@ if __name__ == '__main__':
                         required=False, default=15000)
     parser.add_argument("--multi", "-m", action="store_true", help="Use of the multi recognizer metrics")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
-    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1"], default="A")
+    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1NZ","F1Z"], default="A")
     parser.add_argument("--noise", "-n", type=float, default=0.1, help="The noise to filter")
 
     args = parser.parse_args()
