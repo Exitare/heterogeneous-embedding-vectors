@@ -6,7 +6,7 @@ from tensorflow.keras.layers import Input, Dense, BatchNormalization, Dropout, R
 from tensorflow.keras.models import Model
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score, \
-    matthews_corrcoef, roc_auc_score
+    matthews_corrcoef, roc_auc_score, mean_squared_error, mean_absolute_error, root_mean_squared_error
 from argparse import ArgumentParser
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
@@ -180,7 +180,8 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                             'accuracy': [], 'precision': [], 'recall': [], 'f1': [],
                             'accuracy_zeros': [], 'precision_zeros': [], 'recall_zeros': [], 'f1_zeros': [],
                             'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': [],
-                            'balanced_accuracy': [], 'mcc': [], "auc": []
+                            'balanced_accuracy': [], 'mcc': [], "auc": [], "mae_zeros": [], "mae_nonzeros": [],
+                            "rmse_zeros": [], "rmse_nonzeros": [], "mse_zeros": [], "mse_nonzeros": []
                         } for emb in embeddings
                     }
                     all_predictions[wd] = {emb: [] for emb in embeddings}
@@ -215,8 +216,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                                                  average='weighted', zero_division=0)
                         f1_zeros = f1_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
                                             average='weighted', zero_division=0)
+                        mae_zeros = mean_absolute_error(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
+                        rmse_zeros = root_mean_squared_error(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
+                        mse_zeros = mean_squared_error(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
                     else:
                         acc_zeros, prec_zeros, rec_zeros, f1_zeros = np.nan, np.nan, np.nan, np.nan
+                        mae_zeros, rmse_zeros, mse_zeros = np.nan, np.nan, np.nan
 
                     if np.any(y_true_nonzeros):
                         acc_nonzeros = accuracy_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
@@ -226,8 +231,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                                                     average='weighted', zero_division=0)
                         f1_nonzeros = f1_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
                                                average='weighted', zero_division=0)
+                        mae_nonzeros = mean_absolute_error(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
+                        rmse_nonzeros = root_mean_squared_error(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
+                        mse_nonzeros = mean_squared_error(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
                     else:
                         acc_nonzeros, prec_nonzeros, rec_nonzeros, f1_nonzeros = np.nan, np.nan, np.nan, np.nan
+                        mae_nonzeros, rmse_nonzeros, mse_nonzeros = np.nan, np.nan, np.nan
 
                         # ✅ Compute Balanced Accuracy and MCC
                     balanced_acc = balanced_accuracy_score(y_true_wd, y_pred_wd) if len(
@@ -273,6 +282,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                     all_metrics[wd][embedding]['balanced_accuracy'].append(balanced_acc)
                     all_metrics[wd][embedding]['mcc'].append(mcc)
                     all_metrics[wd][embedding]['auc'].append(auc)
+                    all_metrics[wd][embedding]['mae_zeros'].append(mae_zeros)
+                    all_metrics[wd][embedding]['mae_nonzeros'].append(mae_nonzeros)
+                    all_metrics[wd][embedding]['rmse_zeros'].append(rmse_zeros)
+                    all_metrics[wd][embedding]['rmse_nonzeros'].append(rmse_nonzeros)
+                    all_metrics[wd][embedding]['mse_zeros'].append(mse_zeros)
+                    all_metrics[wd][embedding]['mse_nonzeros'].append(mse_nonzeros)
 
     # ✅ Save results
     detailed_metrics = []
@@ -299,6 +314,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "recall_zeros": np.nanmean(values['recall_zeros']) if values['recall_zeros'] else np.nan,
                         "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values[
                             'recall_nonzeros'] else np.nan,
+                        "mae_zeros": np.nanmean(values['mae_zeros']) if values['mae_zeros'] else np.nan,
+                        "mae_nonzeros": np.nanmean(values['mae_nonzeros']) if values['mae_nonzeros'] else np.nan,
+                        "rmse_zeros": np.nanmean(values['rmse_zeros']) if values['rmse_zeros'] else np.nan,
+                        "rmse_nonzeros": np.nanmean(values['rmse_nonzeros']) if values['rmse_nonzeros'] else np.nan,
+                        "mse_zeros": np.nanmean(values['mse_zeros']) if values['mse_zeros'] else np.nan,
+                        "mse_nonzeros": np.nanmean(values['mse_nonzeros']) if values['mse_nonzeros'] else np.nan,
                         "f1": np.mean(values['f1']) if values['f1'] else 0,
                         "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
                         "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
@@ -321,6 +342,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         "recall": 0.0,
                         "recall_zeros": np.nan,
                         "recall_nonzeros": np.nan,
+                        "mae_zeros": np.nan,
+                        "mae_nonzeros": np.nan,
+                        "rmse_zeros": np.nan,
+                        "rmse_nonzeros": np.nan,
+                        "mse_zeros": np.nan,
+                        "mse_nonzeros": np.nan,
                         "f1": 0.0,
                         "f1_zeros": np.nan,
                         "f1_nonzeros": np.nan,
@@ -351,6 +378,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
         all_bal_acc = []
         all_mcc = []
         all_auc = []
+        all_mae_zeros = []
+        all_mae_nonzeros = []
+        all_rmse_zeros = []
+        all_rmse_nonzeros = []
+        all_mse_zeros = []
+        all_mse_nonzeros = []
 
         for wd in all_walk_distances_seen:
             if wd in all_metrics and embedding in all_metrics[wd]:
@@ -373,6 +406,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                 all_rec_zeros.extend(values['recall_zeros'])
                 all_rec_nonzeros.extend(values['recall_nonzeros'])
                 all_auc.extend(values['auc'])
+                all_mae_zeros.extend(values['mae_zeros'])
+                all_mae_nonzeros.extend(values['mae_nonzeros'])
+                all_rmse_zeros.extend(values['rmse_zeros'])
+                all_rmse_nonzeros.extend(values['rmse_nonzeros'])
+                all_mse_zeros.extend(values['mse_zeros'])
+                all_mse_nonzeros.extend(values['mse_nonzeros'])
 
         aggregated_metrics.append({
             "walk_distance": -1 if walk_distance == -1 else walk_distance,
@@ -386,6 +425,12 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
             "recall": np.mean(all_rec) if all_rec else 0,
             "recall_zeros": np.nanmean(all_rec_zeros) if all_rec_zeros else np.nan,
             "recall_nonzeros": np.nanmean(all_rec_nonzeros) if all_rec_nonzeros else np.nan,
+            "mae_zeros": np.nanmean(all_mae_zeros) if all_mae_zeros else np.nan,
+            "mae_nonzeros": np.nanmean(all_mae_nonzeros) if all_mae_nonzeros else np.nan,
+            "rmse_zeros": np.nanmean(all_rmse_zeros) if all_rmse_zeros else np.nan,
+            "rmse_nonzeros": np.nanmean(all_rmse_nonzeros) if all_rmse_nonzeros else np.nan,
+            "mse_zeros": np.nanmean(all_mse_zeros) if all_mse_zeros else np.nan,
+            "mse_nonzeros": np.nanmean(all_mse_nonzeros) if all_mse_nonzeros else np.nan,
             "f1": np.mean(all_f1) if all_f1 else 0,
             "f1_zeros": np.nanmean(all_f1_zeros) if all_f1_zeros else np.nan,
             "f1_nonzeros": np.nanmean(all_f1_nonzeros) if all_f1_nonzeros else np.nan,
