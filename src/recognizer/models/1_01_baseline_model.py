@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.metrics import accuracy_score, jaccard_score, f1_score, recall_score, precision_score, \
-    balanced_accuracy_score, matthews_corrcoef, roc_auc_score, mean_absolute_error, mean_squared_error
+    balanced_accuracy_score, matthews_corrcoef, roc_auc_score, mean_absolute_error, mean_squared_error, root_mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 import pandas as pd
@@ -79,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument("--cancer", "-c", nargs="+", required=False,
                         help="The cancer types to work with", default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--epochs", "-e", type=int, default=100, help="The number of epochs to train the model.")
+    parser.add_argument("--multi", action="store_true", help="Create fine grained cancer predictions")
     args = parser.parse_args()
 
     batch_size: int = args.batch_size
@@ -88,6 +89,7 @@ if __name__ == '__main__':
     noise_ratio: float = args.noise_ratio
     cancers: [str] = args.cancer
     epochs: int = args.epochs
+    multi: bool = args.multi
 
     if len(cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -95,7 +97,7 @@ if __name__ == '__main__':
 
     selected_cancers = "_".join(cancers)
 
-    logging.info("Running file simple_recognizer_nc")
+    logging.info(f"Running filename: {__file__}")
     logging.info(f"Selected cancers: {selected_cancers}")
     logging.info(f"Total walk distance: {walk_distance}")
     logging.info(f"Batch size: {batch_size}")
@@ -103,10 +105,13 @@ if __name__ == '__main__':
     logging.info(f"Summed embedding count: {amount_of_summed_embeddings}")
     logging.info(f"Noise ratio: {noise_ratio}")
     logging.info(f"Epochs: {epochs}")
+    logging.info(f"Multi: {multi}")
 
     load_path: Path = Path(load_path, selected_cancers)
 
     run_name: str = f"run_{run_iteration}"
+
+    save_path = Path(save_path, "multi" if multi else "single")
 
     if walk_distance == -1:
         if noise_ratio == 0.0:
@@ -146,7 +151,7 @@ if __name__ == '__main__':
     with h5py.File(train_file, "r") as f:
         input_dim = f["X"].shape[1]
         num_samples = f["X"].shape[0]
-        label_keys = embeddings
+        label_keys = embeddings if not multi else f.keys() - {"X", "meta_information"}
 
     logging.info(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
 
@@ -176,7 +181,7 @@ if __name__ == '__main__':
 
     logging.info("Running model....")
     """Trains separate logistic regression models for each output."""
-    model = MultiOutputClassifier(LogisticRegression(max_iter=1000))
+    model = MultiOutputClassifier(LogisticRegression(max_iter=1))
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
@@ -224,6 +229,7 @@ if __name__ == '__main__':
 
         modality_metrics = {}
         modality_metrics["modality"] = modality
+        modality_metrics["walk_distance"] = walk_distance
         modality_metrics["balanced_accuracy"] = balanced_accuracy_score(y_test[:, i], y_pred[:, i])
         modality_metrics["mcc"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
         if num_unique_classes > 1:
@@ -242,7 +248,7 @@ if __name__ == '__main__':
             recall_zero = recall_score(y_test_zero, y_pred_zero, average='weighted')
             precision_zero = precision_score(y_test_zero, y_pred_zero, average='weighted')
             mae_zero = mean_absolute_error(y_test_zero, y_pred_zero)
-            rmse_zero = mean_squared_error(y_test_zero, y_pred_zero, squared=False)
+            rmse_zero = root_mean_squared_error(y_test_zero, y_pred_zero)
             mse_zero = mean_squared_error(y_test_zero, y_pred_zero)
 
             modality_metrics["accuracy_zero"] = acc_zero
