@@ -6,7 +6,8 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.metrics import accuracy_score, jaccard_score, f1_score, recall_score, precision_score, \
-    balanced_accuracy_score, matthews_corrcoef, roc_auc_score, mean_absolute_error, mean_squared_error, root_mean_squared_error
+    balanced_accuracy_score, matthews_corrcoef, roc_auc_score, mean_absolute_error, mean_squared_error, \
+    root_mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 import pandas as pd
@@ -17,6 +18,27 @@ save_path = Path("results", "recognizer", "baseline")
 load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
+
+
+def compute_split_metrics(y_test, y_pred, label_keys):
+    split_metrics = []
+    for i, modality in enumerate(label_keys):
+        y_true = y_test[:, i]
+        y_pred_modality = y_pred[:, i]
+        for wd in np.unique(y_true):
+            mask = y_true == wd
+            if np.any(mask):
+                split_metrics.append({
+                    "walk_distance": wd,
+                    "modality": modality,
+                    "accuracy": accuracy_score(y_true[mask], y_pred_modality[mask]),
+                    "balanced_accuracy": balanced_accuracy_score(y_true[mask], y_pred_modality[mask]),
+                    "mcc": matthews_corrcoef(y_true[mask], y_pred_modality[mask]) if len(
+                        np.unique(y_true[mask])) > 1 else np.nan,
+                    "auc": roc_auc_score(y_true[mask], y_pred_modality[mask]) if len(
+                        np.unique(y_true[mask])) > 1 else np.nan,
+                })
+    return split_metrics
 
 
 def compute_multiclass_confusion_matrices(y_test, y_pred):
@@ -151,7 +173,12 @@ if __name__ == '__main__':
     with h5py.File(train_file, "r") as f:
         input_dim = f["X"].shape[1]
         num_samples = f["X"].shape[0]
-        label_keys = embeddings if not multi else f.keys() - {"X", "meta_information"}
+        # Explicitly sort keys for consistency
+        label_keys = sorted(embeddings) if not multi else sorted(f.keys() - {"X", "meta_information", "WalkDistances"})
+
+        logging.info(f"Label keys: {label_keys}")
+        assert len(label_keys) == 4 if not multi else len(
+            label_keys) == 10, "Error: Expected 4 modalities for single cancer, or more for multi-cancer."
 
     logging.info(f"Loaded HDF5 file with {num_samples} samples and input dimension {input_dim}.")
 
@@ -181,7 +208,7 @@ if __name__ == '__main__':
 
     logging.info("Running model....")
     """Trains separate logistic regression models for each output."""
-    model = MultiOutputClassifier(LogisticRegression(max_iter=1000))
+    model = MultiOutputClassifier(LogisticRegression(max_iter=1))
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
@@ -222,8 +249,6 @@ if __name__ == '__main__':
         y_test_zero = y_test[zero_mask, i]
         y_pred_zero = y_pred[zero_mask, i]
 
-
-
         y_pred_proba_adjusted = y_pred_proba[:, i, :num_unique_classes]
         y_pred_proba_adjusted /= y_pred_proba_adjusted.sum(axis=1, keepdims=True)
 
@@ -238,7 +263,6 @@ if __name__ == '__main__':
             )
         else:
             modality_metrics["auc"] = np.nan  # Avoid computing AUC for a single class
-
 
         # Compute accuracy for zero values
         if np.any(zero_mask):  # Ensure at least one zero entry exists
@@ -259,7 +283,6 @@ if __name__ == '__main__':
             modality_metrics["mae_zero"] = mae_zero
             modality_metrics["rmse_zero"] = rmse_zero
             modality_metrics["mse_zero"] = mse_zero
-
 
         # Compute accuracy for non-zero values
         if np.any(non_zero_mask):  # Ensure at least one non-zero entry exists
@@ -295,7 +318,14 @@ if __name__ == '__main__':
 
     print(metrics_df)
 
+    # generate split metrics for each walk distance:
+    if walk_distance == -1:
+        split_metrics = compute_split_metrics(y_test, y_pred, label_keys)
+        split_metrics_df = pd.DataFrame(split_metrics)
+        print(split_metrics_df)
+        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
+        logging.info(f"Saved split metrics to {Path(save_path, 'split_metrics.csv')}")
+
     # save the metrics
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
     logging.info(f"Saved metrics to {Path(save_path, 'metrics.csv')}")
-

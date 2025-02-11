@@ -17,6 +17,13 @@ walk_distance=$2
 run_iteration=$3
 amount_of_summed_embeddings=$4
 noise_ratio=$5
+multi=$6
 
+# if multi set to true
+if [ "$multi" = "true" ]; then
+    multi="--multi"
+else
+    multi=""
+fi
 
-python3 src/recognizer/models/1_01_baseline_model.py  -c ${cancer_types}  -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}"
+python3 src/recognizer/models/1_01_baseline_model.py  -c ${cancer_types}  -w "${walk_distance}" -ri "${run_iteration}" -a "${amount_of_summed_embeddings}" -n "${noise_ratio}" ${multi}
