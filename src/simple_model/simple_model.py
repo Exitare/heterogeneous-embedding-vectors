@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.metrics import accuracy_score, jaccard_score, f1_score, recall_score, precision_score, \
-    precision_recall_fscore_support, balanced_accuracy_score, matthews_corrcoef, roc_auc_score
+    balanced_accuracy_score, matthews_corrcoef, roc_auc_score, mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 import pandas as pd
@@ -225,7 +225,7 @@ if __name__ == '__main__':
         modality_metrics = {}
         modality_metrics["modality"] = modality
         modality_metrics["balanced_accuracy"] = balanced_accuracy_score(y_test[:, i], y_pred[:, i])
-        modality_metrics["matthews_corrcoef"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
+        modality_metrics["mcc"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
         if num_unique_classes > 1:
             modality_metrics["auc"] = roc_auc_score(
                 y_test[:, i], y_pred_proba_adjusted, multi_class="ovr", labels=unique_classes
@@ -241,12 +241,19 @@ if __name__ == '__main__':
             jaccard_zero = jaccard_score(y_test_zero, y_pred_zero, average='weighted')
             recall_zero = recall_score(y_test_zero, y_pred_zero, average='weighted')
             precision_zero = precision_score(y_test_zero, y_pred_zero, average='weighted')
+            mae_zero = mean_absolute_error(y_test_zero, y_pred_zero)
+            rmse_zero = mean_squared_error(y_test_zero, y_pred_zero, squared=False)
+            mse_zero = mean_squared_error(y_test_zero, y_pred_zero)
 
             modality_metrics["accuracy_zero"] = acc_zero
             modality_metrics["jaccard_zero"] = jaccard_zero
             modality_metrics["f1_zero"] = f1_zero
             modality_metrics["recall_zero"] = recall_zero
             modality_metrics["precision_zero"] = precision_zero
+            modality_metrics["mae_zero"] = mae_zero
+            modality_metrics["rmse_zero"] = rmse_zero
+            modality_metrics["mse_zero"] = mse_zero
+
 
         # Compute accuracy for non-zero values
         if np.any(non_zero_mask):  # Ensure at least one non-zero entry exists
@@ -255,16 +262,18 @@ if __name__ == '__main__':
             jaccard_non_zero = jaccard_score(y_test_non_zero, y_pred_non_zero, average='weighted')
             recall_non_zero = recall_score(y_test_non_zero, y_pred_non_zero, average='weighted')
             precision_non_zero = precision_score(y_test_non_zero, y_pred_non_zero, average='weighted')
-
-            precision, recall, f1, _ = precision_recall_fscore_support(
-                y_test_non_zero, y_pred_non_zero, average="weighted", zero_division=1
-            )
+            mae_non_zero = mean_absolute_error(y_test_non_zero, y_pred_non_zero)
+            rmse_non_zero = mean_squared_error(y_test_non_zero, y_pred_non_zero, squared=False)
+            mse_non_zero = mean_squared_error(y_test_non_zero, y_pred_non_zero)
 
             modality_metrics["accuracy_non_zero"] = acc_non_zero
             modality_metrics["jaccard_non_zero"] = jaccard_non_zero
             modality_metrics["f1_non_zero"] = f1_non_zero
             modality_metrics["recall_non_zero"] = recall_non_zero
             modality_metrics["precision_non_zero"] = precision_non_zero
+            modality_metrics["mae_non_zero"] = mae_non_zero
+            modality_metrics["rmse_non_zero"] = rmse_non_zero
+            modality_metrics["mse_non_zero"] = mse_non_zero
 
         metrics.append(modality_metrics)
 
@@ -279,3 +288,8 @@ if __name__ == '__main__':
     metrics_df = pd.DataFrame(metrics)
 
     print(metrics_df)
+
+    # save the metrics
+    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
+    logging.info(f"Saved metrics to {Path(save_path, 'metrics.csv')}")
+
