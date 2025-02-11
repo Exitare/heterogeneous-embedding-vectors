@@ -267,24 +267,6 @@ def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_pat
             logging.error("Generator ran out of data earlier than expected.")
             break
 
-    if all_predictions:
-        predictions_df = pd.DataFrame(all_predictions)
-        for wd in predictions_df["walk_distance"].unique():
-            for embedding in predictions_df["embedding"].unique():
-                mask = (predictions_df["walk_distances"] == wd) & (predictions_df["embedding"] == embedding)
-                y_true = predictions_df[mask]["y_true"]
-                y_pred = predictions_df[mask]["y_pred"]
-
-                # only get non zero values
-                y_true = y_true[y_true > 0]
-                y_pred = y_pred[y_true > 0]
-
-                mcc = matthews_corrcoef(y_true, y_pred)
-                logging.info(f"Matthews correlation coefficient for {embedding} at walk distance {wd}: {mcc}")
-                input()
-                #all_metrics[wd][embedding]['mcc'].append(mcc)
-                # global_metrics[embedding]['mcc'].append(mcc)
-
 
     # ✅ Save per-walk-distance metrics
     split_metrics = [{
