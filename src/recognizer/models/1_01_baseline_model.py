@@ -181,7 +181,7 @@ if __name__ == '__main__':
 
     logging.info("Running model....")
     """Trains separate logistic regression models for each output."""
-    model = MultiOutputClassifier(LogisticRegression(max_iter=1))
+    model = MultiOutputClassifier(LogisticRegression(max_iter=1000))
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
