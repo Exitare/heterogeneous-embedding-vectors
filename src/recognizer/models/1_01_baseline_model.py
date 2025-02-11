@@ -100,7 +100,7 @@ if __name__ == '__main__':
                         help="Ratio of random noise added to the sum embeddings")
     parser.add_argument("--cancer", "-c", nargs="+", required=False,
                         help="The cancer types to work with", default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
-    parser.add_argument("--epochs", "-e", type=int, default=100, help="The number of epochs to train the model.")
+    parser.add_argument("--epochs", "-e", type=int, default=1000, help="The number of epochs to train the model.")
     parser.add_argument("--multi", action="store_true", help="Create fine grained cancer predictions")
     args = parser.parse_args()
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     logging.info("Running model....")
     """Trains separate logistic regression models for each output."""
-    model = MultiOutputClassifier(LogisticRegression(max_iter=1))
+    model = MultiOutputClassifier(LogisticRegression(max_iter=epochs))
     model.fit(X_train, y_train)
 
     y_pred = model.predict(X_test)
