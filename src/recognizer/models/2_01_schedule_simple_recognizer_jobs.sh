@@ -12,11 +12,11 @@ if [ -z "$cancer_types" ]; then
   exit 1
 fi
 
-# if upper bound not set, set to 15
+# if upper bound not set, set to 10
 if [ -z "$upper_bound" ]
 then
-  echo "Upper bound not set, setting to 15"
-  upper_bound=15
+  echo "Upper bound not set, setting to 10"
+  upper_bound=10
 fi
 
 # if summed embeddings count not set, set to 100000
