@@ -20,6 +20,9 @@ embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "multi")
 load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 
+def has_valid_data(values):
+    """Check if any metric in the values dictionary has data."""
+    return any(len(v) > 0 for v in values.values())  # ✅ Ensure at least one metric has data
 
 def create_indices(hdf5_file_path, walk_distance: int, test_size=0.2, random_state=42):
     """
@@ -267,33 +270,38 @@ def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_pat
             logging.error("Generator ran out of data earlier than expected.")
             break
 
-
-    # ✅ Save per-walk-distance metrics
-    split_metrics = [{
-        "walk_distance": wd,
-        "embedding": embedding,
-        "accuracy": np.mean(values['accuracy']),
-        "accuracy_zeros": np.nanmean(values['accuracy_zeros']),
-        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']),
-        "precision": np.mean(values['precision']),
-        "precision_zeros": np.nanmean(values['precision_zeros']),
-        "precision_nonzeros": np.nanmean(values['precision_nonzeros']),
-        "recall": np.mean(values['recall']),
-        "recall_zeros": np.nanmean(values['recall_zeros']),
-        "recall_nonzeros": np.nanmean(values['recall_nonzeros']),
-        "mae_nonzeros": np.mean(values['mae_nonzeros']),
-        "mse_nonzeros": np.mean(values['mse_nonzeros']),
-        "rmse_nonzeros": np.mean(values['rmse_nonzeros']),
-        "mae_zeros": np.mean(values['mae_zeros']),
-        "mse_zeros": np.mean(values['mse_zeros']),
-        "rmse_zeros": np.mean(values['rmse_zeros']),
-        "f1": np.mean(values['f1']),
-        "f1_zeros": np.nanmean(values['f1_zeros']),
-        "f1_nonzeros": np.nanmean(values['f1_nonzeros']),
-        "mcc": np.mean(values['mcc']),
-        "balanced_accuracy": np.mean(values['balanced_accuracy']),
-        "noise": noise
-    } for wd, embedding_data in all_metrics.items() for embedding, values in embedding_data.items()]
+    split_metrics = []
+    for wd, embedding_data in all_metrics.items():
+        for embedding, values in embedding_data.items():
+            if has_valid_data(values):  # ✅ Check if ANY metric has valid data
+                split_metrics.append({
+                    "walk_distance": wd,
+                    "embedding": embedding,
+                    "accuracy": np.mean(values['accuracy']) if values['accuracy'] else np.nan,
+                    "accuracy_zeros": np.nanmean(values['accuracy_zeros']) if values['accuracy_zeros'] else np.nan,
+                    "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if values[
+                        'accuracy_nonzeros'] else np.nan,
+                    "precision": np.mean(values['precision']) if values['precision'] else np.nan,
+                    "precision_zeros": np.nanmean(values['precision_zeros']) if values['precision_zeros'] else np.nan,
+                    "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if values[
+                        'precision_nonzeros'] else np.nan,
+                    "recall": np.mean(values['recall']) if values['recall'] else np.nan,
+                    "recall_zeros": np.nanmean(values['recall_zeros']) if values['recall_zeros'] else np.nan,
+                    "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values['recall_nonzeros'] else np.nan,
+                    "mae_nonzeros": np.mean(values['mae_nonzeros']) if values['mae_nonzeros'] else np.nan,
+                    "mse_nonzeros": np.mean(values['mse_nonzeros']) if values['mse_nonzeros'] else np.nan,
+                    "rmse_nonzeros": np.mean(values['rmse_nonzeros']) if values['rmse_nonzeros'] else np.nan,
+                    "mae_zeros": np.mean(values['mae_zeros']) if values['mae_zeros'] else np.nan,
+                    "mse_zeros": np.mean(values['mse_zeros']) if values['mse_zeros'] else np.nan,
+                    "rmse_zeros": np.mean(values['rmse_zeros']) if values['rmse_zeros'] else np.nan,
+                    "f1": np.mean(values['f1']) if values['f1'] else np.nan,
+                    "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
+                    "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
+                    "mcc": np.mean(values['mcc']) if values['mcc'] else np.nan,
+                    "balanced_accuracy": np.mean(values['balanced_accuracy']) if values[
+                        'balanced_accuracy'] else np.nan,
+                    "noise": noise
+                })
 
     split_metrics_df = pd.DataFrame(split_metrics)
     split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
