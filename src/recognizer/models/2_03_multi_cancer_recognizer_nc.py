@@ -207,13 +207,20 @@ def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_pat
                             rmse_nonzeros = root_mean_squared_error(y_true_wd[y_true_nonzeros],
                                                                     y_pred_wd[y_true_nonzeros])
 
+                            if embedding in cancer_embeddings:
+                                mcc = matthews_corrcoef(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
+                            else:
+                                mcc = matthews_corrcoef(y_true_wd, y_pred_wd)
+
                         else:
                             f1_nonzeros = np.nan
                             prec_nonzeros, rec_nonzeros, acc_nonzeros = np.nan, np.nan, np.nan
                             mae_nonzeros, mse_nonzeros, rmse_nonzeros = np.nan, np.nan, np.nan
+                            mcc = np.nan
 
                         # ✅ Store per walk-distance metrics
                         all_metrics[wd][embedding]['accuracy'].append(acc)
+                        all_metrics[wd][embedding]['mcc'].append(mcc)
                         all_metrics[wd][embedding]['precision'].append(prec)
                         all_metrics[wd][embedding]['recall'].append(rec)
                         all_metrics[wd][embedding]['f1'].append(f1)
@@ -236,6 +243,7 @@ def evaluate_walk_distance_batches(model, generator, steps, embeddings, save_pat
 
                         # ✅ Also accumulate in global metrics
                         global_metrics[embedding]['accuracy'].append(acc)
+                        global_metrics[embedding]['mcc'].append(mcc)
                         global_metrics[embedding]['accuracy_zeros'].append(acc_zeros)
                         global_metrics[embedding]['accuracy_nonzeros'].append(acc_nonzeros)
                         global_metrics[embedding]['precision'].append(prec)
