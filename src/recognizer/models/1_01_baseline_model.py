@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score, jaccard_score, f1_score, recall_scor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 import pandas as pd
+from sklearn.preprocessing import label_binarize
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -223,88 +224,136 @@ if __name__ == '__main__':
 
     y_pred_proba = np.transpose(y_pred_proba, (1, 0, 2))  # Ensure shape (N, modalities, C)
 
+    # find walk distance for each y_pred
+    if walk_distance == -1:
+        hdf5_file_path = train_file if noise_ratio == 0.0 else test_file
+
+        if walk_distance == -1:
+            with h5py.File(hdf5_file_path, 'r') as hdf5_file:
+                walk_distances = hdf5_file["WalkDistances"][np.sort(test_indices)]  # Ensure sorted indices
+
+    predictions = {
+        "y_test": y_test,
+        "y_pred": y_pred,
+        "y_pred_proba": y_pred_proba,  #
+        "walk_distance": walk_distances if walk_distance == -1 else np.repeat(walk_distance, len(y_test))
+    }
+
     # Compute accuracy separately for zero and non-zero values per modality
     metrics = []
 
-    for i, modality in enumerate(label_keys):
-        unique_classes = np.unique(y_test[:, i])  # Find unique class labels
-        num_unique_classes = len(unique_classes)
+    walk_distances = predictions["walk_distance"]
+    # get all unique values from numpy array walk distances
+    walk_distances = np.unique(walk_distances)
+    logging.info(f"Walk distances: {walk_distances}")
+    for walk_distance in walk_distances:
+        for i, modality in enumerate(label_keys):
+            walk_indices = np.where(predictions["walk_distance"] == walk_distance)[0]
+            logging.info(f"Walk indices count: {len(walk_indices)}")
 
-        # Ensure `y_pred_proba` contains only relevant classes
-        class_indices = np.isin(range(y_pred_proba.shape[2]), unique_classes)
-        y_pred_proba_adjusted = y_pred_proba[:, i, class_indices]  # Filter probability columns
+            if len(walk_indices) == 0:
+                logging.info(f"⚠️ No indices found for walk_distance={walk_distance}! This might be the issue.")
 
-        # Find indices where the modality is zero vs non-zero
-        zero_mask = y_test[:, i] == 0
-        non_zero_mask = y_test[:, i] != 0
-        if y_test.shape[0] == 0:
-            logging.warning(f"y_test has no samples for modality {modality}!")
+            y_test = predictions["y_test"][walk_indices]
+            y_pred = predictions["y_pred"][walk_indices]
+            y_pred_proba = predictions["y_pred_proba"][walk_indices]
 
-        assert np.all(
-            np.logical_not(np.logical_and(zero_mask, non_zero_mask))), "Error: zero_mask and non_zero_mask overlap!"
+            unique_classes = np.unique(y_test[:, i])  # Find unique class labels
+            num_unique_classes = len(unique_classes)
 
-        y_test_non_zero = y_test[non_zero_mask, i]
-        y_pred_non_zero = y_pred[non_zero_mask, i]
+            # Ensure `y_pred_proba` contains only relevant classes
+            class_indices = np.isin(range(y_pred_proba.shape[2]), unique_classes)
+            y_pred_proba_adjusted = y_pred_proba[:, i, class_indices]  # Filter probability columns
 
-        y_test_zero = y_test[zero_mask, i]
-        y_pred_zero = y_pred[zero_mask, i]
+            zero_mask = y_test[:, i] == 0
+            non_zero_mask = y_test[:, i] != 0
+            if y_test.shape[0] == 0:
+                logging.warning(f"y_test has no samples for modality {modality}!")
 
-        y_pred_proba_adjusted = y_pred_proba[:, i, :num_unique_classes]
-        y_pred_proba_adjusted /= y_pred_proba_adjusted.sum(axis=1, keepdims=True)
+            assert np.all(
+                np.logical_not(np.logical_and(zero_mask, non_zero_mask))), "Error: zero_mask and non_zero_mask overlap!"
 
-        modality_metrics = {}
-        modality_metrics["modality"] = modality
-        modality_metrics["walk_distance"] = walk_distance
-        modality_metrics["balanced_accuracy"] = balanced_accuracy_score(y_test[:, i], y_pred[:, i])
-        modality_metrics["mcc"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
-        if num_unique_classes > 1:
-            modality_metrics["auc"] = roc_auc_score(
-                y_test[:, i], y_pred_proba_adjusted, multi_class="ovr", labels=unique_classes
-            )
-        else:
-            modality_metrics["auc"] = np.nan  # Avoid computing AUC for a single class
+            y_test_non_zero = y_test[non_zero_mask, i]
+            y_pred_non_zero = y_pred[non_zero_mask, i]
 
-        # Compute accuracy for zero values
-        if np.any(zero_mask):  # Ensure at least one zero entry exists
-            acc_zero = accuracy_score(y_test_zero, y_pred_zero)
-            f1_zero = f1_score(y_test_zero, y_pred_zero, average='weighted')
-            jaccard_zero = jaccard_score(y_test_zero, y_pred_zero, average='weighted')
-            recall_zero = recall_score(y_test_zero, y_pred_zero, average='weighted')
-            precision_zero = precision_score(y_test_zero, y_pred_zero, average='weighted')
-            mae_zero = mean_absolute_error(y_test_zero, y_pred_zero)
-            rmse_zero = root_mean_squared_error(y_test_zero, y_pred_zero)
-            mse_zero = mean_squared_error(y_test_zero, y_pred_zero)
+            y_test_zero = y_test[zero_mask, i]
+            y_pred_zero = y_pred[zero_mask, i]
 
-            modality_metrics["accuracy_zero"] = acc_zero
-            modality_metrics["jaccard_zero"] = jaccard_zero
-            modality_metrics["f1_zero"] = f1_zero
-            modality_metrics["recall_zero"] = recall_zero
-            modality_metrics["precision_zero"] = precision_zero
-            modality_metrics["mae_zero"] = mae_zero
-            modality_metrics["rmse_zero"] = rmse_zero
-            modality_metrics["mse_zero"] = mse_zero
+            y_pred_proba_adjusted = y_pred_proba[:, i, :num_unique_classes]
+            y_pred_proba_adjusted /= y_pred_proba_adjusted.sum(axis=1, keepdims=True)
 
-        # Compute accuracy for non-zero values
-        if np.any(non_zero_mask):  # Ensure at least one non-zero entry exists
-            acc_non_zero = accuracy_score(y_test_non_zero, y_pred_non_zero)
-            f1_non_zero = f1_score(y_test_non_zero, y_pred_non_zero, average='weighted')
-            jaccard_non_zero = jaccard_score(y_test_non_zero, y_pred_non_zero, average='weighted')
-            recall_non_zero = recall_score(y_test_non_zero, y_pred_non_zero, average='weighted')
-            precision_non_zero = precision_score(y_test_non_zero, y_pred_non_zero, average='weighted')
-            mae_non_zero = mean_absolute_error(y_test_non_zero, y_pred_non_zero)
-            rmse_non_zero = mean_squared_error(y_test_non_zero, y_pred_non_zero, squared=False)
-            mse_non_zero = mean_squared_error(y_test_non_zero, y_pred_non_zero)
 
-            modality_metrics["accuracy_non_zero"] = acc_non_zero
-            modality_metrics["jaccard_non_zero"] = jaccard_non_zero
-            modality_metrics["f1_non_zero"] = f1_non_zero
-            modality_metrics["recall_non_zero"] = recall_non_zero
-            modality_metrics["precision_non_zero"] = precision_non_zero
-            modality_metrics["mae_non_zero"] = mae_non_zero
-            modality_metrics["rmse_non_zero"] = rmse_non_zero
-            modality_metrics["mse_non_zero"] = mse_non_zero
 
-        metrics.append(modality_metrics)
+            logging.info(f"Found {num_unique_classes} unique classes for modality {modality}.")
+
+            modality_metrics = {}
+            modality_metrics["modality"] = modality
+            modality_metrics["walk_distance"] = walk_distance
+            modality_metrics["balanced_accuracy"] = balanced_accuracy_score(y_test[:, i], y_pred[:, i])
+
+            if modality in embeddings:
+                modality_metrics["mcc"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
+                modality_metrics["auc"] = roc_auc_score(
+                    y_test[:, i], y_pred_proba_adjusted, multi_class="ovr", labels=unique_classes
+                )
+            else:
+                unique_classes = np.unique(y_test_non_zero)  # Find unique class labels
+                y_pred_proba_adjusted_non_zero = y_pred_proba_adjusted[non_zero_mask]
+                num_unique_classes = len(unique_classes)
+                # Identify relevant classes (excluding class 0)
+                relevant_classes = unique_classes[unique_classes != 0]  # Exclude class 0
+
+                # Identify corresponding indices in probability matrix
+                class_indices = np.isin(range(y_pred_proba_adjusted_non_zero.shape[1]), relevant_classes)
+
+                # Select only relevant class probabilities
+                y_pred_proba_adjusted_non_zero = y_pred_proba_adjusted_non_zero[:, class_indices]
+                # Convert y_test to one-hot encoding
+                y_test_non_zero_one_hot = label_binarize(y_test_non_zero, classes=unique_classes)
+                modality_metrics["mcc"] = matthews_corrcoef(y_test_non_zero, y_pred_non_zero)
+                modality_metrics["auc"] = roc_auc_score(
+                    y_test_non_zero_one_hot, y_pred_proba_adjusted_non_zero, multi_class="ovr", labels=unique_classes
+                )
+
+            if modality in embeddings:
+                # Compute accuracy for zero values
+                if np.any(zero_mask):  # Ensure at least one zero entry exists
+                    acc_zero = accuracy_score(y_test_zero, y_pred_zero)
+                    f1_zero = f1_score(y_test_zero, y_pred_zero, average='weighted')
+                    jaccard_zero = jaccard_score(y_test_zero, y_pred_zero, average='weighted')
+                    recall_zero = recall_score(y_test_zero, y_pred_zero, average='weighted')
+                    precision_zero = precision_score(y_test_zero, y_pred_zero, average='weighted')
+                    mae_zero = mean_absolute_error(y_test_zero, y_pred_zero)
+                    rmse_zero = root_mean_squared_error(y_test_zero, y_pred_zero)
+                    mse_zero = mean_squared_error(y_test_zero, y_pred_zero)
+
+                    modality_metrics["accuracy_zero"] = acc_zero
+                    modality_metrics["f1_zero"] = f1_zero
+                    modality_metrics["recall_zero"] = recall_zero
+                    modality_metrics["precision_zero"] = precision_zero
+                    modality_metrics["mae_zero"] = mae_zero
+                    modality_metrics["rmse_zero"] = rmse_zero
+                    modality_metrics["mse_zero"] = mse_zero
+
+            # Compute accuracy for non-zero values
+            if np.any(non_zero_mask):  # Ensure at least one non-zero entry exists
+                acc_non_zero = accuracy_score(y_test_non_zero, y_pred_non_zero)
+                f1_non_zero = f1_score(y_test_non_zero, y_pred_non_zero, average='weighted')
+                recall_non_zero = recall_score(y_test_non_zero, y_pred_non_zero, average='weighted')
+                precision_non_zero = precision_score(y_test_non_zero, y_pred_non_zero, average='weighted')
+                mae_non_zero = mean_absolute_error(y_test_non_zero, y_pred_non_zero)
+                rmse_non_zero = root_mean_squared_error(y_test_non_zero, y_pred_non_zero)
+                mse_non_zero = mean_squared_error(y_test_non_zero, y_pred_non_zero)
+
+                modality_metrics["accuracy"] = acc_non_zero
+                modality_metrics["f1"] = f1_non_zero
+                modality_metrics["recall"] = recall_non_zero
+                modality_metrics["precision"] = precision_non_zero
+                modality_metrics["mae"] = mae_non_zero
+                modality_metrics["rmse"] = rmse_non_zero
+                modality_metrics["mse"] = mse_non_zero
+
+            metrics.append(modality_metrics)
 
     # create confusion matrices
     # Compute confusion matrices for each output
@@ -317,14 +366,6 @@ if __name__ == '__main__':
     metrics_df = pd.DataFrame(metrics)
 
     print(metrics_df)
-
-    # generate split metrics for each walk distance:
-    if walk_distance == -1:
-        split_metrics = compute_split_metrics(y_test, y_pred, label_keys)
-        split_metrics_df = pd.DataFrame(split_metrics)
-        print(split_metrics_df)
-        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
-        logging.info(f"Saved split metrics to {Path(save_path, 'split_metrics.csv')}")
 
     # save the metrics
     metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
