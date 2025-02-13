@@ -1,7 +1,6 @@
 from argparse import ArgumentParser
 import logging
 from pathlib import Path
-import ast
 import numpy as np
 import pandas as pd
 from imblearn.metrics import specificity_score, sensitivity_score
@@ -25,7 +24,7 @@ if __name__ == '__main__':
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
                         required=False, default=15000)
-    parser.add_argument("--model", "-m", choices=["multi", "simple", "baseline"], default="multi",
+    parser.add_argument("--model", "-m", choices=["multi", "simple"], default="multi",
                         help="The model to use")
 
     args = parser.parse_args()
@@ -53,6 +52,9 @@ if __name__ == '__main__':
                 if run_folder.is_file():
                     continue
 
+                noise_ratio = float(run_folder.parts[-3])
+                print(run_folder)
+
                 # Reset the AUC dictionary for this run folder
                 aucs = {}
                 results = []
@@ -60,7 +62,6 @@ if __name__ == '__main__':
                 # Process probabilities.json files for this run folder
                 for file in run_folder.iterdir():
                     if file.is_file() and "probabilities.json" in file.parts:
-                        logging.info(f"Loading {file}...")
                         df = pd.read_json(file, orient="records", lines=True)
                         for walk_distance in df["walk_distance"].unique():
                             walk_distance_df = df[df["walk_distance"] == walk_distance]
@@ -92,7 +93,7 @@ if __name__ == '__main__':
                                 # Create a consistent key (make sure walk_distance is an integer, embedding is a string)
                                 key = (int(walk_distance), str(embedding))
                                 aucs[key] = auc
-                                #logging.info(f"Computed AUC for {key}: {auc}")
+                                # logging.info(f"Computed AUC for {key}: {auc}")
 
                 # Now process predictions.csv files for this run folder and add the corresponding AUCs:
                 for file in run_folder.iterdir():
@@ -166,6 +167,7 @@ if __name__ == '__main__':
                                     results.append({
                                         "walk_distance": walk_distance,
                                         "embedding": embedding,
+                                        "noise": noise_ratio,
                                         "mcc": mcc,
                                         "balanced_accuracy": balanced_accuracy,
                                         "mae": mae,
@@ -218,6 +220,7 @@ if __name__ == '__main__':
                                     results.append({
                                         "walk_distance": walk_distance,
                                         "embedding": embedding,
+                                        "noise": noise_ratio,
                                         "mcc": mcc,
                                         "balanced_accuracy": balanced_accuracy,
                                         "mae": mae,
@@ -233,3 +236,5 @@ if __name__ == '__main__':
                             df_results = pd.DataFrame(results)
                             df_results.to_csv(Path(run_folder, "metrics.csv"), index=False)
                             processed_files.append(file)
+
+    logging.info(f"Processed {len(processed_files)} files.")

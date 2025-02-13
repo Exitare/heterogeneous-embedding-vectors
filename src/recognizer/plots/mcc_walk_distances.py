@@ -15,7 +15,7 @@ if __name__ == '__main__':
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
                         required=False, default=15000)
-    parser.add_argument("--model", "-m", choices=["multi", "simple", "baseline"], default="multi",
+    parser.add_argument("--model", "-m", choices=["multi", "simple", "baseline_m", "baseline_s"], default="multi",
                         help="The model to use")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
 
@@ -28,6 +28,11 @@ if __name__ == '__main__':
 
     logging.info(
         f"Loading data for model: {model}, cancers: {cancers}, foundation: {foundation}, amount_of_walk_embeddings: {amount_of_walk_embeddings}")
+
+    if model == "baseline_m":
+        model = "baseline/multi"
+    elif model == "baseline_s":
+        model = "baseline/simple"
 
     load_folder = Path(load_folder, model, selected_cancers, str(amount_of_walk_embeddings))
 
@@ -53,7 +58,7 @@ if __name__ == '__main__':
 
                 for file in run_folder.iterdir():
                     if 'combined_embeddings' in walk_distance_folder.parts:
-                        file_name = "split_metrics.csv"
+                        file_name = "metrics.csv"
                     else:
                         file_name = "metrics.csv"
 
@@ -62,15 +67,25 @@ if __name__ == '__main__':
                         dfs.append(df)
 
     df = pd.concat(dfs)
+
+    if "baseline" in model:
+        # rename modality to embedding
+        df.rename(columns={"modality": "embedding"}, inplace=True)
+
     print(df)
 
-    print(df["mcc"].isna().sum())
 
     #create bar plot for mcc for each walk_distance and modality
-    df = df.groupby(["walk_distance", "em"]).mean()
-    fig, ax = sns.barplot(x="walk_distance", y="mcc", hue="modality", data=df)
-    fig.set_title("MCC per walk distance and modality")
-    fig.set_ylabel("MCC")
+    df_grouped_by_wd_embedding = df.groupby(["walk_distance", "embedding"]).mean()
+    # Create the bar plot
+    plt.figure(figsize=(10, 6))
+    ax = sns.barplot(x="walk_distance", y="mcc", hue="embedding", data=df_grouped_by_wd_embedding)
 
-    fig.tight_layout()
-    fig.show()
+    # Set title and labels
+    ax.set_title("MCC per Walk Distance and Modality")
+    ax.set_ylabel("MCC")
+    ax.set_xlabel("Walk Distance")
+
+    # Improve layout and show the plot
+    plt.tight_layout()
+    plt.show()

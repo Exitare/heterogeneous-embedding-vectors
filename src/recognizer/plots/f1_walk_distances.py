@@ -15,7 +15,7 @@ if __name__ == '__main__':
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
                         required=False, default=15000)
-    parser.add_argument("--model", "-m", choices=["multi", "simple", "baseline"], default="multi",
+    parser.add_argument("--model", "-m", choices=["multi", "simple", "baseline_m", "baseline_s"], default="multi",
                         help="The model to use")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
 
@@ -28,6 +28,11 @@ if __name__ == '__main__':
 
     logging.info(
         f"Loading data for model: {model}, cancers: {cancers}, foundation: {foundation}, amount_of_walk_embeddings: {amount_of_walk_embeddings}")
+
+    if model == "baseline_m":
+        model = "baseline/multi"
+    elif model == "baseline_s":
+        model = "baseline/simple"
 
     load_folder = Path(load_folder, model, selected_cancers, str(amount_of_walk_embeddings))
 
