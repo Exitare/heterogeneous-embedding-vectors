@@ -21,27 +21,6 @@ load_path = Path("results", "recognizer", "summed_embeddings", "multi")
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 
 
-def compute_split_metrics(y_test, y_pred, label_keys):
-    split_metrics = []
-    for i, modality in enumerate(label_keys):
-        y_true = y_test[:, i]
-        y_pred_modality = y_pred[:, i]
-        for wd in np.unique(y_true):
-            mask = y_true == wd
-            if np.any(mask):
-                split_metrics.append({
-                    "walk_distance": wd,
-                    "modality": modality,
-                    "accuracy": accuracy_score(y_true[mask], y_pred_modality[mask]),
-                    "balanced_accuracy": balanced_accuracy_score(y_true[mask], y_pred_modality[mask]),
-                    "mcc": matthews_corrcoef(y_true[mask], y_pred_modality[mask]) if len(
-                        np.unique(y_true[mask])) > 1 else np.nan,
-                    "auc": roc_auc_score(y_true[mask], y_pred_modality[mask]) if len(
-                        np.unique(y_true[mask])) > 1 else np.nan,
-                })
-    return split_metrics
-
-
 def compute_multiclass_confusion_matrices(y_test, y_pred):
     """Computes confusion matrices separately for each output in a multi-output setting."""
 
@@ -134,7 +113,7 @@ if __name__ == '__main__':
 
     run_name: str = f"run_{run_iteration}"
 
-    save_path = Path(save_path, "multi" if multi else "single")
+    save_path = Path(save_path, "multi" if multi else "simple")
 
     if walk_distance == -1:
         if noise_ratio == 0.0:
