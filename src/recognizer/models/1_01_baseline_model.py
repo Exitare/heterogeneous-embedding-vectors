@@ -293,6 +293,21 @@ if __name__ == '__main__':
 
             if modality in embeddings:
                 modality_metrics["mcc"] = matthews_corrcoef(y_test[:, i], y_pred[:, i])
+
+                # Get number of classes actually predicted
+                num_pred_classes = y_pred_proba_adjusted.shape[1]
+
+                # If a class is missing from predictions, add zero-probability columns
+                if num_pred_classes < len(unique_classes):
+                    missing_classes = set(unique_classes) - set(range(num_pred_classes))
+                    print(f"⚠️ Missing classes in predictions: {missing_classes}")
+
+                    # Pad missing classes with zero probabilities
+                    y_pred_proba_padded = np.zeros((y_pred_proba_adjusted.shape[0], len(unique_classes)))
+                    y_pred_proba_padded[:, :num_pred_classes] = y_pred_proba_adjusted  # Fill known classes
+
+                    y_pred_proba_adjusted = y_pred_proba_padded  # Replace with padded version
+
                 modality_metrics["auc"] = roc_auc_score(
                     y_test[:, i], y_pred_proba_adjusted, multi_class="ovr", labels=unique_classes
                 )
