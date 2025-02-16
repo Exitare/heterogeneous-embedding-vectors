@@ -1,10 +1,10 @@
-import sys
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from argparse import ArgumentParser
 import logging
+from helper.load_metric_data import load_metric_data
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -12,14 +12,15 @@ color_palette = {"Text": "blue", "Image": "red", "RNA": "green", "Mutation": "pu
                  "LUAD": "lime", "BLCA": "pink", "THCA": "brown", "STAD": "black", "COAD": "grey"}
 
 save_folder = Path("figures", "recognizer")
-load_folder = Path("results", "recognizer", "aggregated_metrics")
+load_folder = Path("results", "recognizer")
 
 metric_mappings = {
     "A": "Accuracy",
     "P": "Precision",
     "R": "Recall",
-    "F1NZ": "f1_nonzeros",
-    "F1Z": "f1_zeros"
+    "F1": "f1",
+    "F1Z": "f1_zeros",
+    "BA": "balanced_accuracy",
 }
 
 
@@ -29,7 +30,7 @@ def plot_bar_plot(df: pd.DataFrame):
     sns.set_context("paper")
 
     # Plot individual embeddings
-    sns.barplot(data=df, x="embedding", y="f1_nonzeros", hue="embedding", alpha=0.6)
+    sns.barplot(data=df, x="embedding", y="f1", hue="embedding", alpha=0.6)
 
     plt.savefig(Path(save_folder, "bar_plot.png"), dpi=150)
 
@@ -67,6 +68,8 @@ def noise_grid(df, metric: str, file_name: str):
         "walk_distance", metric, "embedding",
         palette=color_palette, alpha=0.6
     )
+    # change y axis to metric
+    g.set_ylabels(metric_input)
 
     # Add legend to the grid
     g.add_legend(title="Embedding")
@@ -77,12 +80,13 @@ def noise_grid(df, metric: str, file_name: str):
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
-    parser.add_argument("-c", "--cancer", required=False, nargs='+')
+    parser.add_argument("-c", "--cancer", required=False, nargs='+',
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
                         required=False, default=15000)
     parser.add_argument("--multi", "-m", action="store_true", help="Use of the multi recognizer metrics")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
-    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1NZ","F1Z"], default="A")
+    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1", "F1Z", "BA"], default="A")
     parser.add_argument("--noise", "-n", type=float, default=0.1, help="The noise to filter")
 
     args = parser.parse_args()
@@ -93,6 +97,7 @@ if __name__ == '__main__':
     metric: str = args.metric
     selected_cancers: [str] = '_'.join(cancers)
 
+    metric_input = metric
     metric = metric_mappings[metric]
 
     logging.info(
@@ -106,18 +111,18 @@ if __name__ == '__main__':
         save_folder.mkdir(parents=True)
 
     if multi:
-        file_path = Path(load_folder, "multi", selected_cancers, str(amount_of_walk_embeddings),
-                         "metrics.csv" if not foundation else "split_metrics.csv")
+        load_path = Path(load_folder, "multi", selected_cancers, str(amount_of_walk_embeddings))
 
     else:
-        file_path = Path(load_folder, "simple", selected_cancers, str(amount_of_walk_embeddings),
-                         "metrics.csv" if not foundation else "split_metrics.csv")
+        load_path = Path(load_folder, "simple", selected_cancers, str(amount_of_walk_embeddings))
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
-    logging.info(f"Loading file using {file_path}...")
-    df = pd.read_csv(file_path)
+
+    logging.info(f"Loading files using {load_path}...")
+
+    df = load_metric_data(load_folder=load_path, noise_ratio=-1, foundation=foundation)
     logging.info(df)
 
     # remove -1 walk_distance
@@ -127,12 +132,6 @@ if __name__ == '__main__':
 
     # filter noise <= 0.5
     df = df[df["noise"] <= 0.5]
-
-    # find the value 0.7606436894358242 in the df
-    for index, row in df.iterrows():
-        if row["f1_nonzeros"] == 0.7606436894358242:
-            logging.info(row)
-            input()
 
     # calculate mean of embeddings
     grouped = df.groupby(["walk_distance", "embedding", "noise"]).mean(numeric_only=True)
@@ -155,6 +154,7 @@ if __name__ == '__main__':
     else:
         file_name = f"{metric}_{multi_name}_noise_grid.png"
 
+    logging.info(f"Saving to {file_name}")
     noise_grid(grouped, metric, file_name)
 
     logging.info("Done")

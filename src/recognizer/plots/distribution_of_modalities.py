@@ -33,7 +33,7 @@ if __name__ == '__main__':
     logging.info(f"Noise: {noise}")
     logging.info(f"Walk distance: {walk_distance}")
 
-    save_folder = Path(save_folder, cancers, str(amount_of_walk_embeddings), str(noise), str(walk_distance))
+    save_folder = Path(save_folder, cancers, str(amount_of_walk_embeddings), str(noise), f"{str(walk_distance)}_embeddings")
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 

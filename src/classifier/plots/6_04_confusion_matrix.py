@@ -3,6 +3,9 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -31,7 +34,7 @@ if __name__ == '__main__':
                 continue
 
             if "predictions.csv" in str(path):
-                print(f"Loading {path}")
+                logging.info(f"Loading {path}")
                 predictions = pd.read_csv(path)
                 all_predictions.append(predictions)
 
