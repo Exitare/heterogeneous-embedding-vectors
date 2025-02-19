@@ -5,11 +5,10 @@ import seaborn as sns
 from argparse import ArgumentParser
 import logging
 from helper.load_metric_data import load_metric_data
+from helper.plot_styling import color_palette
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-color_palette = {"Text": "blue", "Image": "red", "RNA": "green", "Mutation": "purple", "BRCA": "orange",
-                 "LUAD": "lime", "BLCA": "pink", "THCA": "brown", "STAD": "black", "COAD": "grey"}
 
 save_folder = Path("figures", "recognizer")
 load_folder = Path("results", "recognizer")
@@ -21,6 +20,7 @@ metric_mappings = {
     "F1": "f1",
     "F1Z": "f1_zeros",
     "BA": "balanced_accuracy",
+    "MCC": "mcc"
 }
 
 
@@ -51,34 +51,92 @@ def plot_noise(df: pd.DataFrame, metric: str):
 
 def noise_grid(df, metric: str, file_name: str):
     # Ensure 'noise' is treated as a categorical variable for plotting
-    df["noise"] = df["noise"].astype(str)  # Convert to string to ensure proper FacetGrid behavior
+    # convert noise to percentage
+    tmp_df = df.copy()
+
+    tmp_df["noise"] = tmp_df["noise"] * 100
+    # to int
+    tmp_df["noise"] = tmp_df["noise"].astype(int)
+    tmp_df["noise"] = tmp_df["noise"].astype(str)  # Convert to string to ensure proper FacetGrid behavior
     # sort the noise values
-    df["noise"] = pd.Categorical(df["noise"], categories=sorted(df["noise"].unique()), ordered=True)
+    tmp_df["noise"] = pd.Categorical(tmp_df["noise"], categories=sorted(tmp_df["noise"].unique()), ordered=True)
 
     # Set up Seaborn theme
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
 
     # Create a FacetGrid with one plot per unique noise value
-    g = sns.FacetGrid(df, col="noise", col_wrap=3, height=4)
+    g = sns.FacetGrid(tmp_df, col="noise", col_wrap=3, height=4)
 
-    # Map the lineplot to each facet
+    # Map the lineplot to each facet, increase line
     g.map(
         sns.lineplot,
-        "walk_distance", metric, "embedding",
-        palette=color_palette, alpha=0.6
+        "walk_distance", metric, "embedding", markers=True,
+        palette=color_palette, alpha=0.6, marker="o", markersize=5, linewidth=1.5
     )
     # change y axis to metric
     g.set_ylabels(metric_input)
-
+    # change x axis to walk_distance
+    g.set_xlabels("Walk Distance")
+    g.set_ylabels(metric.upper())
+    g.set(ylim=(0, 1.02))
+    # set title for each plot colname %
+    g.set_titles(col_template="{col_name} %")
     # Add legend to the grid
-    g.add_legend(title="Embedding")
+    g.add_legend(title="Modality")
+
+    # Show the plots
+    plt.savefig(Path(save_folder, file_name), dpi=150)
+
+
+def reduced_noise_grid(df, metric: str, file_name: str):
+    # Ensure 'noise' is treated as a categorical variable for plotting
+
+    tmp_df = df.copy()
+    # convert noise to percentage
+    tmp_df["noise"] = tmp_df["noise"] * 100
+    # to int
+    tmp_df["noise"] = tmp_df["noise"].astype(int)
+    tmp_df["noise"] = tmp_df["noise"].astype(str)  # Convert to string to ensure proper FacetGrid behavior
+
+    # only select noise values of 10 and 50
+    tmp_df = tmp_df[(tmp_df["noise"] == "10") | (tmp_df["noise"] == "50")]
+    # sort the noise values
+    tmp_df["noise"] = pd.Categorical(tmp_df["noise"], categories=sorted(tmp_df["noise"].unique()), ordered=True)
+
+    # Set up Seaborn theme
+    sns.set_theme(style="whitegrid")
+    sns.set_context("paper")
+
+    # Create a FacetGrid with one plot per unique noise value
+    g = sns.FacetGrid(tmp_df, col="noise", col_wrap=2, height=4)
+
+    # Map the lineplot to each facet, increase line
+    g.map(
+        sns.lineplot,
+        "walk_distance", metric, "embedding", markers=True,
+        palette=color_palette, alpha=0.6, marker="o", markersize=5, linewidth=1.5
+    )
+    # change y axis to metric
+    g.set_ylabels(metric_input)
+    # change x axis to walk_distance
+    g.set_xlabels("Walk Distance")
+    g.set_ylabels(metric.upper())
+    #set y-lim from 0 to 1
+    g.set(ylim=(0, 1))
+
+    # set title for each plot colname %
+    g.set_titles(col_template="{col_name} %")
+    # Add legend to the grid
+    g.add_legend(title="Modality")
 
     # Show the plots
     plt.savefig(Path(save_folder, file_name), dpi=150)
 
 
 if __name__ == '__main__':
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 12
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
     parser.add_argument("-c", "--cancer", required=False, nargs='+',
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
@@ -86,7 +144,7 @@ if __name__ == '__main__':
                         required=False, default=15000)
     parser.add_argument("--multi", "-m", action="store_true", help="Use of the multi recognizer metrics")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
-    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1", "F1Z", "BA"], default="A")
+    parser.add_argument("--metric", required=True, choices=["A", "P", "R", "F1", "F1Z", "BA", "MCC"], default="A")
     parser.add_argument("--noise", "-n", type=float, default=0.1, help="The noise to filter")
 
     args = parser.parse_args()
@@ -123,7 +181,9 @@ if __name__ == '__main__':
     logging.info(f"Loading files using {load_path}...")
 
     df = load_metric_data(load_folder=load_path, noise_ratio=-1, foundation=foundation)
-    logging.info(df)
+    #logging.info(df)
+    # print walk_distance == 3 and noise == 0.1 and embedding text
+    #print(df[(df["walk_distance"] == 3) & (df["noise"] == 0.1) & (df["embedding"] == "Text")])
 
     # remove -1 walk_distance
     df = df[df["walk_distance"] != -1]
@@ -132,6 +192,8 @@ if __name__ == '__main__':
 
     # filter noise <= 0.5
     df = df[df["noise"] <= 0.5]
+
+    df.reset_index(drop=True, inplace=True)
 
     # calculate mean of embeddings
     grouped = df.groupby(["walk_distance", "embedding", "noise"]).mean(numeric_only=True)
@@ -142,7 +204,8 @@ if __name__ == '__main__':
     # plot line plot for embeddings, embeddings and accuracy
     grouped = grouped.reset_index()
 
-    logging.info(grouped)
+    plot_bar_plot(grouped)
+
 
     plot_noise(grouped, metric)
 
@@ -151,10 +214,14 @@ if __name__ == '__main__':
 
     if foundation_name:
         file_name = f"{metric}_{multi_name}_{foundation_name}_noise_grid.png"
+        reduced_file_name = f"{metric}_{multi_name}_{foundation_name}_reduced_noise_grid.png"
     else:
         file_name = f"{metric}_{multi_name}_noise_grid.png"
+        reduced_file_name = f"{metric}_{multi_name}_reduced_noise_grid.png"
 
     logging.info(f"Saving to {file_name}")
-    noise_grid(grouped, metric, file_name)
+    logging.info(f"Saving to {reduced_file_name}")
+    noise_grid(df, metric, file_name)
+    reduced_noise_grid(df, metric, reduced_file_name)
 
     logging.info("Done")

@@ -2,7 +2,7 @@ from pathlib import Path
 import logging
 import pandas as pd
 
-def load_metric_data(load_folder: Path, noise_ratio: float, foundation: bool):
+def load_metric_data(load_folder: Path, noise_ratio: float, foundation: bool, verbose: bool = False) -> pd.DataFrame:
     dfs = []
     for noise_folder in load_folder.iterdir():
         if noise_folder.is_file():
@@ -33,8 +33,9 @@ def load_metric_data(load_folder: Path, noise_ratio: float, foundation: bool):
 
                 for file in run_folder.iterdir():
                     file_name = "metrics.csv"
-
                     if file.is_file() and file_name in file.parts:
+                        if verbose:
+                            logging.info(f"Loading {file}...")
                         df = pd.read_csv(file)
                         dfs.append(df)
 

@@ -113,6 +113,60 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=200)
 
+def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    # Separate the grouped data for each model.
+    # Since grouped_df is multi-indexed by ["model", "walk_distance", "embedding"],
+    # we extract the baseline (first model) and target (second model) data.
+    baseline_df = df[df["model"] == models[0]].reset_index(drop=True)
+    baseline_df["model"] = model_names[models[0]]
+    baseline_model_name = model_names[models[0]]
+
+    target_df = df[df["model"] == models[1]].reset_index(drop=True)
+    target_df["model"] = model_names[models[1]]
+    compare_model_name = model_names[models[1]]
+
+    # rename model to Model and embedding to Embedding
+    baseline_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
+    target_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
+
+
+    line_df = pd.concat([baseline_df, target_df])
+    line_df.reset_index(drop=True, inplace=True)
+    plt.figure(figsize=(10, 6))
+
+    # Plot the baseline model with reduced opacity (faded)
+    sns.lineplot(
+        x="walk_distance",
+        y=metric.name,
+        hue="Modality",
+        data=line_df,
+        palette=color_palette,
+        hue_order=order,
+        style="Model",
+        style_order=[compare_model_name,baseline_model_name],
+    )
+
+    #plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
+    plt.ylabel(metric.label)
+    plt.xlabel("Walk Distance")
+    #plt.legend(title="", loc='lower left')
+    #remove legend
+    plt.legend().remove()
+    plt.ylim(0,1.02)
+    # increase font size
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    # set label font size
+    plt.xlabel("Walk Distance", fontsize=18)
+    plt.ylabel(metric.label, fontsize=18)
+
+    # remove box
+    plt.box(False)
+    # helvitaca font
+    plt.rcParams['font.family'] = 'helvetica'
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_line_plot_comparison.png"), dpi=200)
+
 
 def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
     # create a line chart too
@@ -205,7 +259,7 @@ if __name__ == '__main__':
     # combine model data
     df = pd.concat([model_data[models[0]], model_data[models[1]]])
     save_folder = Path("figures", "recognizer", selected_cancers, str(amount_of_walk_embeddings), str(noise_ratio),
-                       f"{models[0]}_{models[1]}_bg")
+                       f"{models[0]}_{models[1]}")
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
@@ -222,6 +276,7 @@ if __name__ == '__main__':
     df_grouped_by_wd_embedding = df.groupby(["model", "walk_distance", "embedding"]).mean()
     df.reset_index(drop=True, inplace=True)
 
-    create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
-    create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
-    create_box_plot(metric, df, save_folder)
+    #create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
+    #create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
+    create_dist_line_chart(models, metric, df, save_folder)
+    #create_box_plot(metric, df, save_folder)
