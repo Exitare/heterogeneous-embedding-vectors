@@ -54,6 +54,10 @@ def noise_grid(df, metric: str, file_name: str):
     # convert noise to percentage
     tmp_df = df.copy()
 
+    # change text to Annotation
+    tmp_df["embedding"] = tmp_df["embedding"].replace("Text", "Annotation")
+
+
     tmp_df["noise"] = tmp_df["noise"] * 100
     # to int
     tmp_df["noise"] = tmp_df["noise"].astype(int)
@@ -79,7 +83,7 @@ def noise_grid(df, metric: str, file_name: str):
     # change x axis to walk_distance
     g.set_xlabels("Walk Distance")
     g.set_ylabels(metric.upper())
-    g.set(ylim=(0, 1.02))
+    g.set(ylim=(-0.1, 1.02))
     # set title for each plot colname %
     g.set_titles(col_template="{col_name} %")
     # Add legend to the grid
@@ -93,6 +97,9 @@ def reduced_noise_grid(df, metric: str, file_name: str):
     # Ensure 'noise' is treated as a categorical variable for plotting
 
     tmp_df = df.copy()
+
+    # change text to Annotation
+    tmp_df["embedding"] = tmp_df["embedding"].replace("Text", "Annotation")
     # convert noise to percentage
     tmp_df["noise"] = tmp_df["noise"] * 100
     # to int
@@ -123,7 +130,7 @@ def reduced_noise_grid(df, metric: str, file_name: str):
     g.set_xlabels("Walk Distance")
     g.set_ylabels(metric.upper())
     #set y-lim from 0 to 1
-    g.set(ylim=(0, 1))
+    g.set(ylim=(-0.1, 1))
 
     # set title for each plot colname %
     g.set_titles(col_template="{col_name} %")
@@ -183,7 +190,7 @@ if __name__ == '__main__':
     df = load_metric_data(load_folder=load_path, noise_ratio=-1, foundation=foundation)
     #logging.info(df)
     # print walk_distance == 3 and noise == 0.1 and embedding text
-    #print(df[(df["walk_distance"] == 3) & (df["noise"] == 0.1) & (df["embedding"] == "Text")])
+    print(df[(df["walk_distance"] == 3) & (df["noise"] == 0.5) & (df["embedding"] == "Text")])
 
     # remove -1 walk_distance
     df = df[df["walk_distance"] != -1]

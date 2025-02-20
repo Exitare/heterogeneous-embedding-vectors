@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from keras.src.layers import BatchNormalization
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, matthews_corrcoef, balanced_accuracy_score
 from sklearn.preprocessing import label_binarize
 import pandas as pd
 from pathlib import Path
@@ -12,6 +12,7 @@ from collections import defaultdict
 from collections import Counter
 import math
 import logging
+
 
 load_folder = Path("results", "classifier", "summed_embeddings")
 save_folder = Path("results", "classifier", "classification")
@@ -148,15 +149,20 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         f1_cancer = f1_score(y_test_cancer, y_pred_cancer, average='weighted')
         precision_cancer = precision_score(y_test_cancer, y_pred_cancer, average='weighted')
         recall_cancer = recall_score(y_test_cancer, y_pred_cancer, average='weighted')
+        mcc_cancer = matthews_corrcoef(y_test_cancer, y_pred_cancer)
+        balanced_accuracy = balanced_accuracy_score(y_test_cancer, y_pred_cancer)
 
         logging.info(
-            f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}"
+            f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}. "
+            f"MCC: {mcc_cancer:.4f}, Balanced Accuracy: {balanced_accuracy:.4f}"
         )
 
         results.append({
             "cancer": cancer_name,
             "accuracy": accuracy_cancer,
             "f1": f1_cancer,
+            "mcc": matthews_corrcoef(y_test_cancer, y_pred_cancer),
+            "balanced_accuracy": balanced_accuracy,
             "precision": precision_cancer,
             "recall": recall_cancer,
             "iteration": iteration,
@@ -169,6 +175,8 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     precision_total = precision_score(y_test, y_pred, average='weighted')
     recall_total = recall_score(y_test, y_pred, average='weighted')
     accuracy_total = (y_test == y_pred).mean()
+    mcc_total = matthews_corrcoef(y_test, y_pred)
+    balanced_accuracy = balanced_accuracy_score(y_test, y_pred)
 
     logging.info(y_test.shape)
     logging.info(y_pred.shape)
@@ -179,12 +187,15 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     auc_score = roc_auc_score(y_test_one_hot, y_pred_proba, multi_class='ovo', average='macro')
 
     logging.info(
-        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f}")
+        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f},"
+        f"MCC: {mcc_total:.4f}, Balanced Accuracy: {balanced_accuracy:.4f}")
 
     results.append({
         "cancer": "All",
         "accuracy": accuracy_total,
         "f1": f1_total,
+        "mcc": mcc_total,
+        "balanced_accuracy": balanced_accuracy,
         "precision": precision_total,
         "recall": recall_total,
         "auc": auc_score,

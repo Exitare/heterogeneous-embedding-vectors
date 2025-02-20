@@ -11,6 +11,19 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 fig_save_folder = Path("figures", "classifier")
 
+color_palette = {
+    "Annotation": "#c8b7b7ff",
+    "Image": "#d38d5fff",
+    "RNA": "#c6afe9ff",
+    "Mutation": "#de87aaff",
+    "BRCA": "#c837abff",
+    "LUAD": "#37abc8ff",
+    "BLCA": "#ffcc00ff",
+    "THCA": "#d35f5fff",
+    "STAD": "#f47e44d7",
+    "COAD": "#502d16ff"
+}
+
 
 if __name__ == '__main__':
 
@@ -55,8 +68,8 @@ if __name__ == '__main__':
     gmm = GaussianMixture(n_components=num_clusters, random_state=42)
     cluster_labels = gmm.fit_predict(X_data)
 
-    # Manually map cancer types to colors
-    cancer_palette = dict(zip(unique_cancers, sns.color_palette("Set1", len(unique_cancers))))  # Assign colors
+    # Manually map cancer types to colors use the color_palette
+    cancer_palette = {cancer: color_palette[cancer] for cancer in unique_cancers}
 
     # Ensure cancer types are correctly mapped
     color_mapping = [cancer_palette[cancer] for cancer in cancer_types]
@@ -69,9 +82,9 @@ if __name__ == '__main__':
     legend_patches = [plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=cancer_palette[c], markersize=6)
                       for c in unique_cancers]
 
-    plt.legend(legend_patches, unique_cancers, title="Cancer Type", loc="upper right", bbox_to_anchor=(0.9, 1))
+    #plt.legend(legend_patches, unique_cancers, title="Cancer Type", loc="upper right", bbox_to_anchor=(0.9, 1))
 
-    plt.title(f"GMM Clustering")
+    #plt.title(f"GMM Clustering")
     plt.xlabel("PCA Component 1")
     plt.ylabel("PCA Component 2")
     plt.tight_layout()

@@ -1,5 +1,5 @@
 color_palette = {
-    "Text": "#c8b7b7ff",
+    "Annotation": "#c8b7b7ff",
     "Image": "#d38d5fff",
     "RNA": "#c6afe9ff",
     "Mutation": "#de87aaff",
