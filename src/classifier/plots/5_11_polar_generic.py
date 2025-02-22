@@ -173,7 +173,7 @@ def create_polar_inter_plot(df, ax, color_dict, all_combos):
         ax.scatter(cancer_angles, distances, color=color_dict.get(cancer, None), s=50, edgecolors='w', zorder=5)
 
     # Set the title
-    ax.set_title("Inter-Class Distances", va='bottom', fontsize=14, fontweight='bold')
+    ax.set_title("Inter-Class Distances", va='bottom')
 
     # Optional: Set radial limits with some padding
     max_distance = merged['distance'].max()
@@ -211,8 +211,7 @@ def main_polar_plots(combined_df: pd.DataFrame, file_name: str):
     handles, labels = axes[0].get_legend_handles_labels()
 
     # Place the legend outside the plots
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=6, title="Cancer Types",
-               fontsize=12)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=6, title="Cancer Types")
 
     # Add a main title
     plt.suptitle("Polar Plots of Intra and Inter Cancer Type Distances", fontsize=18, fontweight='bold', y=1.02)
@@ -221,7 +220,7 @@ def main_polar_plots(combined_df: pd.DataFrame, file_name: str):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
     # Save the figure
-    plt.savefig(Path(figure_save_folder, f"{file_name}.png"), bbox_inches='tight', dpi=150)
+    plt.savefig(Path(figure_save_folder, f"{file_name}.png"), bbox_inches='tight', dpi=300)
 
 
 def calculate_intra_inter_distances(summed_embeddings: dict, selected_cancers: list,
@@ -337,9 +336,13 @@ def convert_to_records(intra_df: {}, inter_df: {}):
 
 
 if __name__ == '__main__':
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 12
     # Parse command-line arguments
     parser = ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
+    parser.add_argument("--cancer", "-c", nargs='+', required=False, help="The cancer type to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+                        )
     args = parser.parse_args()
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)

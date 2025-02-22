@@ -149,20 +149,15 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         f1_cancer = f1_score(y_test_cancer, y_pred_cancer, average='weighted')
         precision_cancer = precision_score(y_test_cancer, y_pred_cancer, average='weighted')
         recall_cancer = recall_score(y_test_cancer, y_pred_cancer, average='weighted')
-        mcc_cancer = matthews_corrcoef(y_test_cancer, y_pred_cancer)
-        balanced_accuracy = balanced_accuracy_score(y_test_cancer, y_pred_cancer)
 
         logging.info(
             f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}. "
-            f"MCC: {mcc_cancer:.4f}, Balanced Accuracy: {balanced_accuracy:.4f}"
         )
 
         results.append({
             "cancer": cancer_name,
             "accuracy": accuracy_cancer,
             "f1": f1_cancer,
-            "mcc": matthews_corrcoef(y_test_cancer, y_pred_cancer),
-            "balanced_accuracy": balanced_accuracy,
             "precision": precision_cancer,
             "recall": recall_cancer,
             "iteration": iteration,

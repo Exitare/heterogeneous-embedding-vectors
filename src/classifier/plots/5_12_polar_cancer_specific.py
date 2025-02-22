@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from argparse import ArgumentParser
 
-from sklearn.metrics.pairwise import distance_metrics
-
 # Corrected walk_distances to include 4
 walk_distances = [3, 4, 5]
 walk_amounts = [3, 4, 5]
@@ -15,7 +13,7 @@ results_load_folder = Path("results", "classifier", "distances")
 save_folder = Path("figures", "classifier")
 
 
-def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
+def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos, metric="euclidean"):
     """
     Creates a polar line plot for intra-class distances for each primary cancer.
     """
@@ -32,6 +30,12 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
     # Merge to ensure all combinations are present, filling missing with NaN
     merged = pd.merge(all_combos_df, group, on=['walk_distance', 'walk_amount', 'combo'], how='left')
 
+    # If using dot_product, shift distances so that the minimum value becomes 0.
+    if metric == "dot_product":
+        min_distance = merged['distance'].min()
+        if pd.notnull(min_distance) and min_distance < 0:
+            merged['distance'] = merged['distance'] - min_distance
+
     # Sort by walk_distance and walk_amount
     merged = merged.sort_values(['walk_distance', 'walk_amount'])
 
@@ -39,7 +43,7 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
     N = len(all_combos)
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
 
-    # Ensure the plot is circular by appending the first value at the end
+    # Ensure the plot is circular by appending the first angle at the end
     angles += angles[:1]
 
     # Create a mapping from combo to angle
@@ -47,7 +51,7 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
 
     # Set the labels for each combination
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(all_combos_df['combo'], fontsize=10)
+    ax.set_xticklabels(all_combos_df['combo'])
 
     # Plot data for each cancer type within the primary cancer group
     cancers = group['combined_cancer'].unique()
@@ -72,7 +76,7 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos):
     # Set the title
     ax.set_title(f"{primary_cancer} - Polar Plot", va='bottom', fontsize=14, fontweight='bold')
 
-    # Set radial limits with some padding
+    # Set radial limits with some padding (recompute max after shifting)
     max_distance = merged['distance'].max()
     ax.set_ylim(0, max_distance * 1.1)
 
@@ -91,7 +95,8 @@ def main_polar_plots_for_primary_cancers(combined_df: pd.DataFrame, metric: str)
         if primary_cancer not in primary_cancers:
             primary_cancers[primary_cancer] = [combined_df[combined_df["combined_cancer"].str.contains(primary_cancer)]]
         primary_cancers[primary_cancer].append(
-            combined_df[combined_df["combined_cancer"].str.contains(primary_cancer)])
+            combined_df[combined_df["combined_cancer"].str.contains(primary_cancer)]
+        )
 
     # Prepare color mapping for cancers
     cancers = primary_cancers.keys()
@@ -106,18 +111,23 @@ def main_polar_plots_for_primary_cancers(combined_df: pd.DataFrame, metric: str)
     for primary_cancer, dfs in primary_cancers.items():
         df = pd.concat(dfs)
         fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(10, 10))
-        create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos)
+        create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos, metric=metric)
 
         # Save the plot
         plt.tight_layout()
-        plt.savefig(Path(save_folder, f"{primary_cancer}_{metric}_polar.png"), dpi=150)
+        plt.savefig(Path(save_folder, f"{primary_cancer}_{metric}_polar.png"), dpi=300)
         plt.close(fig)
 
 
 if __name__ == '__main__':
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 12
     parser = ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
-    parser.add_argument("--distance_metric", "-dm", type=str, required=True, help="The distance metric to load.",
+    parser.add_argument("--cancer", "-c", nargs='+', required=False,
+                        help="The cancer type to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
+    parser.add_argument("--distance_metric", "-dm", type=str, required=True,
+                        help="The distance metric to load.",
                         choices=["euclidean", "cosine", "dot_product"], default="euclidean")
     args = parser.parse_args()
     selected_cancers = args.cancer
@@ -136,8 +146,7 @@ if __name__ == '__main__':
     elif distance_metric == "dot_product":
         file_name = "dot_product_combined_distances.csv"
 
-    combined_df = pd.read_csv(
-        Path(results_load_folder, file_name))
+    combined_df = pd.read_csv(Path(results_load_folder, file_name))
 
     # Generate polar plots for each primary cancer
     main_polar_plots_for_primary_cancers(combined_df, distance_metric)

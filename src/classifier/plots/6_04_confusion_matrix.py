@@ -49,4 +49,4 @@ if __name__ == '__main__':
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
     plt.savefig(Path("figures", "classifier", cancers, "performance",
                      f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=150)
+                dpi=300)

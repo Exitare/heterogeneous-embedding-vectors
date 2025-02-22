@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     g.fig.suptitle('Model Accuracy Across Different Walk Distances and Amount of Walks')
 
-    plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=300)
 
     # Combine the two DataFrames
     combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'cancer', 'type']],
@@ -150,4 +150,4 @@ if __name__ == '__main__':
     # set x axis ticks to 3,4 and 5
     plt.xticks([3, 4, 5])
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=300)

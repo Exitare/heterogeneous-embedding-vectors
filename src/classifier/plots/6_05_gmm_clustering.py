@@ -26,7 +26,8 @@ color_palette = {
 
 
 if __name__ == '__main__':
-
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 12
     parser = ArgumentParser(description='Embedding Clustering')
     parser.add_argument("--selected_cancers", "-c", nargs='+', required=False,
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
@@ -88,4 +89,4 @@ if __name__ == '__main__':
     plt.xlabel("PCA Component 1")
     plt.ylabel("PCA Component 2")
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, f"{walk_amount}_{walk_distance}_gmm_clustering.png"), dpi=150)
+    plt.savefig(Path(fig_save_folder, f"{walk_amount}_{walk_distance}_gmm_clustering.png"), dpi=300)

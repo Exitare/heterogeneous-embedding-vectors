@@ -9,7 +9,6 @@ from helper.plot_styling import color_palette
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 save_folder = Path("figures", "recognizer")
 load_folder = Path("results", "recognizer")
 
@@ -57,7 +56,6 @@ def noise_grid(df, metric: str, file_name: str):
     # change text to Annotation
     tmp_df["embedding"] = tmp_df["embedding"].replace("Text", "Annotation")
 
-
     tmp_df["noise"] = tmp_df["noise"] * 100
     # to int
     tmp_df["noise"] = tmp_df["noise"].astype(int)
@@ -93,7 +91,7 @@ def noise_grid(df, metric: str, file_name: str):
     plt.savefig(Path(save_folder, file_name), dpi=150)
 
 
-def reduced_noise_grid(df, metric: str, file_name: str):
+def reduced_noise_grid(df, metric: str, file_name: str, title: str):
     # Ensure 'noise' is treated as a categorical variable for plotting
 
     tmp_df = df.copy()
@@ -129,16 +127,24 @@ def reduced_noise_grid(df, metric: str, file_name: str):
     # change x axis to walk_distance
     g.set_xlabels("Walk Distance")
     g.set_ylabels(metric.upper())
-    #set y-lim from 0 to 1
+    # set y-lim from 0 to 1
     g.set(ylim=(-0.1, 1))
 
     # set title for each plot colname %
     g.set_titles(col_template="{col_name} %")
     # Add legend to the grid
     g.add_legend(title="Modality")
+    # set title
+    # Set title
+    g.fig.suptitle(title, y=0.95, fontsize=12)
+    # move subtitlte to the left
+    g.fig.subplots_adjust(left=0.14)
+
+    # Adjust layout to prevent subtitle cutoff
+    plt.subplots_adjust(top=0.85)
 
     # Show the plots
-    plt.savefig(Path(save_folder, file_name), dpi=150)
+    plt.savefig(Path(save_folder, file_name), dpi=300, bbox_inches="tight")
 
 
 if __name__ == '__main__':
@@ -184,11 +190,10 @@ if __name__ == '__main__':
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
-
     logging.info(f"Loading files using {load_path}...")
 
     df = load_metric_data(load_folder=load_path, noise_ratio=-1, foundation=foundation)
-    #logging.info(df)
+    # logging.info(df)
     # print walk_distance == 3 and noise == 0.1 and embedding text
     print(df[(df["walk_distance"] == 3) & (df["noise"] == 0.5) & (df["embedding"] == "Text")])
 
@@ -213,7 +218,6 @@ if __name__ == '__main__':
 
     plot_bar_plot(grouped)
 
-
     plot_noise(grouped, metric)
 
     multi_name = "multi" if multi else "simple"
@@ -222,13 +226,15 @@ if __name__ == '__main__':
     if foundation_name:
         file_name = f"{metric}_{multi_name}_{foundation_name}_noise_grid.png"
         reduced_file_name = f"{metric}_{multi_name}_{foundation_name}_reduced_noise_grid.png"
+        figure_title = f"{multi_name.capitalize()} {foundation_name.capitalize()}"
     else:
         file_name = f"{metric}_{multi_name}_noise_grid.png"
         reduced_file_name = f"{metric}_{multi_name}_reduced_noise_grid.png"
+        figure_title = f"{multi_name.capitalize()}"
 
     logging.info(f"Saving to {file_name}")
     logging.info(f"Saving to {reduced_file_name}")
     noise_grid(df, metric, file_name)
-    reduced_noise_grid(df, metric, reduced_file_name)
+    reduced_noise_grid(df, metric, reduced_file_name, figure_title)
 
     logging.info("Done")
