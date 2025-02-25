@@ -31,7 +31,6 @@ color_palette = {
     "All": "#000000"
 }
 
-
 def create_grid_plot(df: pd.DataFrame, metric: str):
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
     fig, ax = plt.subplots(figsize=(10, 5))
