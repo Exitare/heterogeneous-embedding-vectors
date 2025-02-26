@@ -1,5 +1,5 @@
 #!/bin/bash
-#./src/classifier/models/4_01_schedule_cancer_classifier.sh "BRCA LUAD STAD BLCA COAD THCA"
+#./src/tmb_classifier/models/4_01_schedule_cancer_classifier.sh "BRCA LUAD STAD BLCA COAD THCA"
 cancers=$1
 walk_distance=$2
 walk_amount=$3

@@ -8,6 +8,6 @@ for walk_distance in "${walk_distance[@]}"
 do
   for amount in "${amount_of_walks[@]}"
   do
-    sbatch ./src/classifier/3_01_run_summed_embeddings.sh -c ${selected_cancers} -w $walk_distance -a $amount
+     ./src/tmb_classifier/summed_embeddings_generation/3_01_run_summed_embeddings.sh "${selected_cancers}" $walk_distance $amount
   done
 done

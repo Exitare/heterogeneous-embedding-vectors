@@ -29,9 +29,9 @@ color_palette = {
     "STAD": "#f47e44d7",
     "COAD": "#502d16ff",
     "All": "#000000",
-    "0": "#c837abff",
-    "1": "#37abc8ff",
-    "2": "#ffcc00ff",
+    "Low": "#c837abff",
+    "High": "#37abc8ff",
+    "N/A": "#ffcc00ff",
 }
 
 def create_grid_plot(df: pd.DataFrame, metric: str):
@@ -50,7 +50,7 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     labels = [f"Distance: {label.split('_')[0]}\n Amount: {label.split('_')[1]}" for label in labels]
     ax.set_xticklabels(labels)
     # adjust legend
-    ax.legend(loc='lower center', ncols=7, title="Cancer Type", bbox_to_anchor=(0.5, -0.28))
+    ax.legend(loc='lower center', ncols=7, title="Tumor Mutation Burden", bbox_to_anchor=(0.5, -0.28))
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric}_score_grid.png"), dpi=300)
     plt.close('all')
@@ -143,7 +143,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5,vmin=0.8, vmax=1.0)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5,vmin=0.2, vmax=1.0)
         # adjust heatmap range to 0.8 - 1.0
 
         plt.title(f"{metric} Scores Heatmap")
@@ -194,6 +194,10 @@ if __name__ == '__main__':
 
     # concatenate all results
     results = pd.concat(results)
+
+    # rename tmb values 0 to Low, 1 to High, 2 to None
+    results["tmb"] = results["tmb"].replace({"0": "Low", "1": "High", "2": "N/A"})
+
     # create new column walks by combining walk distance and amount_of_walk using an underscore
     results["walks"] = results["walk_distance"].astype(str) + "_" + results["amount_of_walks"].astype(str)
     results.reset_index(drop=True, inplace=True)
