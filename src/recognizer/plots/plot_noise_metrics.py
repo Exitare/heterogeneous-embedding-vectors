@@ -24,28 +24,28 @@ metric_mappings = {
 
 
 def plot_bar_plot(df: pd.DataFrame):
-    fig = plt.figure(figsize=(10, 5), dpi=150)
+    fig = plt.figure(figsize=(10, 5), dpi=300)
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
 
     # Plot individual embeddings
     sns.barplot(data=df, x="embedding", y="f1", hue="embedding", alpha=0.6)
 
-    plt.savefig(Path(save_folder, "bar_plot.png"), dpi=150)
+    plt.savefig(Path(save_folder, "bar_plot.png"), dpi=300)
 
 
 def plot_noise(df: pd.DataFrame, metric: str):
     # calculate mean for each noise
     df = df.groupby(["walk_distance", "noise"]).mean(numeric_only=True)
 
-    fig = plt.figure(figsize=(10, 5), dpi=150)
+    fig = plt.figure(figsize=(10, 5), dpi=300)
     sns.set_theme(style="whitegrid")
     sns.set_context("paper")
 
     # Plot individual embeddings
     sns.lineplot(data=df, x="walk_distance", y=metric, hue="noise", alpha=0.6)
 
-    plt.savefig(Path(save_folder, "noise_plot.png"), dpi=150)
+    plt.savefig(Path(save_folder, "noise_plot.png"), dpi=300)
 
 
 def noise_grid(df, metric: str, file_name: str):
@@ -88,7 +88,7 @@ def noise_grid(df, metric: str, file_name: str):
     g.add_legend(title="Modality")
 
     # Show the plots
-    plt.savefig(Path(save_folder, file_name), dpi=150)
+    plt.savefig(Path(save_folder, file_name), dpi=300)
 
 
 def reduced_noise_grid(df, metric: str, file_name: str, title: str):

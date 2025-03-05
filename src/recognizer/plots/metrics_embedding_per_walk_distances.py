@@ -53,7 +53,7 @@ def create_bar_chart(metric: Metric, grouped_df: pd.DataFrame, df: pd.DataFrame,
 
     # Improve layout and show the plot
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=300)
 
 
 def create_line_chart(metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
@@ -71,7 +71,7 @@ def create_line_chart(metric: Metric, grouped_df: pd.DataFrame, save_folder: Pat
     ax.set_ylim(-0.1, 1.05)
     # Improve layout and show the plot
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=300)
 
 def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
     # create a line chart too
@@ -89,7 +89,7 @@ def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
 
     # Improve layout and show the plot
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=300)
 
 
 if __name__ == '__main__':

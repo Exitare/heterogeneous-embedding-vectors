@@ -73,7 +73,7 @@ if __name__ == '__main__':
                 plt.legend(wedges, unique, title=key, loc="center left", bbox_to_anchor=(1, 0.5))
                 plt.title(f"Distribution of {key}")
                 plt.tight_layout()
-                plt.savefig(Path(save_folder, f"{key}_distribution.png"), dpi=150)
+                plt.savefig(Path(save_folder, f"{key}_distribution.png"), dpi=300)
 
 
             else:
@@ -106,5 +106,5 @@ if __name__ == '__main__':
 
             plt.title(f"Zero vs. Non-Zero Distribution in {key}")
             plt.tight_layout()
-            plt.savefig(Path(save_folder, f"{key}_zero_distribution.png"), dpi=150)
+            plt.savefig(Path(save_folder, f"{key}_zero_distribution.png"), dpi=300)
             plt.close('all')

@@ -61,7 +61,7 @@ def create_bar_chart(metric: Metric, grouped_df: pd.DataFrame, df: pd.DataFrame,
 
     # Improve layout and show the plot
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=300)
 
 
 def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
