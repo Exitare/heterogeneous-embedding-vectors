@@ -12,8 +12,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 load_folder = Path("results", "recognizer")
 
-
-
 Metric = namedtuple("Metric", ["name", "label"])
 
 metrics = {
@@ -80,7 +78,6 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
     baseline_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
     target_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
 
-
     line_df = pd.concat([baseline_df, target_df])
     if "simple" in models and not foundation:
         y_lim = [0.5, 1.05]
@@ -100,18 +97,19 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
         palette=color_palette,
         hue_order=order,
         style="Model",
-        style_order=[compare_model_name,baseline_model_name],
+        style_order=[compare_model_name, baseline_model_name],
     )
 
     plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
     plt.ylabel(metric.label)
     plt.xlabel("Walk Distance")
-    #plt.legend(title="", loc='lower left')
-    #remove legend
+    # plt.legend(title="", loc='lower left')
+    # remove legend
     plt.legend().remove()
     plt.ylim(y_lim)
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=200)
+    plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=300)
+
 
 def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save_folder: Path):
     # Separate the grouped data for each model.
@@ -129,7 +127,6 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     baseline_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
     target_df.rename(columns={"model": "Model", "embedding": "Modality"}, inplace=True)
 
-
     line_df = pd.concat([baseline_df, target_df])
     line_df.reset_index(drop=True, inplace=True)
     plt.figure(figsize=(10, 6))
@@ -143,16 +140,16 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
         palette=color_palette,
         hue_order=order,
         style="Model",
-        style_order=[compare_model_name,baseline_model_name],
+        style_order=[compare_model_name, baseline_model_name],
     )
 
-    #plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
+    # plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
     plt.ylabel(metric.label)
     plt.xlabel("Walk Distance")
-    #plt.legend(title="", loc='lower left')
-    #remove legend
+    # plt.legend(title="", loc='lower left')
+    # remove legend
     plt.legend().remove()
-    plt.ylim(0,1.02)
+    plt.ylim(0, 1.02)
     # increase font size
     plt.xticks(fontsize=18)
     plt.yticks(fontsize=18)
@@ -165,7 +162,7 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     # helvitaca font
     plt.rcParams['font.family'] = 'helvetica'
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_line_plot_comparison.png"), dpi=200)
+    plt.savefig(Path(save_folder, f"{metric.name}_line_plot_comparison.png"), dpi=300)
 
 
 def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
@@ -177,14 +174,14 @@ def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
     # Set title and labels
     ax.set_title(f"{metric.label} per Walk Distance and Modality")
     ax.set_ylabel(metric.label)
-    ax.set_xlabel("Walk Distance")
+    ax.set_xlabel("Random Selection")
     # put legend outside of plot
     plt.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
-    ax.set_ylim(0.8, 1.01)
+    ax.set_ylim(-1, 1.01)
 
     # Improve layout and show the plot
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=200)
+    plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=300)
 
 
 if __name__ == '__main__':
@@ -193,7 +190,8 @@ if __name__ == '__main__':
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
                         required=False, default=15000)
-    parser.add_argument("--models", "-m", nargs='+', choices=["multi", "simple", "baseline_m", "baseline_s", "simple_f", "multi_f"],
+    parser.add_argument("--models", "-m", nargs='+',
+                        choices=["multi", "simple", "baseline_m", "baseline_s", "simple_f", "multi_f"],
                         default="multi",
                         help="The model to use")
     parser.add_argument("--noise_ratio", "-n", type=float, help="The noise ratio to use", default=0.0)
@@ -231,7 +229,6 @@ if __name__ == '__main__':
         else:
             model_path = model
 
-        print(model_path)
         model_load_folder = Path(load_folder, model_path, selected_cancers, str(amount_of_walk_embeddings))
 
         is_foundation = "_f" in model
@@ -239,9 +236,14 @@ if __name__ == '__main__':
 
         # load data
         df = load_metric_data(load_folder=model_load_folder, noise_ratio=noise_ratio, foundation=is_foundation)
-        print(len(df))
         df["model"] = model
         df.reset_index(drop=True, inplace=True)
+
+        if "modality" in df.columns:
+            # rename text to annotation in modality column
+            df["modality"] = df["modality"].replace("Text", "Annotation")
+        else:
+            df["embedding"] = df["embedding"].replace("Text", "Annotation")
 
         if "baseline" in model:
             # rename modality to embedding
@@ -254,7 +256,6 @@ if __name__ == '__main__':
             assert df["noise"].unique() == noise_ratio, "Noise is not unique"
 
         model_data[model] = df
-
 
     # combine model data
     df = pd.concat([model_data[models[0]], model_data[models[1]]])
@@ -276,7 +277,15 @@ if __name__ == '__main__':
     df_grouped_by_wd_embedding = df.groupby(["model", "walk_distance", "embedding"]).mean()
     df.reset_index(drop=True, inplace=True)
 
-    #create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
-    #create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
+    annotations = df[df["embedding"] == "Annotation"]
+
+    simple_annotation = df[(df["model"] == "simple") & (df["embedding"] == "Annotation")]
+    simple_f_annotation = df[(df["model"] == "simple_f") & (df["embedding"] == "Annotation")]
+
+    print(simple_annotation.groupby("walk_distance")["f1"].mean())
+    print(simple_f_annotation.groupby("walk_distance")["f1"].mean())
+
+    # create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
+    # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)
-    #create_box_plot(metric, df, save_folder)
+    create_box_plot(metric, df, save_folder)
