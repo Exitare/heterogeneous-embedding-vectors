@@ -1,8 +1,22 @@
 from pathlib import Path
 import pandas as pd
 from collections import Counter
+import numpy as np
+
+cancers =  ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
 
 if __name__ == '__main__':
+    submitter_ids = {}
+    for cancer in cancers:
+        df = pd.read_csv(Path("data","rna", cancer,"data.csv"), index_col= 0)
+        print(df)
+        df["submitter_id"] = df["Patient"].apply(lambda x: '-'.join(x.split('-')[:3]))
+        submitter_ids[cancer] = df["submitter_id"].values
+
+    all_submitter_ids = np.concatenate(list(submitter_ids.values()))
+    print(len(list(set(all_submitter_ids))))
+    input()
+
     annotation_embeddings = pd.read_csv(
         Path("results", "embeddings", "annotations", "BRCA_LUAD_STAD_BLCA_COAD_THCA", "embeddings.csv"))
     # print(annotation_embeddings.head())
@@ -10,7 +24,7 @@ if __name__ == '__main__':
     print(f"Annotations per cancer type: {annotation_embeddings['cancer'].value_counts()}")
 
     rna_embeddings = {}
-    for cancer in ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]:
+    for cancer in cancers:
         df = pd.read_csv(
             Path("results", "embeddings", "rna", "BRCA_LUAD_STAD_BLCA_COAD_THCA", f"{cancer}_embeddings.csv"))
 
@@ -30,3 +44,6 @@ if __name__ == '__main__':
         Path("results", "embeddings",  "mutation_embeddings.csv"))
     print(f"Mutation patient: {mutation_embeddings['submitter_id'].nunique()}")
     print(f"Mutations per cancer type: {mutation_embeddings['cancer'].value_counts()}")
+
+
+

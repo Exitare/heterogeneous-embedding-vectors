@@ -43,9 +43,6 @@ if __name__ == '__main__':
     # concatenate all results
     results = pd.concat(results)
     results["tmb"] = results["tmb"].replace({"0": "Low", "1": "High", "2": "N/A"})
-    print(results)
-    print(results["walk_distance"].unique())
-    print(results["amount_of_walks"].unique())
 
     pivot = results.pivot_table(
         values='accuracy',

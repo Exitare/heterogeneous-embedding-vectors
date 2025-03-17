@@ -34,33 +34,53 @@ model_names = {
 }
 
 
-def create_bar_chart(metric: Metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_folder: Path):
-    plt.figure(figsize=(10, 6))
+def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_folder: Path):
+    print(grouped_df)
 
-    # Bar plot
-    ax = sns.barplot(x="walk_distance", y=metric.name, hue="embedding", data=grouped_df,
-                     palette=color_palette, hue_order=order, alpha=0.8, edgecolor="black")
+    # Get unique model names dynamically
+    models = df["model"].unique()
 
-    # Scatter plot overlay (showing all data points)
-    sns.stripplot(x="walk_distance", y=metric.name, hue="embedding", data=df,
-                  palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6)
+    if len(models) != 2:
+        raise ValueError(f"Expected exactly two models, but found: {models}")
 
-    # Set title and labels
-    ax.set_title(f"{metric.label} per Walk Distance and Modality")
-    ax.set_ylabel(metric.label)
-    ax.set_xlabel("Walk Distance")
+    # Create subplots for side-by-side visualization
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
 
-    # set y lim between 0 and 1
-    ax.set_ylim(-0.1, 1.1)
+    for i, model in enumerate(models):
+        ax = axes[i]
+        #subset_grouped = grouped_df[grouped_df["model"] == model]
+        subset_df = df[df["model"] == model]
 
-    # Remove duplicate legends from scatter plot
-    handles, labels = ax.get_legend_handles_labels()
-    plt.legend(handles[:len(order)], labels[:len(order)], title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
+        # Ensure all embeddings are included
+        #order = subset_grouped["embedding"].unique().tolist()
 
-    # Improve layout and show the plot
+        # Bar plot
+        sns.barplot(x="walk_distance", y=metric.name, hue="embedding", data=subset_df,
+                    palette=color_palette, hue_order=order, alpha=0.8, edgecolor="black", ax=ax)
+
+        # Scatter plot overlay (showing all data points)
+        sns.stripplot(x="walk_distance", y=metric.name, hue="embedding", data=subset_df,
+                      palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6, ax=ax)
+
+        # Set title and labels
+        ax.set_title(f"{metric.label} per Walk Distance ({model})")
+        ax.set_ylabel(metric.label)
+        ax.set_xlabel("Walk Distance")
+
+        # Set y limits between 0 and 1
+        ax.set_ylim(0, 1.1)
+
+        # Remove duplicate legends from scatter plot
+        if i == 1:  # Show legend only for the second subplot to avoid duplication
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles[:len(order)], labels[:len(order)], title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
+        else:
+            ax.legend([], [], frameon=False)  # Hide legend for the first plot
+
+    # Improve layout and save the plot
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=300)
-
+    plt.close('all')
 
 def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
     # Separate the grouped data for each model.
@@ -109,6 +129,7 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
     plt.ylim(y_lim)
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=300)
+    plt.close('all')
 
 
 def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save_folder: Path):
@@ -163,25 +184,38 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     plt.rcParams['font.family'] = 'helvetica'
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_line_plot_comparison.png"), dpi=300)
+    plt.close('all')
 
 
-def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
-    # create a line chart too
-    plt.figure(figsize=(10, 6))
-    ax = sns.boxplot(x="walk_distance", y=metric.name, hue="embedding", data=df,
-                     palette=color_palette, hue_order=order)
+def create_box_plot(metric, df: pd.DataFrame, save_folder: Path):
+    # Get unique model names dynamically
+    models = df["model"].unique()
 
-    # Set title and labels
-    ax.set_title(f"{metric.label} per Walk Distance and Modality")
-    ax.set_ylabel(metric.label)
-    ax.set_xlabel("Random Selection")
-    # put legend outside of plot
-    plt.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
-    ax.set_ylim(-1, 1.01)
+    if len(models) != 2:
+        raise ValueError("Expected exactly two models, but found:", models)
 
-    # Improve layout and show the plot
+    # Create subplots with two side-by-side plots
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
+
+    for i, model in enumerate(models):
+        ax = axes[i]
+        subset = df[df["model"] == model]
+
+        # Ensure all embeddings are included
+        order = subset["embedding"].unique().tolist()
+
+        sns.boxplot(x="walk_distance", y=metric.name, hue="embedding", data=subset,
+                    palette=color_palette, hue_order=order, ax=ax)
+
+        ax.set_title(f"{metric.label} per Walk Distance ({model})")
+        ax.set_ylabel(metric.label)
+        ax.set_xlabel("Random Selection")
+        ax.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
+
+    # Adjust layout and save plot
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=300)
+    plt.close('all')
 
 
 if __name__ == '__main__':
@@ -285,7 +319,7 @@ if __name__ == '__main__':
     print(simple_annotation.groupby("walk_distance")["f1"].mean())
     print(simple_f_annotation.groupby("walk_distance")["f1"].mean())
 
-    # create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
+    create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
     # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)
     create_box_plot(metric, df, save_folder)

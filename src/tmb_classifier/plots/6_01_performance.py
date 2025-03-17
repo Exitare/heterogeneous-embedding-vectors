@@ -32,13 +32,23 @@ color_palette = {
     "Low": "#c837abff",
     "High": "#37abc8ff",
     "N/A": "#ffcc00ff",
+    "3_3": "#c837abff",
+    "3_4": "#ffcc00ff",
+    "3_5": "#37abc8ff",
+    "4_3": "#e63946ff",
+    "4_4": "#2a9d8fff",
+    "4_5": "#f4a261ff",
+    "5_3": "#264653ff",
+    "5_4": "#8ecae6ff",
+    "5_5": "#ff6700ff",
+    "6_6": "#6a0572ff"
 }
 
 def create_grid_plot(df: pd.DataFrame, metric: str):
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.boxenplot(data=df, x="walks", y=metric, hue="tmb", ax=ax, palette=color_palette,
-                  order=["3_3", "3_4", "3_5", "4_3", "4_4", "4_5", "5_3", "5_4", "5_5"])
+    sns.boxenplot(data=df, x="tmb", y=metric, hue="walks", ax=ax, palette=color_palette,
+                  order=["Low", "High", "N/A", "All"], hue_order=["3_3", "3_4", "3_5", "4_3", "4_4", "4_5", "5_3", "5_4", "5_5"])
     ax.set_title(f"{metrics[metric]} Score")
     ax.set_ylabel(f"{metrics[metric]} Score")
     ax.set_xlabel("")
@@ -46,11 +56,17 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     # set ylim
     ax.set_ylim(0, 1.01)
 
-    labels = [item.get_text() for item in ax.get_xticklabels()]
-    labels = [f"Distance: {label.split('_')[0]}\n Amount: {label.split('_')[1]}" for label in labels]
-    ax.set_xticklabels(labels)
+    # change legend by removing the underscore
+    handles, labels = ax.get_legend_handles_labels()
+    # convert to Sample count: 3 Repeats: 3
+    labels = [f"SC: {label.split('_')[0]} R: {label.split('_')[1]}" for label in labels]
+    ax.legend(handles, labels, title="Tumor Mutational Burden", ncols=5, loc='lower center', bbox_to_anchor=(0.5, -0.3))
+
+    #labels = [item.get_text() for item in ax.get_xticklabels()]
+    #labels = [f"Sample Count: {label.split('_')[0]}\n Amount: {label.split('_')[1]}" for label in labels]
+    #ax.set_xticklabels(labels)
     # adjust legend
-    ax.legend(loc='lower center', ncols=7, title="Tumor Mutation Burden", bbox_to_anchor=(0.5, -0.28))
+    #ax.legend(loc='lower center', ncols=7, title="Tumor Mutation Burden", bbox_to_anchor=(0.5, -0.28))
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric}_score_grid.png"), dpi=300)
     plt.close('all')
@@ -113,7 +129,7 @@ def create_performance_overview_plot_per_combination(df: pd.DataFrame):
     ax.set_ylim(0, 1)
 
     labels = [item.get_text() for item in ax.get_xticklabels()]
-    labels = [f"Distance: {label.split(' ')[0]}\n Amount: {label.split(' ')[1]}" for label in labels]
+    labels = [f"Sample Count: {label.split(' ')[0]}\n Repeats: {label.split(' ')[1]}" for label in labels]
     ax.set_xticklabels(labels)
 
     plt.legend(title="", loc='lower right', ncols=7)  #
@@ -147,8 +163,8 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         # adjust heatmap range to 0.8 - 1.0
 
         plt.title(f"{metric} Scores Heatmap")
-        plt.xlabel("Amount of Walks")
-        plt.ylabel("Walk Distance")
+        plt.xlabel("Sample Count")
+        plt.ylabel("Repeats")
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig(Path(save_folder, f"overview_scores_heatmap_{metric}.png"), dpi=300, bbox_inches="tight")

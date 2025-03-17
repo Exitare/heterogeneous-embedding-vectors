@@ -10,4 +10,4 @@ color_palette = {
     "STAD": "#f47e44d7",
     "COAD": "#502d16ff"
 }
-order = ["Text", "Image", "RNA", "Mutation", "BRCA", "LUAD", "BLCA", "THCA", "STAD", "COAD"]
+order = ["Annotation", "Image", "RNA", "Mutation", "BRCA", "LUAD", "BLCA", "THCA", "STAD", "COAD"]

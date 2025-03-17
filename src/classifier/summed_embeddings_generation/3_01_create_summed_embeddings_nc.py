@@ -81,6 +81,7 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
     if "rna" in modalities:
         submitter_ids.update(h5_file["rna"].keys())
         logging.info(f"RNA modality: {len(submitter_ids)} submitter_ids collected.")
+        input()
         return list(submitter_ids)
     else:
         raise ValueError("RNA modality is required for processing.")
@@ -89,8 +90,9 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
 def main():
     parser = argparse.ArgumentParser(description="Process and sum patient embeddings.")
     parser.add_argument(
-        "--cancer", "-c", nargs="+", required=True,
-        help="The cancer types to work with."
+        "--cancer", "-c", nargs="+", required=False,
+        help="The cancer types to work with.",
+        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
     )
     parser.add_argument(
         "--walk_distance", "-w", type=int, required=True,
@@ -137,7 +139,7 @@ def main():
         logging.info(f"Total unique patients to process: {len(patient_ids)}")
 
         summed_embeddings_data = []
-        mutation_count = 0
+        patient_count = 0
 
         for patient_id in tqdm(patient_ids, desc="Processing Patients"):
             try:
@@ -151,12 +153,12 @@ def main():
                     patient_id, patient_data, walk_distance, walk_amount
                 )
                 summed_embeddings_data.append((summed_embedding, patient_cancer, patient_id))
-                mutation_count += 1
+                patient_count += 1
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
 
-    logging.info(f"Processed {mutation_count} patients with valid embeddings.")
+    logging.info(f"Processed {patient_count} patients with valid embeddings.")
 
     # ✅ Save summed embeddings to HDF5
     with h5py.File(output_file, "w") as out_file:

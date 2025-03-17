@@ -28,14 +28,26 @@ color_palette = {
     "THCA": "#d35f5fff",
     "STAD": "#f47e44d7",
     "COAD": "#502d16ff",
-    "All": "#000000"
+    "All": "#000000",
+    "3_3": "#c837abff",
+    "3_4": "#ffcc00ff",
+    "3_5": "#37abc8ff",
+    "4_3": "#e63946ff",
+    "4_4": "#2a9d8fff",
+    "4_5": "#f4a261ff",
+    "5_3": "#264653ff",
+    "5_4": "#8ecae6ff",
+    "5_5": "#ff6700ff",
+    "6_6": "#6a0572ff"
 }
 
+
 def create_grid_plot(df: pd.DataFrame, metric: str):
+    hue_order = ["3_3", "3_4", "3_5", "4_3", "4_4", "4_5", "5_3", "5_4", "5_5"]
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.boxenplot(data=df, x="walks", y=metric, hue="cancer", ax=ax, palette=color_palette,
-                  order=["3_3", "3_4", "3_5", "4_3", "4_4", "4_5", "5_3", "5_4", "5_5"])
+    sns.boxenplot(data=df, x="cancer", y=metric, hue="walks", ax=ax, palette=color_palette,
+                  hue_order=hue_order)
     ax.set_title(f"{metrics[metric]} Score")
     ax.set_ylabel(f"{metrics[metric]} Score")
     ax.set_xlabel("")
@@ -43,11 +55,14 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     # set ylim
     ax.set_ylim(0.62, 1.01)
 
-    labels = [item.get_text() for item in ax.get_xticklabels()]
-    labels = [f"Distance: {label.split('_')[0]}\n Amount: {label.split('_')[1]}" for label in labels]
-    ax.set_xticklabels(labels)
+    handles, labels = ax.get_legend_handles_labels()
+    # Sort labels based on hue_order
+    label_dict = {hue: f"SC: {hue.split('_')[0]} R: {hue.split('_')[1]}" for hue in hue_order}
+    sorted_labels = [label_dict[label] for label in hue_order if label in labels]
+    sorted_handles = [handles[labels.index(label)] for label in hue_order if label in labels]
     # adjust legend
-    ax.legend(loc='lower center', ncols=7, title="Cancer Type", bbox_to_anchor=(0.5, -0.28))
+    ax.legend(sorted_handles, sorted_labels, loc='lower center', ncols=5, title="Cancer Type",
+              bbox_to_anchor=(0.5, -0.28))
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric}_score_grid.png"), dpi=300)
     plt.close('all')
@@ -139,12 +154,12 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5,vmin=0.8, vmax=1.0)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.8, vmax=1.0)
         # adjust heatmap range to 0.8 - 1.0
 
         plt.title(f"{metric} Scores Heatmap")
-        plt.xlabel("Amount of Walks")
-        plt.ylabel("Walk Distance")
+        plt.xlabel("Sample Counts")
+        plt.ylabel("Repeats")
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig(Path(save_folder, f"overview_scores_heatmap_{metric}.png"), dpi=300, bbox_inches="tight")

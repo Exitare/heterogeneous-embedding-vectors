@@ -41,13 +41,19 @@ if __name__ == '__main__':
 
     predictions = pd.concat(all_predictions)
 
+    # rename .replace({"0": "Low", "1": "High", "2": "N/A"})
+    predictions["y_test_decoded"] = predictions["y_test_decoded"].replace({0: "Low", 1: "High", 2: "N/A"})
+    predictions["y_pred_decoded"] = predictions["y_pred_decoded"].replace({0: "Low", 1: "High", 2: "N/A"})
+
     # create confusion matrix
     confusion_matrix = pd.crosstab(predictions["y_test_decoded"], predictions["y_pred_decoded"], rownames=['True'],
                                    colnames=['Predicted'])
 
+    save_file = Path("figures", "tmb_classifier", cancers, "performance",
+                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png")
+    logging.info(f"Saving confusion matrix to {save_file}")
+    logging.info(confusion_matrix)
     # visualize the confusion matrix
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "tmb_classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=300)
+    plt.savefig(save_file, dpi=300)
