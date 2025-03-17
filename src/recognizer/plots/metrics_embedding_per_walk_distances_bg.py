@@ -63,9 +63,9 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
                       palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6, ax=ax)
 
         # Set title and labels
-        ax.set_title(f"{metric.label} per Walk Distance ({model})")
+        ax.set_title(f"{metric.label} per Sample Count ({model})")
         ax.set_ylabel(metric.label)
-        ax.set_xlabel("Walk Distance")
+        ax.set_xlabel("Sample Count")
 
         # Set y limits between 0 and 1
         ax.set_ylim(0, 1.1)
@@ -122,7 +122,7 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
 
     plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
     plt.ylabel(metric.label)
-    plt.xlabel("Walk Distance")
+    plt.xlabel("Sample Count")
     # plt.legend(title="", loc='lower left')
     # remove legend
     plt.legend().remove()
@@ -166,7 +166,7 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
 
     # plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
     plt.ylabel(metric.label)
-    plt.xlabel("Walk Distance")
+    plt.xlabel("Sample Count")
     # plt.legend(title="", loc='lower left')
     # remove legend
     plt.legend().remove()
@@ -175,7 +175,7 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     plt.xticks(fontsize=18)
     plt.yticks(fontsize=18)
     # set label font size
-    plt.xlabel("Walk Distance", fontsize=18)
+    plt.xlabel("Sample Count", fontsize=18)
     plt.ylabel(metric.label, fontsize=18)
 
     # remove box
@@ -207,7 +207,7 @@ def create_box_plot(metric, df: pd.DataFrame, save_folder: Path):
         sns.boxplot(x="walk_distance", y=metric.name, hue="embedding", data=subset,
                     palette=color_palette, hue_order=order, ax=ax)
 
-        ax.set_title(f"{metric.label} per Walk Distance ({model})")
+        ax.set_title(f"{metric.label} per Sample Count ({model})")
         ax.set_ylabel(metric.label)
         ax.set_xlabel("Random Selection")
         ax.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
@@ -283,7 +283,7 @@ if __name__ == '__main__':
             # rename modality to embedding
             df.rename(columns={"modality": "embedding"}, inplace=True)
 
-            # only select up to 10 walk distance
+            # only select up to 10 Sample Count
         df = df[df["walk_distance"] <= 10]
         if "noise" in df.columns:
             # assert only the selected noise ratio is in the df

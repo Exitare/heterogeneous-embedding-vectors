@@ -79,7 +79,7 @@ def noise_grid(df, metric: str, file_name: str):
     # change y axis to metric
     g.set_ylabels(metric_input)
     # change x axis to walk_distance
-    g.set_xlabels("Walk Distance")
+    g.set_xlabels("Sample Count")
     g.set_ylabels(metric.upper())
     g.set(ylim=(-0.1, 1.02))
     # set title for each plot colname %
@@ -125,7 +125,7 @@ def reduced_noise_grid(df, metric: str, file_name: str, title: str):
     # change y axis to metric
     g.set_ylabels(metric_input)
     # change x axis to walk_distance
-    g.set_xlabels("Walk Distance")
+    g.set_xlabels("Sample Count")
     g.set_ylabels(metric.upper())
     # set y-lim from 0 to 1
     g.set(ylim=(-0.1, 1))

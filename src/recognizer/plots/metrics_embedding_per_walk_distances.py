@@ -63,9 +63,9 @@ def create_line_chart(metric: Metric, grouped_df: pd.DataFrame, save_folder: Pat
                       palette=color_palette, hue_order=order)
 
     # Set title and labels
-    ax.set_title(f"{metric.label} per Walk Distance and Modality")
+    ax.set_title(f"{metric.label} per Sample Counts and Modality")
     ax.set_ylabel(metric.label)
-    ax.set_xlabel("Walk Distance")
+    ax.set_xlabel("Sample Count")
     # put legend outside of plot
     plt.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
     ax.set_ylim(-0.1, 1.05)
@@ -80,9 +80,9 @@ def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
                       palette=color_palette, hue_order=order)
 
     # Set title and labels
-    ax.set_title(f"{metric.label} per Walk Distance and Modality")
+    ax.set_title(f"{metric.label} per Sample Count and Modality")
     ax.set_ylabel(metric.label)
-    ax.set_xlabel("Walk Distance")
+    ax.set_xlabel("Sample Count")
     # put legend outside of plot
     plt.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
     ax.set_ylim(0.8, 1.01)
@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     print(df)
 
-    # only select up to 10 walk distance
+    # only select up to 10 Sample Count
     df = df[df["walk_distance"] <= 10]
 
     if "noise" in df.columns:
