@@ -33,6 +33,16 @@ model_names = {
     "baseline_s": "BL Simple"
 }
 
+# Define the dashes mapping based on style_order
+dashes_dict = {
+    "Baseline Simple": (1, 0),  # Solid line (continuous)
+    "Baseline Multi": (1, 0),  # Solid line (continuous)
+    "DL Simple": (5, 2),  # Dashed line (5px on, 2px off)
+    "DL Multi": (5, 2),  # Dashed line (5px on, 2px off)
+    "DL Simple Foundation": (5, 2, 1, 2),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
+    "DL Multi Foundation": (5, 2, 1, 2)  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
+}
+
 
 def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_folder: Path):
     print(grouped_df)
@@ -48,11 +58,11 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
 
     for i, model in enumerate(models):
         ax = axes[i]
-        #subset_grouped = grouped_df[grouped_df["model"] == model]
+        # subset_grouped = grouped_df[grouped_df["model"] == model]
         subset_df = df[df["model"] == model]
 
         # Ensure all embeddings are included
-        #order = subset_grouped["embedding"].unique().tolist()
+        # order = subset_grouped["embedding"].unique().tolist()
 
         # Bar plot
         sns.barplot(x="walk_distance", y=metric.name, hue="embedding", data=subset_df,
@@ -60,7 +70,8 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
 
         # Scatter plot overlay (showing all data points)
         sns.stripplot(x="walk_distance", y=metric.name, hue="embedding", data=subset_df,
-                      palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6, ax=ax)
+                      palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6,
+                      ax=ax)
 
         # Set title and labels
         ax.set_title(f"{metric.label} per Sample Count ({model})")
@@ -73,7 +84,8 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
         # Remove duplicate legends from scatter plot
         if i == 1:  # Show legend only for the second subplot to avoid duplication
             handles, labels = ax.get_legend_handles_labels()
-            ax.legend(handles[:len(order)], labels[:len(order)], title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
+            ax.legend(handles[:len(order)], labels[:len(order)], title="Embedding", loc='upper left',
+                      bbox_to_anchor=(1, 1))
         else:
             ax.legend([], [], frameon=False)  # Hide legend for the first plot
 
@@ -81,6 +93,7 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=300)
     plt.close('all')
+
 
 def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
     # Separate the grouped data for each model.
@@ -133,9 +146,6 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
 
 
 def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save_folder: Path):
-    # Separate the grouped data for each model.
-    # Since grouped_df is multi-indexed by ["model", "walk_distance", "embedding"],
-    # we extract the baseline (first model) and target (second model) data.
     baseline_df = df[df["model"] == models[0]].reset_index(drop=True)
     baseline_df["model"] = model_names[models[0]]
     baseline_model_name = model_names[models[0]]
@@ -152,17 +162,11 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     line_df.reset_index(drop=True, inplace=True)
     plt.figure(figsize=(10, 6))
 
+
     # Plot the baseline model with reduced opacity (faded)
-    sns.lineplot(
-        x="walk_distance",
-        y=metric.name,
-        hue="Modality",
-        data=line_df,
-        palette=color_palette,
-        hue_order=order,
-        style="Model",
-        style_order=[compare_model_name, baseline_model_name],
-    )
+    sns.lineplot(x="walk_distance", y=metric.name, hue="Modality", data=line_df, palette=color_palette, hue_order=order,
+                 style="Model", style_order=[compare_model_name, baseline_model_name],
+                 dashes=dashes_dict)
 
     # plt.title(f"{metric.label} comparison between {baseline_model_name} and {compare_model_name}")
     plt.ylabel(metric.label)
@@ -170,7 +174,7 @@ def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save
     # plt.legend(title="", loc='lower left')
     # remove legend
     plt.legend().remove()
-    plt.ylim(0, 1.02)
+    plt.ylim(0.1, 1.02)
     # increase font size
     plt.xticks(fontsize=18)
     plt.yticks(fontsize=18)
@@ -319,6 +323,8 @@ if __name__ == '__main__':
     print(simple_annotation.groupby("walk_distance")["f1"].mean())
     print(simple_f_annotation.groupby("walk_distance")["f1"].mean())
 
+    print(df)
+    input()
     create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
     # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)
