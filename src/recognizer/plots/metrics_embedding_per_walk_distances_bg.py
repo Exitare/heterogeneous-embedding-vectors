@@ -35,12 +35,12 @@ model_names = {
 
 # Define the dashes mapping based on style_order
 dashes_dict = {
-    "Baseline Simple": (1, 0),  # Solid line (continuous)
-    "Baseline Multi": (1, 0),  # Solid line (continuous)
+    "BL Simple": (1, 0),  # Solid line (continuous)
+    "BL Multi": (1, 0),  # Solid line (continuous)
     "DL Simple": (5, 2),  # Dashed line (5px on, 2px off)
     "DL Multi": (5, 2),  # Dashed line (5px on, 2px off)
-    "DL Simple Foundation": (5, 2, 1, 2),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
-    "DL Multi Foundation": (5, 2, 1, 2)  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
+    "DL Simple Foundation": (2, 4, 2, 4, 8, 4),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
+    "DL Multi Foundation": (2, 4, 2, 4, 8, 4),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
 }
 
 
@@ -324,7 +324,6 @@ if __name__ == '__main__':
     print(simple_f_annotation.groupby("walk_distance")["f1"].mean())
 
     print(df)
-    input()
     create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
     # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)

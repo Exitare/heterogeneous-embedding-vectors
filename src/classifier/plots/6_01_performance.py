@@ -154,7 +154,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.8, vmax=1.0)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.8, vmax=0.95)
         # adjust heatmap range to 0.8 - 1.0
 
         plt.title(f"{metric} Scores Heatmap")
