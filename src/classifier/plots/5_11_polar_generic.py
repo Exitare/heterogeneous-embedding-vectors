@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import h5py
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Corrected walk_distances to include 4
 walk_distances = [3, 4, 5]
@@ -66,6 +69,11 @@ def create_polar_line_plot(df, distance_type, ax, color_dict, all_combos):
 
     # Set the labels for each combination
     ax.set_xticks(angles[:-1])
+    # Apply the transformation using split and format
+    all_combos_df['combo'] = all_combos_df['combo'].apply(lambda x: f"SC: {x.split('_')[0]} and R: {x.split('_')[1]}")
+    print(all_combos_df['combo'])
+
+    # Now, set the tick labels
     ax.set_xticklabels(all_combos_df['combo'], fontsize=10)
 
     # Iterate over each cancer type and plot its distances
@@ -395,23 +403,28 @@ if __name__ == '__main__':
         summed_embeddings[key] = pd.concat(dfs, ignore_index=True)
 
     # Initialize dictionaries to store distances
+    logging.info("Calculating euclidean distances")
     euclidean_intra_distances, euclidean_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                            selected_cancers,
                                                                                            distance_metric="euclidean")
+    logging.info("Calculating cosine distances")
     cosine_intra_distances, cosine_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                      selected_cancers,
                                                                                      distance_metric="cosine")
+    logging.info("Calculating dot_product distances")
     dot_product_intra_distances, dot_product_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                                selected_cancers,
                                                                                                distance_metric="dot_product")
 
     # Convert to DataFrames
+    logging.info("Converting to dataframes")
     euclidean_intra_df, euclidean_inter_df = convert_to_records(euclidean_intra_distances, euclidean_inter_distances)
     cosine_intra_df, cosine_inter_df = convert_to_records(cosine_intra_distances, cosine_inter_distances)
     dot_product_intra_df, dot_product_inter_df = convert_to_records(dot_product_intra_distances,
                                                                     dot_product_inter_distances)
 
     # Combine intra and inter distance DataFrames
+    logging.info("Combining to dataframes")
     euclidean_combined_df = pd.concat([euclidean_intra_df, euclidean_inter_df], ignore_index=True)
     cosine_combined_df = pd.concat([cosine_intra_df, cosine_inter_df], ignore_index=True)
     dot_product_combined_df = pd.concat([dot_product_intra_df, dot_product_inter_df], ignore_index=True)
@@ -425,7 +438,9 @@ if __name__ == '__main__':
     cosine_combined_df.to_csv(Path(results_save_folder, cosine_save_file_name), index=False)
     dot_product_combined_df.to_csv(Path(results_save_folder, dot_product_save_file_name), index=False)
 
+
     # Generate the polar plots with enhanced legends
+    logging.info("Creating plots...")
     main_polar_plots(euclidean_combined_df, "euclidean_polar")
     main_polar_plots(cosine_combined_df, "cosine_polar")
     main_polar_plots(dot_product_combined_df, "dot_product_polar")

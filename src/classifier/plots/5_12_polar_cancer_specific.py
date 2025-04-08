@@ -51,7 +51,10 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos, metri
 
     # Set the labels for each combination
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(all_combos_df['combo'])
+    all_combos_df['combo'] = all_combos_df['combo'].apply(lambda x: f"SC: {x.split('_')[0]} and R: {x.split('_')[1]}")
+
+    # Now, set the tick labels
+    ax.set_xticklabels(all_combos_df['combo'], fontsize=10)
 
     # Plot data for each cancer type within the primary cancer group
     cancers = group['combined_cancer'].unique()
@@ -67,14 +70,30 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos, metri
         distances += distances[:1]
         cancer_angles = [combo_to_angle[combo] for combo in combos] + [combo_to_angle[combos[0]]]
 
+        if "-" not in cancer:
+            cancer_label = f"{cancer}-{cancer}"
+        else:
+            cancer_label = cancer
+
         # Plot the line
-        ax.plot(cancer_angles, distances, label=cancer, color=color_dict.get(cancer, None), linewidth=2)
+        ax.plot(cancer_angles, distances, label=cancer_label, color=color_dict.get(cancer, None), linewidth=2)
 
         # Plot the points
         ax.scatter(cancer_angles, distances, color=color_dict.get(cancer, None), s=50, edgecolors='w', zorder=5)
 
+    title = f"{primary_cancer} -"
+
+    if distance_metric == "euclidean":
+        title += " Euclidean Distance"
+
+    elif distance_metric == "cosine":
+        title += " Cosine"
+
+    elif distance_metric == "dot_product":
+        title += " Dot Product"
+
     # Set the title
-    ax.set_title(f"{primary_cancer} - Polar Plot", va='bottom', fontsize=14, fontweight='bold')
+    ax.set_title(title, va='bottom', fontsize=14, fontweight='bold')
 
     # Set radial limits with some padding (recompute max after shifting)
     max_distance = merged['distance'].max()

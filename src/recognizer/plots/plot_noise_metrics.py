@@ -220,8 +220,8 @@ if __name__ == '__main__':
 
     plot_noise(grouped, metric)
 
-    multi_name = "multi" if multi else "simple"
-    foundation_name = "foundation" if foundation else ""
+    multi_name = "Cancer Specific" if multi else "Simple"
+    foundation_name = "Composite" if foundation else ""
 
     if foundation_name:
         file_name = f"{metric}_{multi_name}_{foundation_name}_noise_grid.png"

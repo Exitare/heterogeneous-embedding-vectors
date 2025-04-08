@@ -26,7 +26,7 @@ color_palette = {
 
 
 if __name__ == '__main__':
-    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.family'] = 'Helvetica'
     plt.rcParams['font.size'] = 12
     parser = ArgumentParser(description='Embedding Clustering')
     parser.add_argument("--selected_cancers", "-c", nargs='+', required=False,
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     scatter1 = ax1.scatter(X_pca[:, 0], X_pca[:, 1], c=cluster_labels, cmap='viridis', alpha=0.6)
     ax1.set_xlabel("PCA 1")
     ax1.set_ylabel("PCA 2")
-    ax1.set_title("GMM Clustering (Model-Driven Segmentation)")
+    ax1.set_title("GMM Clustering")
     # Overlay cluster centers on this plot
     for idx, center in enumerate(centers_pca):
         ax1.scatter(center[0], center[1], marker='X', s=200, c='black')
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                     color=cancer_palette[cancer], alpha=0.6)
     ax2.set_xlabel("PCA 1")
     ax2.set_ylabel("PCA 2")
-    ax2.set_title("Cancer Type Distribution (Data Provenance)")
+    ax2.set_title("Cancer Type Distribution")
 
     # Create legend patches for the cancer types to ensure color parity
     legend_patches = [
@@ -131,5 +131,7 @@ if __name__ == '__main__':
     ax2.legend(handles=legend_patches, title="Cancer Type", bbox_to_anchor=(1.05, 1), loc='upper left',
                borderaxespad=0.)
 
+    fig.suptitle(f"SC: {walk_distance} R: {walk_amount}", fontsize=16, fontweight='bold')
+
     plt.tight_layout()
-    plt.savefig(Path(fig_save_folder, f"{walk_amount}_{walk_distance}_gmm_clustering.png"), dpi=300)
+    plt.savefig(Path(fig_save_folder, f"{walk_distance}_{walk_amount}_gmm_clustering.png"), dpi=300)

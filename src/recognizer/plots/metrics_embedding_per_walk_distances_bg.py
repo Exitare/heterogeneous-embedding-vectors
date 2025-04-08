@@ -35,10 +35,10 @@ model_names = {
 
 # Define the dashes mapping based on style_order
 dashes_dict = {
-    "BL Simple": (1, 0),  # Solid line (continuous)
-    "BL Multi": (1, 0),  # Solid line (continuous)
-    "DL Simple": (5, 2),  # Dashed line (5px on, 2px off)
-    "DL Multi": (5, 2),  # Dashed line (5px on, 2px off)
+    "BL Simple": (5, 2),  # Solid line (continuous)
+    "BL Multi": (5, 2),  # Solid line (continuous)
+    "DL Simple": (1, 0),  # Dashed line (5px on, 2px off)
+    "DL Multi": (1, 0),  # Dashed line (5px on, 2px off)
     "DL Simple Foundation": (2, 4, 2, 4, 8, 4),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
     "DL Multi Foundation": (2, 4, 2, 4, 8, 4),  # Dash-dot pattern (5px dash, 2px space, 1px dot, 2px space)
 }
@@ -305,7 +305,7 @@ if __name__ == '__main__':
 
     logging.info(f"Saving figures to {save_folder}")
 
-    # color palette should inlcude only the mebedding that are availabe in the dataset
+    # color palette should include only the embedding that are available in the dataset
 
     available_embeddings = df["embedding"].unique()
     color_palette = {k: v for k, v in color_palette.items() if k in df["embedding"].unique()}
