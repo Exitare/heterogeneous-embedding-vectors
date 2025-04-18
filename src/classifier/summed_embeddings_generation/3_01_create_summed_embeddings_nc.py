@@ -81,7 +81,6 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
     if "rna" in modalities:
         submitter_ids.update(h5_file["rna"].keys())
         logging.info(f"RNA modality: {len(submitter_ids)} submitter_ids collected.")
-        input()
         return list(submitter_ids)
     else:
         raise ValueError("RNA modality is required for processing.")
