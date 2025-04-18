@@ -5,13 +5,16 @@ from pathlib import Path
 from tensorflow.keras.layers import Input, Dense, BatchNormalization, Dropout, ReLU
 from tensorflow.keras.models import Model
 import numpy as np
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, balanced_accuracy_score, \
+    matthews_corrcoef, roc_auc_score, mean_squared_error, mean_absolute_error, root_mean_squared_error
 from argparse import ArgumentParser
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import ReduceLROnPlateau
 import h5py
 from sklearn.model_selection import train_test_split
+import scipy.special
+from tensorflow.keras.utils import to_categorical
 
 embeddings = ['Text', 'Image', 'RNA', 'Mutation']
 save_path = Path("results", "recognizer", "simple")
@@ -92,12 +95,12 @@ def build_model(input_dim):
     text_x = BatchNormalization()(text_x)
     text_x = Dropout(0.2)(text_x)  # Adding dropout for regularization
     text_x = Dense(32, activation='relu', name='text_dense_3')(text_x)
-    text_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Text')(text_x)
+    text_output = Dense(num_classes, activation='softmax', name='Text')(text_x)
 
     # Less complex paths for other outputs
-    image_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Image')(x)
-    rna_output = Dense(1, activation=ReLU(max_value=max_embedding), name='RNA')(x)
-    mutation_output = Dense(1, activation=ReLU(max_value=max_embedding), name='Mutation')(x)
+    image_output = Dense(num_classes, activation='softmax', name='Image')(x)
+    rna_output = Dense(num_classes, activation='softmax', name='RNA')(x)
+    mutation_output = Dense(num_classes, activation='softmax', name='Mutation')(x)
 
     # Separate output layers for each count
     outputs = [text_output, image_output, rna_output, mutation_output]
@@ -107,7 +110,7 @@ def build_model(input_dim):
     return model
 
 
-def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
+def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance: int):
     with h5py.File(hdf5_file_path, 'r') as f:
         X = f["X"][:]
         walk_distances = f["WalkDistances"][:] if walk_distance == -1 else None
@@ -122,26 +125,27 @@ def hdf5_generator(hdf5_file_path, batch_size, indices, walk_distance):
             batch_indices = np.sort(indices[start_idx:end_idx])
 
             X_batch = X[batch_indices]
-            y_batch = {key: labels[key][batch_indices] for key in labels}
 
+            # Convert labels to one-hot encoded format
+            y_batch = {key: to_categorical(labels[key][batch_indices], num_classes=num_classes) for key in labels}
             if walk_distance == -1:
                 yield X_batch, y_batch, walk_distances[batch_indices]
             else:
                 yield X_batch, y_batch
 
 
-def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Path, noise: float, walk_distance: int):
+def evaluate_model_in_batches(model, generator, steps, embeddings, noise: float, walk_distance: int):
     """
     Evaluate the model using a generator and save predictions, ground truth, and metrics.
     If walk_distance == -1, tracks metrics per walk distance and generates two files:
         - `metrics.csv` for aggregated results
         - `split_metrics.csv` for detailed results per walk distance
     """
-    save_path.mkdir(parents=True, exist_ok=True)
 
     all_metrics = {}
     all_predictions = {}
     all_ground_truth = {}
+    all_probabilities = {}  # Store probabilities for AUC calculation
     all_walk_distances_seen = set()  # Track all seen walk distances
 
     for _ in range(steps):
@@ -156,6 +160,10 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
             continue  # Skip iteration if there's an issue
 
         y_pred_batch = model.predict(X_batch)
+        y_pred_proba_batch = scipy.special.softmax(model.predict(X_batch), axis=-1)
+
+        if y_pred_proba_batch.shape[-1] > 1:  # If model outputs logits, apply softmax
+            y_pred_proba_batch = scipy.special.softmax(y_pred_proba_batch, axis=-1)
 
         # Track all unique walk distances seen
         all_walk_distances_seen.update(np.unique(walk_distance_batch))
@@ -170,193 +178,100 @@ def evaluate_model_in_batches(model, generator, steps, embeddings, save_path: Pa
                         emb: {
                             'accuracy': [], 'precision': [], 'recall': [], 'f1': [],
                             'accuracy_zeros': [], 'precision_zeros': [], 'recall_zeros': [], 'f1_zeros': [],
-                            'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': []
+                            'accuracy_nonzeros': [], 'precision_nonzeros': [], 'recall_nonzeros': [], 'f1_nonzeros': [],
+                            'balanced_accuracy': [], 'mcc': [], "auc": [], "mae_zeros": [], "mae_nonzeros": [],
+                            "rmse_zeros": [], "rmse_nonzeros": [], "mse_zeros": [], "mse_nonzeros": []
                         } for emb in embeddings
                     }
                     all_predictions[wd] = {emb: [] for emb in embeddings}
                     all_ground_truth[wd] = {emb: [] for emb in embeddings}
+                    all_probabilities[wd] = {emb: [] for emb in embeddings}
 
                 mask = walk_distance_batch == wd
-                y_true_wd = y_true[mask]
-                y_pred_wd = y_pred[mask]
+
+                y_true_wd_one_hot = y_true[mask]
+                y_pred_wd_one_hot = y_pred[mask]
+
+                # Convert from one-hot encoding to categorical labels
+                y_true_wd = np.argmax(y_true_wd_one_hot, axis=1)
+                y_pred_wd = np.argmax(y_pred_wd_one_hot, axis=1)
+
+                y_pred_proba_wd = y_pred_proba_batch[i][mask]  # Extract class probabilities
 
                 if len(y_true_wd) > 0:
                     all_predictions[wd][embedding].extend(y_pred_wd.flatten())
                     all_ground_truth[wd][embedding].extend(y_true_wd.flatten())
 
-                    # ✅ Compute separate F1-scores
-                    y_true_zeros = (y_true_wd == 0)
-                    y_true_nonzeros = (y_true_wd > 0)
+                    # Instead of slicing, use the full probability vector.
+                    y_pred_proba_full = y_pred_proba_wd  # This should always be of shape (n_samples, 4)
+                    # Optionally, normalize the full vector (if not already normalized)
+                    y_pred_proba_normalized = y_pred_proba_full / np.sum(y_pred_proba_full, axis=1, keepdims=True)
 
-                    if np.any(y_true_zeros):
-                        acc_zeros = accuracy_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros])
-                        prec_zeros = precision_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                                     average='macro', zero_division=0)
-                        rec_zeros = recall_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                                 average='macro', zero_division=0)
-                        f1_zeros = f1_score(y_true_wd[y_true_zeros], y_pred_wd[y_true_zeros],
-                                            average='macro', zero_division=0)
-                    else:
-                        acc_zeros, prec_zeros, rec_zeros, f1_zeros = np.nan, np.nan, np.nan, np.nan
+                    all_probabilities[wd][embedding].extend(y_pred_proba_normalized.tolist())
 
-                    if np.any(y_true_nonzeros):
-                        acc_nonzeros = accuracy_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros])
-                        prec_nonzeros = precision_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                                        average='macro', zero_division=0)
-                        rec_nonzeros = recall_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                                    average='macro', zero_division=0)
-                        f1_nonzeros = f1_score(y_true_wd[y_true_nonzeros], y_pred_wd[y_true_nonzeros],
-                                               average='macro', zero_division=0)
-                    else:
-                        acc_nonzeros, prec_nonzeros, rec_nonzeros, f1_nonzeros = np.nan, np.nan, np.nan, np.nan
-
-                    all_metrics[wd][embedding]['accuracy'].append(accuracy_score(y_true_wd, y_pred_wd))
-                    all_metrics[wd][embedding]['precision'].append(
-                        precision_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
-                    all_metrics[wd][embedding]['recall'].append(
-                        recall_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
-                    all_metrics[wd][embedding]['f1'].append(
-                        f1_score(y_true_wd, y_pred_wd, average='macro', zero_division=0))
-
-                    all_metrics[wd][embedding]['accuracy_zeros'].append(acc_zeros)
-                    all_metrics[wd][embedding]['precision_zeros'].append(prec_zeros)
-                    all_metrics[wd][embedding]['recall_zeros'].append(rec_zeros)
-                    all_metrics[wd][embedding]['f1_zeros'].append(f1_zeros)
-
-                    all_metrics[wd][embedding]['accuracy_nonzeros'].append(acc_nonzeros)
-                    all_metrics[wd][embedding]['precision_nonzeros'].append(prec_nonzeros)
-                    all_metrics[wd][embedding]['recall_nonzeros'].append(rec_nonzeros)
-                    all_metrics[wd][embedding]['f1_nonzeros'].append(f1_nonzeros)
-
-    # ✅ Save results
-    detailed_metrics = []
-    aggregated_metrics = []
-
-    if walk_distance == -1:
-        for wd in sorted(all_walk_distances_seen):  # Ensure all walk distances appear
-            for embedding in embeddings:
-                if wd in all_metrics and embedding in all_metrics[wd]:
-                    values = all_metrics[wd][embedding]
-                    detailed_metrics.append({
-                        "walk_distance": wd,
-                        "embedding": embedding,
-                        "accuracy": np.mean(values['accuracy']) if values['accuracy'] else 0,
-                        "accuracy_zeros": np.nanmean(values['accuracy_zeros']) if values['accuracy_zeros'] else np.nan,
-                        "accuracy_nonzeros": np.nanmean(values['accuracy_nonzeros']) if values['accuracy_nonzeros'] else np.nan,
-                        "precision": np.mean(values['precision']) if values['precision'] else 0,
-                        "precision_zeros": np.nanmean(values['precision_zeros']) if values['precision_zeros'] else np.nan,
-                        "precision_nonzeros": np.nanmean(values['precision_nonzeros']) if values['precision_nonzeros'] else np.nan,
-                        "recall": np.mean(values['recall']) if values['recall'] else 0,
-                        "recall_zeros": np.nanmean(values['recall_zeros']) if values['recall_zeros'] else np.nan,
-                        "recall_nonzeros": np.nanmean(values['recall_nonzeros']) if values['recall_nonzeros'] else np.nan,
-                        "f1": np.mean(values['f1']) if values['f1'] else 0,
-                        "f1_zeros": np.nanmean(values['f1_zeros']) if values['f1_zeros'] else np.nan,
-                        "f1_nonzeros": np.nanmean(values['f1_nonzeros']) if values['f1_nonzeros'] else np.nan,
-                        "noise": noise
-                    })
-                else:
-                    detailed_metrics.append({
-                        "walk_distance": wd,
-                        "embedding": embedding,
-                        "accuracy": 0.0,
-                        "accuracy_zeros": np.nan,
-                        "accuracy_nonzeros": np.nan,
-                        "precision": 0.0,
-                        "precision_zeros": np.nan,
-                        "precision_nonzeros": np.nan,
-                        "recall": 0.0,
-                        "recall_zeros": np.nan,
-                        "recall_nonzeros": np.nan,
-                        "f1": 0.0,
-                        "f1_zeros": np.nan,
-                        "f1_nonzeros": np.nan,
-                        "noise": noise
-                    })
-
-        split_metrics_df = pd.DataFrame(detailed_metrics)
-        split_metrics_df.to_csv(Path(save_path, "split_metrics.csv"), index=False)
-        logging.info(f"Detailed metrics saved to {Path(save_path, 'split_metrics.csv')}")
-
-    # ✅ Aggregate Metrics
-    for embedding in embeddings:
-        all_acc = []
-        all_prec = []
-        all_rec = []
-        all_f1 = []
-        all_f1_zeros = []
-        all_f1_nonzeros = []
-
-        for wd in all_walk_distances_seen:
-            if wd in all_metrics:
-                all_acc.extend(all_metrics[wd][embedding]['accuracy'])
-                all_prec.extend(all_metrics[wd][embedding]['precision'])
-                all_rec.extend(all_metrics[wd][embedding]['recall'])
-                all_f1.extend(all_metrics[wd][embedding]['f1'])
-                all_f1_zeros.extend(all_metrics[wd][embedding]['f1_zeros'])
-                all_f1_nonzeros.extend(all_metrics[wd][embedding]['f1_nonzeros'])
-
-        aggregated_metrics.append({
-            "walk_distance": -1 if walk_distance == -1 else walk_distance,
-            "embedding": embedding,
-            "accuracy": np.mean(all_acc) if all_acc else 0,
-            "accuracy_zeros": np.nanmean(all_metrics[wd][embedding]['accuracy_zeros']) if all_acc else np.nan,
-            "accuracy_nonzeros": np.nanmean(all_metrics[wd][embedding]['accuracy_nonzeros']) if all_acc else np.nan,
-            "precision": np.mean(all_prec) if all_prec else 0,
-            "precision_zeros": np.nanmean(all_metrics[wd][embedding]['precision_zeros']) if all_prec else np.nan,
-            "precision_nonzeros": np.nanmean(all_metrics[wd][embedding]['precision_nonzeros']) if all_prec else np.nan,
-            "recall": np.mean(all_rec) if all_rec else 0,
-            "recall_zeros": np.nanmean(all_metrics[wd][embedding]['recall_zeros']) if all_rec else np.nan,
-            "recall_nonzeros": np.nanmean(all_metrics[wd][embedding]['recall_nonzeros']) if all_rec else np.nan,
-            "f1": np.mean(all_f1) if all_f1 else 0,
-            "f1_zeros": np.nanmean(all_f1_zeros) if all_f1_zeros else np.nan,
-            "f1_nonzeros": np.nanmean(all_f1_nonzeros) if all_f1_nonzeros else np.nan,
-            "noise": noise
-        })
-
-    # ✅ Save all predictions and ground truth
+    # Prepare lists to accumulate records.
     prediction_records = []
-    for wd in sorted(all_walk_distances_seen):  # Iterate over all walk distances
-        for embedding in embeddings:
-            if wd in all_predictions and embedding in all_predictions[wd]:
-                y_preds = all_predictions[wd][embedding]
-                y_trues = all_ground_truth[wd][embedding]
+    probability_records = []
 
-                # Ensure y_true and y_pred lengths match
+    for wd in sorted(all_walk_distances_seen):  # Iterate over all walk distances
+        for emb in embeddings:
+            if wd in all_predictions and emb in all_predictions[wd]:
+                y_preds = all_predictions[wd][emb]
+                y_trues = all_ground_truth[wd][emb]
+
+                # Ensure y_true and y_pred lengths match, then add prediction records.
                 if len(y_preds) == len(y_trues):
-                    for y_true, y_pred in zip(y_trues, y_preds):
+                    for yt, yp in zip(y_trues, y_preds):
                         prediction_records.append({
                             "walk_distance": wd,
-                            "embedding": embedding,
-                            "y_true": y_true,
-                            "y_pred": y_pred,
+                            "embedding": emb,
+                            "y_true": yt,
+                            "y_pred": yp,
                             "noise": noise
                         })
                 else:
-                    logging.warning(f"Length mismatch for walk_distance {wd}, embedding {embedding}")
+                    logging.warning(f"Length mismatch for walk_distance {wd}, embedding {emb} in predictions")
+
+                # Now add probability records if the length matches.
+                if wd in all_probabilities and emb in all_probabilities[wd]:
+                    prob_list = all_probabilities[wd][emb]
+                    if len(prob_list) == len(y_trues):
+                        for yt, yp in zip(y_trues, prob_list):
+                            probability_records.append({
+                                "walk_distance": wd,
+                                "embedding": emb,
+                                "y_true": yt,
+                                "y_prob": yp,  # This is assumed to be a list of floats.
+                                "noise": noise
+                            })
+                    else:
+                        logging.warning(f"Length mismatch for walk_distance {wd}, embedding {emb} in probabilities")
+                else:
+                    logging.warning(f"No probabilities found for walk_distance {wd}, embedding {emb}")
 
     # Convert to DataFrame and save
     predictions_df = pd.DataFrame(prediction_records)
     predictions_df.to_csv(Path(save_path, "predictions.csv"), index=False)
     logging.info(f"Predictions saved to {Path(save_path, 'predictions.csv')}")
 
-    metrics_df = pd.DataFrame(aggregated_metrics)
-    metrics_df.to_csv(Path(save_path, "metrics.csv"), index=False)
-    logging.info(f"Metrics saved to {Path(save_path, 'metrics.csv')}")
+    probabilities_df = pd.DataFrame(probability_records)
+    probabilities_df.to_json(Path(save_path, "probabilities.json"), orient='records', lines=True)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Train a multi-output model for recognizing embeddings')
     parser.add_argument('--batch_size', "-bs", type=int, default=64, help='The batch size to train the model')
-    parser.add_argument('--walk_distance', "-w", type=int, required=True,
+    parser.add_argument('--walk_distance', "-w", type=int, required=False, default=3,
                         help='The number for the walk distance to work with.', choices=list(range(3, 101)) + [-1])
     parser.add_argument("--run_iteration", "-ri", type=int, required=False, default=1,
                         help="The iteration number for the run. Used for saving the results and validation.")
-    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, required=True,
-                        help="The size of the generated summed embeddings count.")
+    parser.add_argument("--amount_of_summed_embeddings", "-a", type=int, required=False,
+                        help="The size of the generated summed embeddings count.", default=15000)
     parser.add_argument("--noise_ratio", "-n", type=float, default=0.0,
                         help="Ratio of random noise added to the sum embeddings")
-    parser.add_argument("--cancer", "-c", nargs="+", required=True,
-                        help="The cancer types to work with, e.g. blca brca")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False,
+                        help="The cancer types to work with, e.g. blca brca",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--epochs", "-e", type=int, default=100, help="The number of epochs to train the model.")
     args = parser.parse_args()
 
@@ -365,14 +280,14 @@ if __name__ == '__main__':
     run_iteration: int = args.run_iteration
     amount_of_summed_embeddings: int = args.amount_of_summed_embeddings
     noise_ratio: float = args.noise_ratio
-    selected_cancers: [str] = args.cancer
+    cancers: [str] = args.cancer
     epochs: int = args.epochs
 
-    if len(selected_cancers) == 1:
+    if len(cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
-        selected_cancers = selected_cancers[0].split(" ")
+        cancers = cancers[0].split(" ")
 
-    cancers = "_".join(selected_cancers)
+    selected_cancers = "_".join(cancers)
 
     logging.info("Running file simple_recognizer_nc")
     logging.info(f"Selected cancers: {selected_cancers}")
@@ -383,7 +298,7 @@ if __name__ == '__main__':
     logging.info(f"Noise ratio: {noise_ratio}")
     logging.info(f"Epochs: {epochs}")
 
-    load_path: Path = Path(load_path, cancers)
+    load_path: Path = Path(load_path, selected_cancers)
 
     run_name: str = f"run_{run_iteration}"
 
@@ -397,7 +312,8 @@ if __name__ == '__main__':
 
             logging.info(f"Loading data from {train_file} and {test_file}...")
 
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), "combined_embeddings", run_name)
+        save_path = Path(save_path, selected_cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         "combined_embeddings", run_name)
     else:
         if noise_ratio == 0.0:
             train_file = Path(load_path, str(amount_of_summed_embeddings), str(noise_ratio),
@@ -412,8 +328,8 @@ if __name__ == '__main__':
 
             logging.info(f"Loading data from {train_file} and {test_file}...")
 
-        save_path = Path(save_path, str(amount_of_summed_embeddings), str(noise_ratio), f"{walk_distance}_embeddings",
-                         run_name)
+        save_path = Path(save_path, selected_cancers, str(amount_of_summed_embeddings), str(noise_ratio),
+                         f"{walk_distance}_embeddings", run_name)
 
     logging.info(f"Saving results to {save_path}")
 
@@ -433,14 +349,17 @@ if __name__ == '__main__':
     else:
         with h5py.File(train_file, "r") as f:
             max_embedding = f["meta_information"].attrs["max_embedding"]
-            logging.info(f"Max embedding: {max_embedding}")
 
+    num_classes: int = max_embedding + 1
+    logging.info(f"Max embedding: {max_embedding}")
+    logging.info(f"Number of classes: {num_classes}")
     logging.info("Building model....")
     model = build_model(input_dim)
     model.compile(optimizer='adam',
-                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss={'Text': 'categorical_crossentropy', 'Image': 'categorical_crossentropy',
+                        'RNA': 'categorical_crossentropy', 'Mutation': 'categorical_crossentropy'},
                   loss_weights={'Text': 3.0, 'Image': 1., 'RNA': 1., 'Mutation': 1.},
-                  metrics=['mae', 'mae', 'mae', 'mae'])
+                  metrics=['accuracy', 'accuracy', 'accuracy', 'accuracy'])
     model.summary()
 
     if noise_ratio == 0.0:
@@ -493,12 +412,13 @@ if __name__ == '__main__':
         restore_best_weights=True
     )
     optimizer = Adam(learning_rate=0.0001)  # Lower learning rate for fine-tuning
-    reduce_lr = ReduceLROnPlateau(monitor='val_Text_mae', factor=0.2, patience=5, min_lr=0.00001, mode='min')
+    reduce_lr = ReduceLROnPlateau(monitor='val_Text_accuracy', factor=0.2, patience=5, min_lr=0.00001, mode='min')
 
     model.compile(optimizer=optimizer,
-                  loss={'Text': 'mse', 'Image': 'mse', 'RNA': 'mse', 'Mutation': 'mse'},
+                  loss={'Text': 'categorical_crossentropy', 'Image': 'categorical_crossentropy',
+                        'RNA': 'categorical_crossentropy', 'Mutation': 'categorical_crossentropy'},
                   loss_weights={'Text': 4., 'Image': 0.1, 'RNA': 0.1, 'Mutation': 0.1},
-                  metrics=['mae', 'mae', 'mae', 'mae'])
+                  metrics=['accuracy', 'accuracy', 'accuracy', 'accuracy'])
     model.summary()
 
     history = model.fit(train_gen,
@@ -509,7 +429,6 @@ if __name__ == '__main__':
                         callbacks=[fine_tuning_early_stopping, reduce_lr])
 
     # Evaluate the model
-    evaluate_model_in_batches(model, test_gen, test_steps, embeddings=embeddings,
-                              save_path=save_path, noise=noise_ratio, walk_distance=walk_distance)
+    evaluate_model_in_batches(model, test_gen, test_steps, embeddings=embeddings, noise=noise_ratio, walk_distance=walk_distance)
 
     logging.info("Done.")

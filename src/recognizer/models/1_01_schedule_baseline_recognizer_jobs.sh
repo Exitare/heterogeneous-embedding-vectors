@@ -3,7 +3,8 @@ cancer_types=$1
 amount_of_summed_embeddings=$2
 # upper bound is the maximum walk distance
 upper_bound=$3
-local=$4
+multi=$4
+local=$5
 
 
 # if cancer_types is not provided, then exit
@@ -30,6 +31,7 @@ fi
 echo "Upper bound: $upper_bound"
 echo "Amount of summed embeddings: $amount_of_summed_embeddings"
 echo "cancer types: $cancer_types"
+echo "multi: $multi"
 
 if [ -z "$local" ]
 then
@@ -46,9 +48,9 @@ do
   do
     if [ -z "$local" ]
     then
-      sbatch ./src/recognizer/models/2_01_run_simple_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings 0.0
+      sbatch ./src/recognizer/models/1_01_run_baseline_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings 0.0 $multi
     else
-      ./src/recognizer/models/2_01_run_simple_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings 0.0
+      ./src/recognizer/models/1_01_run_baseline_recognizer.sh "${cancer_types}" $walk_distance $iteration $amount_of_summed_embeddings 0.0 $multi
     fi
   done
 done

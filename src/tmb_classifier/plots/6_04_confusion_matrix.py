@@ -9,7 +9,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--walk_distance", "-w", type=int, required=True,
                         help="The walk distance used for the classification.")
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True,
@@ -23,7 +24,7 @@ if __name__ == '__main__':
 
     all_predictions = []
 
-    load_path = Path("results", "classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
+    load_path = Path("results", "tmb_classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
     for run_directory in load_path.iterdir():
         if run_directory.is_file():
             continue
@@ -40,13 +41,19 @@ if __name__ == '__main__':
 
     predictions = pd.concat(all_predictions)
 
+    # rename .replace({"0": "Low", "1": "High", "2": "N/A"})
+    predictions["y_test_decoded"] = predictions["y_test_decoded"].replace({0: "Low", 1: "High", 2: "N/A"})
+    predictions["y_pred_decoded"] = predictions["y_pred_decoded"].replace({0: "Low", 1: "High", 2: "N/A"})
+
     # create confusion matrix
     confusion_matrix = pd.crosstab(predictions["y_test_decoded"], predictions["y_pred_decoded"], rownames=['True'],
                                    colnames=['Predicted'])
 
+    save_file = Path("figures", "tmb_classifier", cancers, "performance",
+                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png")
+    logging.info(f"Saving confusion matrix to {save_file}")
+    logging.info(confusion_matrix)
     # visualize the confusion matrix
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=300)
+    plt.savefig(save_file, dpi=300)

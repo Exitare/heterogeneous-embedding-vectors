@@ -3,7 +3,8 @@ import numpy as np
 import tensorflow as tf
 from keras.src.layers import BatchNormalization
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, matthews_corrcoef, balanced_accuracy_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, matthews_corrcoef, \
+    balanced_accuracy_score
 from sklearn.preprocessing import label_binarize
 import pandas as pd
 from pathlib import Path
@@ -13,9 +14,8 @@ from collections import Counter
 import math
 import logging
 
-
-load_folder = Path("results", "classifier", "summed_embeddings")
-save_folder = Path("results", "classifier", "classification")
+load_folder = Path("results", "tmb_classifier", "summed_embeddings")
+save_folder = Path("results", "tmb_classifier", "classification")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -52,9 +52,6 @@ def h5_generator_specific_indices(h5_file_path, indices, batch_size, label_encod
             X_batch = h5_file["X"][batch_indices]
             y_batch = h5_file["y"][batch_indices]
 
-        # Decode and encode labels
-        y_batch = [label.decode("utf-8") for label in y_batch]
-        y_batch = label_encoder.transform(y_batch)
         yield X_batch, y_batch
 
 
@@ -86,15 +83,6 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     x = tf.keras.layers.Dense(128, activation='relu')(x)
     output_layer = tf.keras.layers.Dense(num_classes, activation='softmax')(x)
 
-    classes = list(label_encoder.classes_)
-    decoded_classes = label_encoder.inverse_transform(np.arange(num_classes))
-
-    # using the deocded classes and the classes increase the weights for classes LUAD, BRCA and BLCA
-    class_weights = {classes.index(cancer): 1.0 for cancer in decoded_classes}
-    class_weights[classes.index("LUAD")] = 6
-    # class_weight[classes.index("BRCA")] = 2
-    class_weights[classes.index("BLCA")] = 2.5
-
     model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
 
     # model = apply_weights_and_bias(model, loaded_weights_and_biases)
@@ -107,7 +95,6 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
                         steps_per_epoch=train_batches,
                         validation_data=val_ds,
                         validation_steps=val_batches,
-                        class_weight=class_weights,
                         callbacks=[
                             tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5, mode='max',
                                                              restore_best_weights=True)
@@ -140,10 +127,9 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
 
     # Metrics by cancer type
     results = []
-    for cancer in np.unique(y_test):
-        y_test_cancer = y_test[y_test == cancer]
-        y_pred_cancer = y_pred[y_test == cancer]
-        cancer_name = label_encoder.inverse_transform([cancer])[0]
+    for tmb_class in np.unique(y_test):
+        y_test_cancer = y_test[y_test == tmb_class]
+        y_pred_cancer = y_pred[y_test == tmb_class]
 
         accuracy_cancer = (y_test_cancer == y_pred_cancer).mean()
         f1_cancer = f1_score(y_test_cancer, y_pred_cancer, average='weighted')
@@ -151,11 +137,11 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         recall_cancer = recall_score(y_test_cancer, y_pred_cancer, average='weighted')
 
         logging.info(
-            f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}. "
+            f"TMB class {tmb_class}, Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}. "
         )
 
         results.append({
-            "cancer": cancer_name,
+            "tmb": tmb_class,
             "accuracy": accuracy_cancer,
             "f1": f1_cancer,
             "precision": precision_cancer,
@@ -175,18 +161,19 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
 
     logging.info(y_test.shape)
     logging.info(y_pred.shape)
-    # Assuming the number of classes is known
+
     num_classes = y_pred_proba.shape[1]  # Infer from probabilities
     y_test_one_hot = label_binarize(y_test, classes=np.arange(num_classes))
     # Compute AUC-ROC score
     auc_score = roc_auc_score(y_test_one_hot, y_pred_proba, multi_class='ovo', average='macro')
+
 
     logging.info(
         f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f},"
         f"MCC: {mcc_total:.4f}, Balanced Accuracy: {balanced_accuracy:.4f}")
 
     results.append({
-        "cancer": "All",
+        "tmb": "All",
         "accuracy": accuracy_total,
         "f1": f1_total,
         "mcc": mcc_total,
@@ -214,10 +201,12 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", "-b", type=int, default=32, help="Batch size for training.")
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+                        )
     parser.add_argument("--iteration", "-i", type=int, required=True, help="The iteration number.")
     parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
-                        choices=[3, 4, 5, 6],  default=3)
+                        choices=[3, 4, 5, 6], default=3)
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
                         choices=[3, 4, 5, 6], default=3)
     args = parser.parse_args()
@@ -257,7 +246,7 @@ if __name__ == "__main__":
         feature_dimension = h5_file.attrs["feature_shape"]
         unique_classes = h5_file.attrs["classes"]
         X = h5_file["X"][:]  # Load all features
-        y = np.array([label.decode("utf-8") for label in h5_file["y"][:]])  # Load all labels
+        y = np.array(h5_file["y"][:])  # Load all labels
 
     class_counts = Counter(y)
     split_sizes = {cls: {

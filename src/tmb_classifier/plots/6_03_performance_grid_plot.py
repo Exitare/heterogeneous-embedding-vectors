@@ -5,22 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-save_folder = Path("figures", "classifier")
-
-
-color_palette = {
-    "Annotation": "#c8b7b7ff",
-    "Image": "#d38d5fff",
-    "RNA": "#c6afe9ff",
-    "Mutation": "#de87aaff",
-    "BRCA": "#c837abff",
-    "LUAD": "#37abc8ff",
-    "BLCA": "#ffcc00ff",
-    "THCA": "#d35f5fff",
-    "STAD": "#f47e44d7",
-    "COAD": "#502d16ff",
-    "All": "#000000"
-}
+save_folder = Path("figures", "tmb_classifier")
 
 if __name__ == '__main__':
 
@@ -39,7 +24,7 @@ if __name__ == '__main__':
 
     results = []
     # iterate over all subfolders
-    cancer_folder = Path("results", "classifier", "classification", cancers)
+    cancer_folder = Path("results", "tmb_classifier", "classification", cancers)
     for run in cancer_folder.iterdir():
         if run.is_file():
             continue
@@ -57,13 +42,11 @@ if __name__ == '__main__':
 
     # concatenate all results
     results = pd.concat(results)
-    print(results)
-    print(results["walk_distance"].unique())
-    print(results["amount_of_walks"].unique())
+    results["tmb"] = results["tmb"].replace({"0": "Low", "1": "High", "2": "N/A"})
 
     pivot = results.pivot_table(
         values='accuracy',
-        index=['cancer'],
+        index=['tmb'],
         columns=['walk_distance', 'amount_of_walks'],
         aggfunc='first'
     )
@@ -82,7 +65,7 @@ if __name__ == '__main__':
         ax.bar(x + offset, pivot[col], width=bar_width, label=f'WD:{col[0]}, AW:{col[1]}', color=colors[i])
 
     # Customize the plot
-    ax.set_xlabel('Cancer Types')
+    ax.set_xlabel('Tumor Mutation Burden')
     ax.set_ylabel('Accuracy')
     ax.set_title('Cancer Classification Accuracy Across Walk Distances and Amount of Walks')
     ax.set_xticks(np.arange(len(pivot.index)))
@@ -99,18 +82,18 @@ if __name__ == '__main__':
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 16))
 
     # Plot for Walk Distance
-    sns.lineplot(data=results, x='walk_distance', y='accuracy', hue='cancer', marker='o', ax=ax1)
+    sns.lineplot(data=results, x='walk_distance', y='accuracy', hue='tmb', marker='o', ax=ax1)
     ax1.set_title('Accuracy vs Walk Distance')
     ax1.set_xlabel('Walk Distance')
     ax1.set_ylabel('Accuracy')
-    ax1.legend(title='Cancer Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax1.legend(title='Tumor Mutation Burden', bbox_to_anchor=(1.05, 1), loc='upper left')
 
     # Plot for Amount of Walks
-    sns.lineplot(data=results, x='amount_of_walks', y='accuracy', hue='cancer', marker='o', ax=ax2)
+    sns.lineplot(data=results, x='amount_of_walks', y='accuracy', hue='tmb', marker='o', ax=ax2)
     ax2.set_title('Accuracy vs Amount of Walks')
     ax2.set_xlabel('Amount of Walks')
     ax2.set_ylabel('Accuracy')
-    ax2.legend(title='Cancer Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.legend(title='Tumor Mutation Burden', bbox_to_anchor=(1.05, 1), loc='upper left')
 
     # Adjust layout and display the plot
     plt.tight_layout()
@@ -127,11 +110,11 @@ if __name__ == '__main__':
     results_amount_of_walks.rename(columns={'amount_of_walks': 'x_value'}, inplace=True)
 
     # Set up the FacetGrid
-    g = sns.FacetGrid(results, col="walk_distance", row="amount_of_walks", hue="cancer", margin_titles=True,
+    g = sns.FacetGrid(results, col="walk_distance", row="amount_of_walks", hue="tmb", margin_titles=True,
                       palette="tab10")
 
     # Map the scatter plot to the grid
-    g.map(sns.barplot, "cancer", "accuracy", alpha=.7)
+    g.map(sns.barplot, "tmb", "accuracy", alpha=.7)
 
     # Rotate x-axis labels for each subplot
     for ax in g.axes.flat:
@@ -141,7 +124,7 @@ if __name__ == '__main__':
     g.add_legend()
     plt.subplots_adjust(top=0.9)
     # rename walk_distance to Walk Distance in facet grid
-    g.set_axis_labels("Cancer Type", "Accuracy")
+    g.set_axis_labels("Tumor Mutation Burden", "Accuracy")
     # rename amount_of_walks to Amount of Walks in facet grid
     g.set_titles(col_template="Walk Distance: {col_name}", row_template="Amount of Walks: {row_name}")
 
@@ -150,18 +133,18 @@ if __name__ == '__main__':
     plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=300)
 
     # Combine the two DataFrames
-    combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'cancer', 'type']],
-                                  results_amount_of_walks[['x_value', 'accuracy', 'cancer', 'type']]])
+    combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'tmb', 'type']],
+                                  results_amount_of_walks[['x_value', 'accuracy', 'tmb', 'type']]])
 
     # Plot
     plt.figure(figsize=(10, 6))
-    sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='cancer', style='type',
-                 palette=color_palette, markers=True)
+    sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='tmb', style='type',
+                 palette={ "Low": "#c837abff", "High": "#37abc8ff", "N/A": "#ffcc00ff", "All": "pink"}, markers=True)
 
     plt.title('Accuracy vs Walk Distance and Amount of Walks')
     plt.xlabel('Value')
     plt.ylabel('Accuracy')
-    plt.legend(title='Cancer Type and Walk Type', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.legend(title='Tumor Mutation Burden and Walk Type', bbox_to_anchor=(1.05, 1), loc='upper left')
     # set x axis ticks to 3,4 and 5
     plt.xticks([3, 4, 5])
     plt.tight_layout()

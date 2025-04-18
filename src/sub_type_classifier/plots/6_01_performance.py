@@ -4,8 +4,9 @@ import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
+import json
 
-save_folder = Path("figures", "classifier")
+save_folder = Path("figures", "sub_type_classifier")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 metrics = {
@@ -18,16 +19,9 @@ metrics = {
 }
 
 color_palette = {
-    "Annotation": "#c8b7b7ff",
-    "Image": "#d38d5fff",
-    "RNA": "#c6afe9ff",
-    "Mutation": "#de87aaff",
-    "BRCA": "#c837abff",
-    "LUAD": "#37abc8ff",
-    "BLCA": "#ffcc00ff",
-    "THCA": "#d35f5fff",
-    "STAD": "#f47e44d7",
-    "COAD": "#502d16ff",
+    "LumA": "#c837abff",
+    "BRAF": "#37abc8ff",
+    "Neithe": "#ffcc00ff",
     "All": "#000000",
     "3_3": "#c837abff",
     "3_4": "#ffcc00ff",
@@ -47,13 +41,13 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     # create a grid plot for the accuracy, each unique value of walks should have a separate plot, the hue is cancer
     fig, ax = plt.subplots(figsize=(10, 5))
     sns.boxenplot(data=df, x="cancer", y=metric, hue="walks", ax=ax, palette=color_palette,
-                  hue_order=hue_order)
+                 order=["LumA", "BRAF", "All"], hue_order=hue_order)
     ax.set_title(f"{metrics[metric]} Score")
     ax.set_ylabel(f"{metrics[metric]} Score")
     ax.set_xlabel("")
 
     # set ylim
-    ax.set_ylim(0.62, 1.01)
+    ax.set_ylim(0.9, 1.01)
 
     handles, labels = ax.get_legend_handles_labels()
     # Sort labels based on hue_order
@@ -61,8 +55,7 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     sorted_labels = [label_dict[label] for label in hue_order if label in labels]
     sorted_handles = [handles[labels.index(label)] for label in hue_order if label in labels]
     # adjust legend
-    ax.legend(sorted_handles, sorted_labels, loc='lower center', ncols=5, title="Cancer Type",
-              bbox_to_anchor=(0.5, -0.28))
+    ax.legend(sorted_handles, sorted_labels, loc='lower center', ncols=5, title="Cancer Type", bbox_to_anchor=(0.5, -0.28))
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric}_score_grid.png"), dpi=300)
     plt.close('all')
@@ -89,7 +82,7 @@ def create_performance_overview_plot(df: pd.DataFrame):
     # rename precision to Precision, recall to Recall and auc to AUC
     sub_df["metric"] = sub_df["metric"].replace({"precision": "Precision", "recall": "Recall", "auc": "AUC"})
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.barplot(data=sub_df, x="cancer", y="score", hue="metric", ax=ax)
+    sns.boxenplot(data=sub_df, x="cancer", y="score", hue="metric", ax=ax)
     ax.set_title(f"Overview scores")
     ax.set_ylabel(f"Overview scores")
 
@@ -121,7 +114,7 @@ def create_performance_overview_plot_per_combination(df: pd.DataFrame):
     ax.set_ylabel(f"")
 
     ax.set_xlabel("")
-    ax.set_ylim(0.8, 1)
+    ax.set_ylim(0.9, 1)
 
     labels = [item.get_text() for item in ax.get_xticklabels()]
     labels = [f"Distance: {label.split(' ')[0]}\n Amount: {label.split(' ')[1]}" for label in labels]
@@ -154,7 +147,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.8, vmax=0.95)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.9, vmax=1.0)
         # adjust heatmap range to 0.8 - 1.0
 
         plt.title(f"{metric} Scores Heatmap")
@@ -163,6 +156,8 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.savefig(Path(save_folder, f"overview_scores_heatmap_{metric}.png"), dpi=300, bbox_inches="tight")
+
+
 
 
 if __name__ == '__main__':
@@ -183,10 +178,11 @@ if __name__ == '__main__':
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
+
     # load all runs from results/classifier/classification
     results = []
     # iterate over all subfolders
-    cancer_folder = Path("results", "classifier", "classification", cancers)
+    cancer_folder = Path("results", "sub_type_classifier", "classification", cancers)
     for run in cancer_folder.iterdir():
         if run.is_file():
             continue

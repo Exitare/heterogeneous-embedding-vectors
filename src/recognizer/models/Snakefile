@@ -31,11 +31,12 @@ rule run_simple_recognizer:
         )
     output:
         expand(
-           f"results/recognizer/simple/{{amount}}/{{noise}}/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+           f"results/recognizer/simple/{{cancers}}/{{amount}}/{{noise}}/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
             walk_distance=range(3, simple_cancer_max_walk + 1),
             iteration=range(max_run_iterations),
             amount=amount_of_summed_embeddings,
-            noise=noise_ratios
+            noise=noise_ratios,
+            cancers=joined_cancers
         ),
     run:
         # Set the values from config

@@ -153,7 +153,10 @@ def main():
                     if random.random() < noise_ratio:
                         # Add noise vector
                         noise_vector = generate_noise(LATENT_SPACE_DIM)
+                        # logging.info("Adding noise vector...")
+                        # logging.info(f"Noise vector: {noise_vector}")
                         combined_sum += noise_vector
+                        # logging.info(f"Combined sum: {combined_sum}")
                         continue
 
                     try:

@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, List, Tuple, Optional
+import pandas as pd
 
 LATENT_DIM = 768
 CHUNK_SIZE = 100000  # For processing large image datasets
@@ -85,6 +86,26 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
     else:
         raise ValueError("RNA modality is required for processing.")
 
+def load_subtype_lists(selected_cancers: []) -> pd.DataFrame:
+    sub_types = []
+    for cancer in selected_cancers:
+        try:
+            df = pd.read_csv(Path("data", "cancer_sub_types", f"{cancer}.tsv"), sep="\t")
+            if cancer in df.columns:
+                df = df[[cancer, "Labels"]]
+                df.rename(columns={cancer: "submitter_id"}, inplace=True)
+            else:
+                df = df[[f"{cancer}READ", "Labels"]]
+                df.rename(columns={f"{cancer}READ": "submitter_id"}, inplace=True)
+                # remove the READ from the labels information
+                df["Labels"] = df["Labels"].str.replace("READ", "")
+
+            sub_types.append(df)
+        except FileNotFoundError:
+            logging.warning(f"No subtypes found for cancer {cancer}.")
+
+    return pd.concat(sub_types)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Process and sum patient embeddings.")
@@ -118,7 +139,7 @@ def main():
     cancers: str = "_".join(selected_cancers)
     load_path: Path = Path(args.load_path)
 
-    save_folder = Path("results", "classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}")
+    save_folder = Path("results", "sub_type_classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}")
     save_folder.mkdir(parents=True, exist_ok=True)
 
     h5_load_path: Path = Path(load_path, f"{cancers}_classifier.h5")
@@ -138,11 +159,24 @@ def main():
         logging.info(f"Total unique patients to process: {len(patient_ids)}")
 
         summed_embeddings_data = []
-        patient_count = 0
+        mutation_count = 0
+
+        cancer_sub_types: pd.DataFrame = load_subtype_lists(selected_cancers)
 
         for patient_id in tqdm(patient_ids, desc="Processing Patients"):
             try:
                 patient_data, patient_cancer = load_patient_data(h5_file, patient_id)
+
+                # find the cancer type for the patient
+                patient_sub_type = cancer_sub_types[cancer_sub_types["submitter_id"] == patient_id]
+
+
+                if patient_sub_type.empty:
+                    #logging.warning(f"Skipping {patient_id}: No subtype found.")
+                    continue
+
+                patient_sub_type_cancer = patient_sub_type["Labels"].values[0]
+
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
@@ -151,13 +185,13 @@ def main():
                 summed_embedding = sum_random_embeddings(
                     patient_id, patient_data, walk_distance, walk_amount
                 )
-                summed_embeddings_data.append((summed_embedding, patient_cancer, patient_id))
-                patient_count += 1
+                summed_embeddings_data.append((summed_embedding, patient_cancer, patient_id, patient_sub_type_cancer))
+                mutation_count += 1
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
 
-    logging.info(f"Processed {patient_count} patients with valid embeddings.")
+    logging.info(f"Processed {mutation_count} patients with valid embeddings.")
 
     # ✅ Save summed embeddings to HDF5
     with h5py.File(output_file, "w") as out_file:
@@ -166,7 +200,9 @@ def main():
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="float32")
         out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
         out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
-        out_file.attrs["classes"] = selected_cancers
+        # Extract unique classes from index 3 of each tuple
+        unique_classes = {entry[3] for entry in summed_embeddings_data}
+        out_file.attrs["classes"] = list(unique_classes)
         out_file.attrs["feature_shape"] = shape
 
         # Use batch resizing for better performance
@@ -174,9 +210,9 @@ def main():
         y_data = []
         submitter_ids = []
 
-        for summed_embedding, cancer, submitter_id in tqdm(summed_embeddings_data, desc="Saving Data"):
+        for summed_embedding, cancer, submitter_id, patient_sub_type_cancer in tqdm(summed_embeddings_data, desc="Saving Data"):
             X_data.append(summed_embedding)
-            y_data.append(cancer.encode("utf-8"))
+            y_data.append(patient_sub_type_cancer.encode("utf-8"))
             submitter_ids.append(submitter_id.encode("utf-8"))
 
             # Write in chunks to avoid high memory usage

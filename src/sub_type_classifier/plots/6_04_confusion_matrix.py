@@ -9,7 +9,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False,
+                        help="The cancer types to work with.", default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--walk_distance", "-w", type=int, required=True,
                         help="The walk distance used for the classification.")
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True,
@@ -22,8 +23,12 @@ if __name__ == '__main__':
     amount_of_walks = args.amount_of_walks
 
     all_predictions = []
+    load_path = Path("results", "sub_type_classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
+    save_path = Path("figures", "sub_type_classifier", cancers, "performance")
 
-    load_path = Path("results", "classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
+    if not save_path.exists():
+        save_path.mkdir(parents=True)
+
     for run_directory in load_path.iterdir():
         if run_directory.is_file():
             continue
@@ -47,6 +52,5 @@ if __name__ == '__main__':
     # visualize the confusion matrix
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=300)
+    plt.tight_layout()
+    plt.savefig(Path(save_path, f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"), dpi=300)

@@ -5,22 +5,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-save_folder = Path("figures", "classifier")
-
+save_folder = Path("figures", "sub_type_classifier")
+# 'LUAD_4', 'BLCA_2', 'COAD_2', 'THCA_3', 'LUAD_3', 'COAD_1', 'BRCA_2', 'THCA_1', 'BLCA_1', 'BLCA_3', 'BRCA_1', 'BRCA_4', 'LUAD_2', 'BRCA_3', 'THCA_2', 'LUAD_1', 'COAD_3', 'BLCA_4'
 
 color_palette = {
-    "Annotation": "#c8b7b7ff",
-    "Image": "#d38d5fff",
-    "RNA": "#c6afe9ff",
-    "Mutation": "#de87aaff",
-    "BRCA": "#c837abff",
-    "LUAD": "#37abc8ff",
-    "BLCA": "#ffcc00ff",
-    "THCA": "#d35f5fff",
-    "STAD": "#f47e44d7",
-    "COAD": "#502d16ff",
+    "LumA": "#c837abff",
+    "BRAF": "#37abc8ff",
+    "Neithe": "#ffcc00ff",
     "All": "#000000"
 }
+
 
 if __name__ == '__main__':
 
@@ -39,7 +33,7 @@ if __name__ == '__main__':
 
     results = []
     # iterate over all subfolders
-    cancer_folder = Path("results", "classifier", "classification", cancers)
+    cancer_folder = Path("results", "sub_type_classifier", "classification", cancers)
     for run in cancer_folder.iterdir():
         if run.is_file():
             continue
