@@ -1,0 +1,103 @@
+configfile: './config.yaml'
+
+all_cancers = config['cancers']
+joined_cancers = '_'.join(all_cancers)
+
+requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+run_iterations = range(config['run_iterations'])
+
+rule all:
+    input:
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/{walk_distance}_{walk_amount}_confusion_matrix.png",
+            cancers=[joined_cancers],
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/accuracy_score_grid.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/f1_score_grid.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_AUC.png",
+            cancers=[joined_cancers]
+        ),
+         expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Accuracy.png",
+            cancers=[joined_cancers]
+        ),
+         expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Balanced Accuracy.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_F1 Score.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_MCC.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Precision.png",
+            cancers=[joined_cancers]
+        ),
+        expand(
+            "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Recall.png",
+            cancers=[joined_cancers]
+        )
+
+rule generate_confusion_matrix:
+    input:
+        lambda wildcards: expand(
+            "results/tmb_classifier/classification/{cancers}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
+            cancers=[joined_cancers],
+            walk_amount=[wildcards.walk_amount],
+            walk_distance=[wildcards.walk_distance],
+            iteration=run_iterations
+        )
+    output:
+        "figures/tmb_classifier/{cancers}/performance/{walk_distance}_{walk_amount}_confusion_matrix.png"
+    params:
+        cancer_list=joined_cancers
+    shell:
+        """
+        python ./src/tmb_classifier/plots/6_02_confusion_matrix.py \
+            -c {params.cancer_list} \
+            -a {wildcards.walk_amount} \
+            -w {wildcards.walk_distance}
+        """
+
+
+rule generate_performance_grids:
+    input:
+        expand(
+            "results/tmb_classifier/classification/{cancers}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
+            cancers=[joined_cancers],
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            iteration=run_iterations
+        )
+    output:
+        "figures/tmb_classifier/{cancers}/performance/accuracy_score_grid.png",
+        "figures/tmb_classifier/{cancers}/performance/f1_score_grid.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_AUC.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Accuracy.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Balanced Accuracy.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_F1 Score.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_MCC.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Precision.png",
+        "figures/tmb_classifier/{cancers}/performance/overview_scores_heatmap_Recall.png",
+    params:
+        cancer_list=joined_cancers
+    shell:
+        """
+        python ./src/tmb_classifier/plots/6_01_performance.py \
+            -c {params.cancer_list}
+        """
+
