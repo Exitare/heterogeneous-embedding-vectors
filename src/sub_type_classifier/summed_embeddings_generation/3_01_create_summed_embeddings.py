@@ -86,7 +86,7 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
     else:
         raise ValueError("RNA modality is required for processing.")
 
-def load_subtype_lists(selected_cancers: []) -> pd.DataFrame:
+def load_subtype_lists(selected_cancers: List[str]) -> pd.DataFrame:
     sub_types = []
     for cancer in selected_cancers:
         try:
