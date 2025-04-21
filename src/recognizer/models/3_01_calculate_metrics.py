@@ -9,6 +9,7 @@ from sklearn.metrics import matthews_corrcoef, balanced_accuracy_score, mean_abs
 
 # suppress warnings
 import warnings
+from typing import List
 
 warnings.filterwarnings("ignore")
 
@@ -30,8 +31,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model: str = args.model
     amount_of_walk_embeddings: int = args.amount_of_walk_embeddings
-    cancers: [str] = args.cancer
-    selected_cancers: [str] = '_'.join(cancers)
+    cancers: List[str] = args.cancer
+    selected_cancers: str = '_'.join(cancers)
 
     logging.info(
         f"Loading data for model: {model}, cancers: {cancers}, amount_of_walk_embeddings: {amount_of_walk_embeddings}")
