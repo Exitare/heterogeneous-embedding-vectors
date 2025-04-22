@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 import logging
 from helper.load_metric_data import load_metric_data
 from helper.plot_styling import color_palette
+from typing import List
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -135,10 +136,9 @@ def reduced_noise_grid(df, metric: str, file_name: str, title: str):
     # Add legend to the grid
     g.add_legend(title="Modality")
     # set title
-    # Set title
-    g.fig.suptitle(title, y=0.95, fontsize=12)
+    g.figure.suptitle(title, y=0.95, fontsize=12)
     # move subtitlte to the left
-    g.fig.subplots_adjust(left=0.14)
+    g.figure.subplots_adjust(left=0.14)
 
     # Adjust layout to prevent subtitle cutoff
     plt.subplots_adjust(top=0.85)
@@ -163,10 +163,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     multi: bool = args.multi
     amount_of_walk_embeddings: int = args.amount_of_walk_embeddings
-    cancers: [str] = args.cancer
+    cancers: List[str] = args.cancer
     foundation: bool = args.foundation
     metric: str = args.metric
-    selected_cancers: [str] = '_'.join(cancers)
+    selected_cancers: str = '_'.join(cancers)
 
     metric_input = metric
     metric = metric_mappings[metric]

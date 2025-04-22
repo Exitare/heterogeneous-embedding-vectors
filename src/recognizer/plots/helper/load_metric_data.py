@@ -4,6 +4,7 @@ import pandas as pd
 
 def load_metric_data(load_folder: Path, noise_ratio: float, foundation: bool, verbose: bool = False) -> pd.DataFrame:
     dfs = []
+    logging.info(f"Loading data from {load_folder}...")
     for noise_folder in load_folder.iterdir():
         if noise_folder.is_file():
             logging.info(f"Skipping {noise_folder} because it is a file")

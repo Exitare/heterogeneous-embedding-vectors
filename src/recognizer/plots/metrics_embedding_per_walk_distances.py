@@ -160,6 +160,6 @@ if __name__ == '__main__':
     df_grouped_by_wd_embedding = df.groupby(["walk_distance", "embedding"]).mean()
     df.reset_index(drop=True, inplace=True)
 
-    create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
+    #create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
     create_line_chart(metric, df_grouped_by_wd_embedding, save_folder)
-    create_box_plot(metric, df, save_folder)
+    #create_box_plot(metric, df, save_folder)
