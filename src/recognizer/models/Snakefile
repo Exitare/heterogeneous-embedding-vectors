@@ -11,7 +11,84 @@ noise_ratios = config['noise_ratios']
 rule all:
     input:
         f"results/recognizer/aggregated_metrics/simple/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv",
-        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv",
+        expand(
+            f"results/recognizer/baseline/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(max_run_iterations),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        ),
+        expand(
+            f"results/recognizer/baseline/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(max_run_iterations),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+
+
+rule run_simple_baseline_recognizer:
+    input:
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings.h5",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+    output:
+        expand(
+           f"results/recognizer/baseline/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(max_run_iterations),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        ),
+    run:
+        # Set the values from config
+        amount = amount_of_summed_embeddings
+
+        # Python loop for control
+        for walk_distance in range(3, simple_cancer_max_walk + 1):
+            if max_run_iterations == 1:
+                    # Run only once if max_run_iterations is 1
+                shell(f"python src/recognizer/models/1_01_baseline_model.py -w {walk_distance} -ri 0 -a {amount} -c {all_cancers}")
+            else:
+                # Run multiple times if max_run_iterations > 1
+                for iteration in range(max_run_iterations):
+                    shell(f"python src/recognizer/models/1_01_baseline_model.py -w {walk_distance} -ri {iteration} -a {amount} -c {all_cancers}")
+
+
+rule run_multi_baseline_recognizer:
+    input:
+        expand(
+            f"results/recognizer/summed_embeddings/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings.h5",
+            walk_distance=range(3, multi_cancer_max_walk + 1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+    output:
+        expand(
+           f"results/recognizer/baseline/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, multi_cancer_max_walk + 1),
+            iteration=range(max_run_iterations),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        ),
+    run:
+        # Set the values from config
+        amount = amount_of_summed_embeddings
+
+        # Python loop for control
+        for walk_distance in range(3, multi_cancer_max_walk + 1):
+            if max_run_iterations == 1:
+                    # Run only once if max_run_iterations is 1
+                shell(f"python src/recognizer/models/1_01_baseline_model.py -w {walk_distance} -ri 0 -a {amount} --multi -c {all_cancers}")
+            else:
+                    # Run multiple times if max_run_iterations > 1
+                for iteration in range(max_run_iterations):
+                    shell(f"python src/recognizer/models/1_01_baseline_model.py -w {walk_distance} -ri {iteration} -a {amount} --multi -c {all_cancers}")
+
 
 rule run_simple_recognizer:
     input:

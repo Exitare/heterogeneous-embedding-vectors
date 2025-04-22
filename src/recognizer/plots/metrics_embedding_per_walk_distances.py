@@ -6,6 +6,7 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from collections import namedtuple
 from helper.load_metric_data import load_metric_data
+from typing import List
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -108,9 +109,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     model: str = args.model
     amount_of_walk_embeddings: int = args.amount_of_walk_embeddings
-    cancers: [str] = args.cancer
+    cancers: List[str] = args.cancer
     foundation: bool = args.foundation
-    selected_cancers: [str] = '_'.join(cancers)
+    selected_cancers: str = '_'.join(cancers)
     noise_ratio: float = args.noise_ratio
     selected_metric: str = args.selected_metric
 
