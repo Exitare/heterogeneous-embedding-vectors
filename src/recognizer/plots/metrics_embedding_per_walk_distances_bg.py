@@ -7,6 +7,7 @@ from matplotlib import pyplot as plt
 from collections import namedtuple
 from helper.load_metric_data import load_metric_data
 from helper.plot_styling import color_palette, order
+from typing import List
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -95,7 +96,7 @@ def create_bar_chart(metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_fo
     plt.close('all')
 
 
-def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
+def create_line_chart(models: List[str], metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
     # Separate the grouped data for each model.
     # Since grouped_df is multi-indexed by ["model", "walk_distance", "embedding"],
     # we extract the baseline (first model) and target (second model) data.
@@ -145,7 +146,7 @@ def create_line_chart(models: [str], metric: Metric, grouped_df: pd.DataFrame, s
     plt.close('all')
 
 
-def create_dist_line_chart(models: [str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+def create_dist_line_chart(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
     baseline_df = df[df["model"] == models[0]].reset_index(drop=True)
     baseline_df["model"] = model_names[models[0]]
     baseline_model_name = model_names[models[0]]
@@ -237,10 +238,10 @@ if __name__ == '__main__':
                         default="A")
 
     args = parser.parse_args()
-    models: [str] = args.models
+    models: List[str] = args.models
     amount_of_walk_embeddings: int = args.amount_of_walk_embeddings
-    cancers: [str] = args.cancer
-    selected_cancers: [str] = '_'.join(cancers)
+    cancers: List[str] = args.cancer
+    selected_cancers: str = '_'.join(cancers)
     noise_ratio: float = args.noise_ratio
     selected_metric: str = args.selected_metric
     foundation: bool = "_f" in models[0] or "_f" in models[1]
@@ -324,7 +325,7 @@ if __name__ == '__main__':
     print(simple_f_annotation.groupby("walk_distance")["f1"].mean())
 
     print(df)
-    create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
+    #create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
     # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)
-    create_box_plot(metric, df, save_folder)
+    #create_box_plot(metric, df, save_folder)

@@ -1,42 +1,31 @@
 configfile: './config.yaml'
 
 all_cancers = config['cancers']
-joined_cancers = '_'.join(config['cancers'])
+joined_cancers = '_'.join(all_cancers)
 requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
 requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
-
+cancer_arg = ' '.join(all_cancers)
 
 rule all:
     input:
         expand(
-            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
-            cancers=joined_cancers,
+            "results/classifier/summed_embeddings/{cancers}/{walk_amount}_{walk_distance}/summed_embeddings.h5",
+            cancers=[joined_cancers],
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance
         )
-
 
 rule create_summed_embeddings:
     input:
-         expand(
-            f"results/embeddings/{{cancers}}_classifier.h5",
-            cancers=joined_cancers
-        )
-
+        f"results/embeddings/{joined_cancers}_classifier.h5"
     output:
-        expand(
-            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
-            cancers=joined_cancers,
-            walk_amount=requested_walk_amounts,
-            walk_distance=requested_walk_distance
-        )
-
-    run:
-        cancers=joined_cancers
-        amount_of_walks=requested_walk_amounts
-        walk_distances=requested_walk_distance
-
-        for walk_distance in requested_walk_distance:
-            for walk in amount_of_walks:
-                shell(f"python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings_v3.py -c {{cancers}} -a {{walk}} -w {{walk_distance}}")
-
+        "results/classifier/summed_embeddings/{cancers}/{walk_amount}_{walk_distance}/summed_embeddings.h5"
+    params:
+        cancer_list=cancer_arg
+    shell:
+        """
+        python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings.py \
+            -c {params.cancer_list} \
+            -a {wildcards.walk_amount} \
+            -w {wildcards.walk_distance}
+        """

@@ -1,3 +1,4 @@
+results_keep
 __pycache__
 error.txt
 .snakemake

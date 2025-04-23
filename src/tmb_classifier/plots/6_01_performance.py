@@ -218,10 +218,10 @@ if __name__ == '__main__':
     results["walks"] = results["walk_distance"].astype(str) + "_" + results["amount_of_walks"].astype(str)
     results.reset_index(drop=True, inplace=True)
 
-    create_hue_performance_plot(results, "accuracy")
-    create_hue_performance_plot(results, "f1")
-    create_performance_overview_plot(results)
-    create_performance_overview_plot_per_combination(results)
+    #create_hue_performance_plot(results, "accuracy")
+    #create_hue_performance_plot(results, "f1")
+    #create_performance_overview_plot(results)
+    #create_performance_overview_plot_per_combination(results)
     create_performance_overview_heatmap(results)
 
     create_grid_plot(results, "accuracy")

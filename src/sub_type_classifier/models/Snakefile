@@ -9,19 +9,19 @@ run_iterations = range(0, config['run_iterations'])
 
 rule all:
     input:
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
                iteration=run_iterations
         ),
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
                iteration=run_iterations
         ),
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
@@ -32,25 +32,25 @@ rule all:
 rule run_classification:
     input:
         expand(
-            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
+            f"results/sub_type_classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
             cancers=joined_cancers,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
         )
     output:
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
                iteration=run_iterations
         ),
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
                iteration=run_iterations
         ),
-        expand(f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
+        expand(f"results/sub_type_classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/predictions.csv",
                cancers=joined_cancers,
                walk_amount=requested_walk_amounts,
                walk_distance=requested_walk_distance,
@@ -66,7 +66,7 @@ rule run_classification:
         for walk_distance in requested_walk_distance:
             for walk in requested_walk_amounts:
                 for iteration in iterations:
-                    shell(f"python ./src/classifier/models/4_01_cancer_classifier.py -c {{cancers}} -a {{walk}} -w {{walk_distance}} -i {{iteration}}")
+                    shell(f"python ./src/sub_type_classifier/models/4_01_cancer_classifier.py -c {{cancers}} -a {{walk}} -w {{walk_distance}} -i {{iteration}}")
 
 
 

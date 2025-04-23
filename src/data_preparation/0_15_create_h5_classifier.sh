@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --job-name=c_h5df
+#SBATCH --job-name=h5_classifier
 #SBATCH --time=9-00:00:00
 #SBATCH --partition=batch
 #SBATCH --qos=long_jobs
@@ -23,4 +23,4 @@ fi
 
 echo "image embedding count: $image_embedding_count"
 
-python3 src/data_preparation/0_14_create_h5_v2.py -c BRCA LUAD STAD BLCA COAD THCA -ec $image_embedding_count
+python3 src/data_preparation/0_15_create_h5_classifier.py -c BRCA LUAD STAD BLCA COAD THCA -ec $image_embedding_count
