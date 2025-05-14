@@ -7,10 +7,26 @@ import numpy as np
 
 save_folder = Path("figures", "classifier")
 
+
+color_palette = {
+    "Annotation": "#c8b7b7ff",
+    "Image": "#d38d5fff",
+    "RNA": "#c6afe9ff",
+    "Mutation": "#de87aaff",
+    "BRCA": "#c837abff",
+    "LUAD": "#37abc8ff",
+    "BLCA": "#ffcc00ff",
+    "THCA": "#d35f5fff",
+    "STAD": "#f47e44d7",
+    "COAD": "#502d16ff",
+    "All": "#000000"
+}
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     args = parser.parse_args()
 
     selected_cancers = args.cancer
@@ -131,7 +147,7 @@ if __name__ == '__main__':
 
     g.fig.suptitle('Model Accuracy Across Different Walk Distances and Amount of Walks')
 
-    plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"facet_performance.png"), dpi=300)
 
     # Combine the two DataFrames
     combined_results = pd.concat([results_walk_distance[['x_value', 'accuracy', 'cancer', 'type']],
@@ -140,8 +156,7 @@ if __name__ == '__main__':
     # Plot
     plt.figure(figsize=(10, 6))
     sns.lineplot(data=combined_results, x='x_value', y='accuracy', hue='cancer', style='type',
-                 palette={"BRCA": "red", "BLCA": "blue", "LUAD": "green", "STAD": "purple", "THCA": "orange",
-                          "COAD": "yellow" , "All": "pink"}, markers=True)
+                 palette=color_palette, markers=True)
 
     plt.title('Accuracy vs Walk Distance and Amount of Walks')
     plt.xlabel('Value')
@@ -150,4 +165,4 @@ if __name__ == '__main__':
     # set x axis ticks to 3,4 and 5
     plt.xticks([3, 4, 5])
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=150)
+    plt.savefig(Path(save_folder, f"combined_performance.png"), dpi=300)

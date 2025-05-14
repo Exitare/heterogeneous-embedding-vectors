@@ -4,45 +4,32 @@ configfile: "./config.yaml"
 
 all_cancers = config['cancers']
 joined_cancers = '_'.join(config['cancers'])
+lower_cancers = [c.lower() for c in all_cancers]
+cancer_arg = ' '.join(all_cancers)  # for -c args
 
 rule all:
     input:
         expand(
             f"results/embeddings/{{cancers}}.h5",
             cancers=joined_cancers
-        )
+        ),
+        expand(
+            f"results/embeddings/{{cancers}}_classifier.h5",
+            cancers=joined_cancers
+        ),
 
 
-# Rule for the first download step with a credentials file path
-rule download_step1:
+rule download_rna_data:
     output:
-        protected("data/rna/BLCA/data.csv")
+        "data/rna/{cancer}/data.csv"
+    params:
+        credentials=lambda wildcards: config["credentials_file"]
     shell:
-        "python ./src/data_preparation/0_01_download_rna_data.py --cancer BLCA --credentials {config[credentials_file]} > {output}"
-
-rule download_step2:
-    output:
-        protected("data/rna/COAD/data.csv")
-    shell:
-        "python ./src/data_preparation/0_01_download_rna_data.py --cancer COAD --credentials {config[credentials_file]} > {output}"
-
-rule download_step3:
-    output:
-        protected("data/rna/LUAD/data.csv")
-    shell:
-        "python ./src/data_preparation/0_01_download_rna_data.py --cancer LUAD --credentials {config[credentials_file]} > {output}"
-
-rule download_step4:
-    output:
-        protected("data/rna/STAD/data.csv")
-    shell:
-        "python ./src/data_preparation/0_01_download_rna_data.py --cancer STAD --credentials {config[credentials_file]} > {output}"
-
-rule download_step5:
-    output:
-        protected("data/rna/BRCA/data.csv")
-    shell:
-        "python ./src/data_preparation/0_01_download_rna_data.py --cancer BRCA --credentials {config[credentials_file]} > {output}"
+        """
+        python ./src/data_preparation/0_01_download_rna_data.py \
+            --cancer {wildcards.cancer} \
+            --credentials {params.credentials} > {output}
+        """
 
 rule download_mutations_data:
     output:
@@ -53,21 +40,12 @@ rule download_mutations_data:
 
 rule create_rna_embeddings:
     input:
-        "data/rna/BLCA/data.csv",
-        "data/rna/COAD/data.csv",
-        "data/rna/LUAD/data.csv",
-        "data/rna/STAD/data.csv",
-        "data/rna/BRCA/data.csv"
-        "data/rna/THCA/data.csv"
+        expand("data/rna/{cancer}/data.csv", cancer=all_cancers)
     output:
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/blca_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/brca_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/coad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/luad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/stad_embeddings.csv",
-        "results/embeddings/rna/BRCA_LUAD_STAD_BLCA_COAD_THCA/thca_embeddings.csv"
+        expand("results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
+               joined=joined_cancers, cancer=lower_cancers)
     shell:
-        "python ./src/data_preparation/0_04_create_rna_embeddings.py -c BRCA LUAD STAD BLCA COAD THCA"
+         "python ./src/data_preparation/0_04_create_rna_embeddings.py -c " + ' '.join(all_cancers)
 
 
 rule create_mutation_embeddings:
@@ -108,57 +86,52 @@ rule combine_annotations_1:
         "data/annotations/case_manifest.json",
         "data/annotations/download_complete.txt"
     output:
-         "data/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv"
+        f"data/annotations/{joined_cancers}/embeddings.csv"
     shell:
-        "python ./src/data_preparation/0_08_combine_annotations.py -c BRCA LUAD STAD BLCA COAD THCA > {output}"
-
+        f"python ./src/data_preparation/0_08_combine_annotations.py -c {cancer_arg} > {{output}}"
 
 rule find_empty_txts:
     input:
-       "data/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv"
+        f"data/annotations/{joined_cancers}/embeddings.csv"
     output:
         "data/annotations/empty_txts.csv"
     shell:
-        "python ./src/data_preparation/0_09_find_empty_txts.py -c BRCA LUAD STAD BLCA COAD THCA > {output}"
+        f"python ./src/data_preparation/0_09_find_empty_txts.py -c {cancer_arg} > {{output}}"
 
 rule tesseract_conversion:
     input:
         "data/annotations/empty_txts.csv"
     output:
-       "./data/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/tesseract_conversion_success.txt"
+        f"data/annotations/{joined_cancers}/tesseract_conversion_success.txt"
     shell:
-        "./src/data_preparation/0_10_tesseract_conversion.sh 'BRCA LUAD STAD BLCA COAD THCA' > {output}"
-
-
+        f"./src/data_preparation/0_10_tesseract_conversion.sh '{cancer_arg}' > {{output}}"
 
 rule final_annotation_combination:
     input:
-        "data/annotations/tesseract_conversion_success.txt",
+        f"data/annotations/{joined_cancers}/tesseract_conversion_success.txt"
     output:
-        "data/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/annotations.csv"
+        f"data/annotations/{joined_cancers}/annotations.csv"
     shell:
-        "python ./src/data_preparation/0_11_combine_annotations.py -c BRCA LUAD STAD BLCA COAD THCA > {output}"
-
+        f"python ./src/data_preparation/0_11_combine_annotations.py -c {cancer_arg} > {{output}}"
 
 rule create_annotation_embeddings:
     input:
-        "data/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/annotations.csv"
+        f"data/annotations/{joined_cancers}/annotations.csv"
     output:
-        "results/embeddings/annotations/BRCA_LUAD_STAD_BLCA_COAD_THCA/embeddings.csv"
+        f"results/embeddings/annotations/{joined_cancers}/embeddings.csv"
     shell:
-        "python ./src/data_preparation/0_12_create_annotation_embeddings.py -c BRCA LUAD STAD BLCA COAD THCA > {output} 2>/dev/null"
+        f"python ./src/data_preparation/0_12_create_annotation_embeddings.py -c {cancer_arg} > {{output}} 2>/dev/null"
 
-
-rule create_hdf5:
+rule create_h5:
     input:
         expand(
             "results/embeddings/annotations/{cancers}/embeddings.csv",
             cancers=joined_cancers
         ),
         "results/embeddings/mutation_embeddings.csv",
-        expand(
-            "results/embeddings/rna/{cancers}/{cancer}_embeddings.csv",
-            cancers=joined_cancers,
+          rna_embeddings=expand(
+            "results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
+            joined=joined_cancers,
             cancer=all_cancers
         )
 
@@ -170,4 +143,28 @@ rule create_hdf5:
 
     run:
         cancers = all_cancers
-        shell(f"python ./src/data_preparation/0_14_create_hdf5.py -c {{cancers}}")
+        shell(f"python ./src/data_preparation/0_14_create_h5.py -c {{cancers}}")
+
+
+rule create_classifier_h5:
+    input:
+        expand(
+            "results/embeddings/annotations/{cancers}/embeddings.csv",
+            cancers=joined_cancers
+        ),
+        "results/embeddings/mutation_embeddings.csv",
+          rna_embeddings=expand(
+            "results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
+            joined=joined_cancers,
+            cancer=all_cancers
+        )
+
+    output:
+        expand(
+            f"results/embeddings/{{cancers}}_classifier.h5",
+            cancers=joined_cancers
+        )
+
+    run:
+        cancers = all_cancers
+        shell(f"python ./src/data_preparation/0_15_create_h5_classifier.py -c {{cancers}}")

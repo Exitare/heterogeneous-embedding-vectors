@@ -30,7 +30,8 @@ def sample_words_multiple_times(sentence, num_words, num_samples, submitter_id):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     args = parser.parse_args()
 
     selected_cancers = args.cancer

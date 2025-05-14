@@ -1,11 +1,11 @@
 # config.yaml
 credentials_file: "../bmeg_credentials.json"
-amount_of_summed_embeddings: 1000000
+amount_of_summed_embeddings: 15000
 run_iterations: 1
 max_walk_distance: 10
 cancers: ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
-multi_cancer_max_walk: 15
-simple_cancer_max_walk: 30
+multi_cancer_max_walk: 10
+simple_cancer_max_walk: 10
 noise_ratios: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 classifier_max_walk_amounts: 5
 classifier_max_walk_distance: 5

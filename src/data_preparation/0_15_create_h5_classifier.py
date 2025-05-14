@@ -10,6 +10,7 @@ save_folder = Path("results", "embeddings")
 chunk_size = 100000
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
     """
     Load data from a directory or a single file in chunks.
@@ -33,38 +34,20 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
-def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"):
+def chunked_image_dataframe_loader(path: Path, chunk_size=10000):
     """
     Load image data from a directory containing cancer-specific subdirectories.
 
     Parameters:
         path (Path): Path to the image data directory.
         chunk_size (int): Number of rows per chunk.
-        file_extension (str): Extension of image data files (default: .csv).
 
     Yields:
         pd.DataFrame: Chunk of data from the cancer-specific subdirectories.
     """
-    path = Path(path)
-
-    if path.is_dir():
-        for file_path in path.iterdir():
-            if file_path.is_file():
-                continue  # Skip files at the top level
-            for cancer_path in file_path.iterdir():
-                if cancer_path.is_file() and cancer_path.suffix == file_extension:
-                    logging.info(f"Loading file in chunks: {cancer_path}")
-                    sep = "," if file_extension == ".csv" else "\t"
-                    for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
-                        logging.info(f"Chunk shape: {chunk.shape}")
-                        yield chunk
-    elif path.is_file():
-        logging.info(f"Loading single file in chunks: {path}")
-        for chunk in pd.read_csv(path, chunksize=chunk_size):
-            yield chunk
-    else:
-        logging.info(f"Provided path is neither a file nor a directory: {path}. Skipping...")
-        #raise ValueError(f"Provided path is neither a file nor a directory: {path}")
+    for chunk in pd.read_csv(path, chunksize=chunk_size, sep='\t'):
+        logging.info(f"Chunk shape: {chunk.shape}")
+        yield chunk
 
 
 def process_and_store_per_submitter(dataset_name, loader, h5_file):
@@ -81,11 +64,13 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
         submitter_ids = ['-'.join(sid.split("-")[:3]) for sid in submitter_ids]  # Replace hyphens with underscores
 
         # Extract only numeric columns (skip 'cancer' and 'submitter_id')
-        numeric_cols = [col for col in chunk.columns if col not in ["cancer", "submitter_id", "cancer_type", "tile_pos"]]
+        numeric_cols = [col for col in chunk.columns if
+                        col not in ["cancer", "submitter_id", "cancer_type", "tile_pos"]]
         numeric_data = chunk[numeric_cols].to_numpy(dtype=np.float32)
 
         # Extract cancer labels
-        cancer_values = chunk["cancer_type"].astype(str).tolist() if dataset_name == "images" else chunk["cancer"].astype(str).tolist()
+        cancer_values = chunk["cancer_type"].astype(str).tolist() if dataset_name == "images" else chunk[
+            "cancer"].astype(str).tolist()
 
         for i, submitter_id in enumerate(submitter_ids):
             # Ensure dataset does not already exist
@@ -110,7 +95,8 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
 
                 dataset.attrs["cancer"] = cancer_values[i]
 
-                assert "TCGA-" not in dataset.attrs["cancer"], f"❌ Cancer type still has TCGA prefix: {dataset.attrs['cancer']}"
+                assert "TCGA-" not in dataset.attrs[
+                    "cancer"], f"❌ Cancer type still has TCGA prefix: {dataset.attrs['cancer']}"
 
     logging.info(f"✅ Completed processing {dataset_name}.")
 
@@ -118,14 +104,28 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
 if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--image_embedding_count", "-ec", type=int,
+                        help="The total count of image embeddings per patient.", default=-1)
     args = parser.parse_args()
     selected_cancers = args.cancers
+
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     cancers = "_".join(selected_cancers)
+    image_embedding_counts: int = args.image_embedding_count
+
+    image_file_name: str = f"combined_image_embeddings_{image_embedding_counts}.tsv" if image_embedding_counts != -1 else "combined_image_embeddings.tsv"
+
+    logging.info(f"Selected cancers: {selected_cancers}")
+    logging.info(f"Image embedding count: {image_embedding_counts}")
+    logging.info(f"Image file name: {image_file_name}")
 
     rna_load_folder = Path("results", "embeddings", "rna", cancers)
     annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_folder = Path("results", "embeddings", "images")
+    image_embedding_file = Path("results", "embeddings", image_file_name)
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}_classifier.h5"), "w") as f:
@@ -134,7 +134,7 @@ if __name__ == "__main__":
             process_and_store_per_submitter("rna", rna_loader, f)
 
             # Process Image embeddings (chunked)
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size, file_extension=".tsv")
+            image_loader = chunked_image_dataframe_loader(image_embedding_file, chunk_size=chunk_size)
             process_and_store_per_submitter("images", image_loader, f)
 
             # Process Annotation embeddings

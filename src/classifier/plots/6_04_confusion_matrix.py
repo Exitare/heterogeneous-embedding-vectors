@@ -3,6 +3,9 @@ from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -31,7 +34,7 @@ if __name__ == '__main__':
                 continue
 
             if "predictions.csv" in str(path):
-                print(f"Loading {path}")
+                logging.info(f"Loading {path}")
                 predictions = pd.read_csv(path)
                 all_predictions.append(predictions)
 
@@ -46,4 +49,4 @@ if __name__ == '__main__':
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
     plt.savefig(Path("figures", "classifier", cancers, "performance",
                      f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=150)
+                dpi=300)

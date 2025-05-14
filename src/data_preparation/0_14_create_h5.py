@@ -33,7 +33,7 @@ def chunked_dataframe_loader(path, chunk_size=100000, file_extension=".csv"):
         raise ValueError(f"Provided path is neither a file nor a directory: {path}")
 
 
-def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"):
+def chunked_image_dataframe_loader(path, chunk_size=100000):
     """
     Load image data from a directory containing cancer-specific subdirectories.
 
@@ -45,26 +45,9 @@ def chunked_image_dataframe_loader(path, chunk_size=10000, file_extension=".tsv"
     Yields:
         pd.DataFrame: Chunk of data from the cancer-specific subdirectories.
     """
-    path = Path(path)
-
-    if path.is_dir():
-        for file_path in path.iterdir():
-            logging.info(file_path)
-            if file_path.is_file():
-                continue  # Skip files at the top level
-            for cancer_path in file_path.iterdir():
-                logging.info("cancer_path", cancer_path)
-                if cancer_path.is_file() and cancer_path.suffix == file_extension:
-                    logging.info(f"Loading file in chunks: {cancer_path}")
-                    sep = "," if file_extension == ".csv" else "\t"
-                    for chunk in pd.read_csv(cancer_path, chunksize=chunk_size, sep=sep):
-                        yield chunk
-    elif path.is_file():
-        logging.info(f"Loading single file in chunks: {path}")
-        for chunk in pd.read_csv(path, chunksize=chunk_size):
-            yield chunk
-    else:
-        raise ValueError(f"Provided path is neither a file nor a directory: {path}")
+    logging.info(f"Loading image file: {path}...")
+    for chunk in pd.read_csv(path, chunksize=chunk_size, sep='\t'):
+        yield chunk
 
 
 def process_and_store_in_chunks(dataset_name, loader, f, chunk_size=100000):
@@ -150,17 +133,31 @@ if __name__ == "__main__":
     parser.add_argument(
         "--cancers", "-c", nargs="+", required=True, help="The cancer types to work with."
     )
+    parser.add_argument("--image_embedding_count", "-ec", type=int,
+                        help="The total count of image embeddings per patient.", default=-1)
 
     args = parser.parse_args()
     selected_cancers = args.cancers
+
+    if len(selected_cancers) == 1:
+        logging.info("Selected cancers is a single string. Converting...")
+        selected_cancers = selected_cancers[0].split(" ")
+
     cancers = "_".join(selected_cancers)
+    image_embedding_counts: int = args.image_embedding_count
+
+    image_file_name: str = f"combined_image_embeddings_{image_embedding_counts}.tsv" if image_embedding_counts != -1 else "combined_image_embeddings.tsv"
+
+    logging.info(f"Selected cancers: {selected_cancers}")
+    logging.info(f"Image embedding count: {image_embedding_counts}")
+    logging.info(f"Image file name: {image_file_name}")
 
     rna_load_folder = Path("results", "embeddings", "rna", cancers)
     annotation_embedding_file = Path(
         "results", "embeddings", "annotations", cancers, "embeddings.csv"
     )
     mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
-    image_embedding_folder = Path("results", "embeddings", "images")
+    image_embedding_file = Path("results", "embeddings", image_file_name)
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}.h5"), "w") as f:
@@ -177,8 +174,7 @@ if __name__ == "__main__":
             mutation_indices = process_and_store_in_chunks("mutations", mutation_loader, f, chunk_size=chunk_size)
 
             # Process Image embeddings
-            image_loader = chunked_image_dataframe_loader(image_embedding_folder, chunk_size=chunk_size,
-                                                          file_extension=".tsv")
+            image_loader = chunked_image_dataframe_loader(image_embedding_file, chunk_size=chunk_size)
             image_indices = process_and_store_in_chunks("images", image_loader, f, chunk_size=chunk_size)
 
             # Store indices
@@ -202,6 +198,7 @@ if __name__ == "__main__":
 
             logging.info("HDF5 file with indices created successfully.")
             logging.info(f"Available groups: {f.keys()}")
+            logging.info(f"Saved file to: {Path(save_folder, f'{cancers}.h5')}")
 
     except Exception as e:
         logging.info(e)

@@ -16,4 +16,4 @@ selected_cancers=$1
 walk_distance=$2
 amount_of_walks=$3
 
-python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings_nc.py -c ${selected_cancers} -w $walk_distance -a $amount_of_walks
+python ./src/classifier/summed_embeddings_generation/3_01_create_summed_embeddings.py -c ${selected_cancers} -w $walk_distance -a $amount_of_walks

@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 import h5py
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Corrected walk_distances to include 4
 walk_distances = [3, 4, 5]
@@ -66,6 +69,11 @@ def create_polar_line_plot(df, distance_type, ax, color_dict, all_combos):
 
     # Set the labels for each combination
     ax.set_xticks(angles[:-1])
+    # Apply the transformation using split and format
+    all_combos_df['combo'] = all_combos_df['combo'].apply(lambda x: f"SC: {x.split('_')[0]} and R: {x.split('_')[1]}")
+    print(all_combos_df['combo'])
+
+    # Now, set the tick labels
     ax.set_xticklabels(all_combos_df['combo'], fontsize=10)
 
     # Iterate over each cancer type and plot its distances
@@ -173,7 +181,7 @@ def create_polar_inter_plot(df, ax, color_dict, all_combos):
         ax.scatter(cancer_angles, distances, color=color_dict.get(cancer, None), s=50, edgecolors='w', zorder=5)
 
     # Set the title
-    ax.set_title("Inter-Class Distances", va='bottom', fontsize=14, fontweight='bold')
+    ax.set_title("Inter-Class Distances", va='bottom')
 
     # Optional: Set radial limits with some padding
     max_distance = merged['distance'].max()
@@ -211,8 +219,7 @@ def main_polar_plots(combined_df: pd.DataFrame, file_name: str):
     handles, labels = axes[0].get_legend_handles_labels()
 
     # Place the legend outside the plots
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=6, title="Cancer Types",
-               fontsize=12)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1), ncol=6, title="Cancer Types")
 
     # Add a main title
     plt.suptitle("Polar Plots of Intra and Inter Cancer Type Distances", fontsize=18, fontweight='bold', y=1.02)
@@ -221,7 +228,7 @@ def main_polar_plots(combined_df: pd.DataFrame, file_name: str):
     plt.tight_layout(rect=[0, 0, 1, 0.95])
 
     # Save the figure
-    plt.savefig(Path(figure_save_folder, f"{file_name}.png"), bbox_inches='tight', dpi=150)
+    plt.savefig(Path(figure_save_folder, f"{file_name}.png"), bbox_inches='tight', dpi=300)
 
 
 def calculate_intra_inter_distances(summed_embeddings: dict, selected_cancers: list,
@@ -337,9 +344,13 @@ def convert_to_records(intra_df: {}, inter_df: {}):
 
 
 if __name__ == '__main__':
+    plt.rcParams['font.family'] = 'Times New Roman'
+    plt.rcParams['font.size'] = 12
     # Parse command-line arguments
     parser = ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs='+', required=True, help="The cancer type to work with.")
+    parser.add_argument("--cancer", "-c", nargs='+', required=False, help="The cancer type to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+                        )
     args = parser.parse_args()
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
@@ -392,23 +403,28 @@ if __name__ == '__main__':
         summed_embeddings[key] = pd.concat(dfs, ignore_index=True)
 
     # Initialize dictionaries to store distances
+    logging.info("Calculating euclidean distances")
     euclidean_intra_distances, euclidean_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                            selected_cancers,
                                                                                            distance_metric="euclidean")
+    logging.info("Calculating cosine distances")
     cosine_intra_distances, cosine_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                      selected_cancers,
                                                                                      distance_metric="cosine")
+    logging.info("Calculating dot_product distances")
     dot_product_intra_distances, dot_product_inter_distances = calculate_intra_inter_distances(summed_embeddings,
                                                                                                selected_cancers,
                                                                                                distance_metric="dot_product")
 
     # Convert to DataFrames
+    logging.info("Converting to dataframes")
     euclidean_intra_df, euclidean_inter_df = convert_to_records(euclidean_intra_distances, euclidean_inter_distances)
     cosine_intra_df, cosine_inter_df = convert_to_records(cosine_intra_distances, cosine_inter_distances)
     dot_product_intra_df, dot_product_inter_df = convert_to_records(dot_product_intra_distances,
                                                                     dot_product_inter_distances)
 
     # Combine intra and inter distance DataFrames
+    logging.info("Combining to dataframes")
     euclidean_combined_df = pd.concat([euclidean_intra_df, euclidean_inter_df], ignore_index=True)
     cosine_combined_df = pd.concat([cosine_intra_df, cosine_inter_df], ignore_index=True)
     dot_product_combined_df = pd.concat([dot_product_intra_df, dot_product_inter_df], ignore_index=True)
@@ -422,7 +438,9 @@ if __name__ == '__main__':
     cosine_combined_df.to_csv(Path(results_save_folder, cosine_save_file_name), index=False)
     dot_product_combined_df.to_csv(Path(results_save_folder, dot_product_save_file_name), index=False)
 
+
     # Generate the polar plots with enhanced legends
+    logging.info("Creating plots...")
     main_polar_plots(euclidean_combined_df, "euclidean_polar")
     main_polar_plots(cosine_combined_df, "cosine_polar")
     main_polar_plots(dot_product_combined_df, "dot_product_polar")

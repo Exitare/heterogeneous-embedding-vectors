@@ -1,44 +1,278 @@
-
 configfile: "config.yaml"
 
 joined_cancers = '_'.join(config['cancers'])
 amount_of_summed_embeddings = config['amount_of_summed_embeddings']
-noise_ratio=config['noise_ratios']
+multi_cancer_max_walk = config['multi_cancer_max_walk']
+simple_cancer_max_walk = config['simple_cancer_max_walk']
+max_run_iterations = config['run_iterations']
 
 rule all:
     input:
-        expand(f"figures/recognizer/{{cancers}}/simple/{{amount}}/noise_grid.png",
-            cancers=joined_cancers,
-            amount=amount_of_summed_embeddings
-        ),
-         expand(f"figures/recognizer/{{cancers}}/simple/{{amount}}/noise_plot.png",
-            cancers=joined_cancers,
-            amount=amount_of_summed_embeddings
-        ),
-        expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_grid.png",
-            cancers=joined_cancers,
-            amount=amount_of_summed_embeddings
-        ),
-         expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_plot.png",
-            cancers=joined_cancers,
-            amount=amount_of_summed_embeddings
-        ),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Cancer Specific_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Cancer Specific_reduced_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Cancer Specific_Composite_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Cancer Specific_Composite_reduced_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Simple_Composite_reduced_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Simple_Composite_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Simple_reduced_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/mcc_Simple_noise_grid.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline_m_multi/f1_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline_m_multi/mcc_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline_s_simple/f1_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline_s_simple/mcc_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_simple_f/f1_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_simple_f/mcc_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_multi_f/f1_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_multi_f/mcc_line_plot_comparison.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
 
-rule create_noise_plot:
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/simple/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/simple/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/multi/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/multi/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_foundation/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_foundation/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_foundation/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_foundation/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+
+rule create_multi_foundation_plots:
     input:
-        expand(f"results/recognizer/aggregated_metrics/{{cancers}}/multi/{{amount}}/metrics.csv",
-            cancers=joined_cancers,
+        expand(f"results/recognizer/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(1, max_run_iterations +1),
             amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
         )
     output:
-        expand(f"figures/recognizer/{{cancers}}/multi/{{amount}}/noise_plot.png",
-            cancers=joined_cancers,
-            amount=amount_of_summed_embeddings
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_foundation/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/multi_foundation/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings)
+
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --model multi -f
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --model multi -f
+        """
+
+
+rule create_simple_foundation_plots:
+    input:
+        expand(f"results/recognizer/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(1, max_run_iterations +1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
         )
-    run:
-        cancers=joined_cancers,
-        amount=amount_of_summed_embeddings,
-        shell(f"python3 src/recognizer/plots/5_01_plot_aggregated_metrics.py -c {{cancers}} -a {{amount}}")
+    output:
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_foundation/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple_foundation/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings)
+
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --model simple -f
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --model simple -f
+        """
+
+rule create_simple_plots:
+    input:
+        expand(f"results/recognizer/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(1, max_run_iterations +1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+    output:
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/simple/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings)
+
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --model simple
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --model simple
+        """
+
+
+rule create_baseline_simple_plots:
+    input:
+        expand(f"results/recognizer/baseline/simple/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, simple_cancer_max_walk + 1),
+            iteration=range(1, max_run_iterations +1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+    output:
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/simple/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/simple/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings)
+
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --model baseline_s
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --model baseline_s
+        """
+
+rule create_baseline_multi_plots:
+    input:
+        expand(f"results/recognizer/baseline/multi/{{cancers}}/{{amount}}/0.0/{{walk_distance}}_embeddings/run_{{iteration}}/metrics.csv",
+            walk_distance=range(3, multi_cancer_max_walk + 1),
+            iteration=range(1, max_run_iterations +1),
+            amount=amount_of_summed_embeddings,
+            cancers=joined_cancers
+        )
+    output:
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/multi/f1_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings),
+        expand("figures/recognizer/{cancers}/{amount}/0.0/baseline/multi/mcc_line_plot.png",
+               cancers=joined_cancers, amount=amount_of_summed_embeddings)
+
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --model baseline_m
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --model baseline_m
+        """
 
 
 
+rule create_simple_simple_f_plots:
+    input:
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/simple_simple_f/f1_line_plot_comparison.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/simple_simple_f/mcc_line_plot_comparison.png"
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --models simple simple_f
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --models simple simple_f
+        """
+
+rule create_multi_multi_f_plots:
+    input:
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/multi_multi_f/f1_line_plot_comparison.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/multi_multi_f/mcc_line_plot_comparison.png"
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --models multi multi_f
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --models multi multi_f
+        """
+
+
+
+rule create_baseline_m_multi_plots:
+    input:
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/baseline_m_multi/f1_line_plot_comparison.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/baseline_m_multi/mcc_line_plot_comparison.png"
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --models baseline_m multi
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --models baseline_m multi
+        """
+
+rule create_baseline_s_simple_plots:
+    input:
+        f"results/recognizer/aggregated_metrics/simple/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/baseline_s_simple/f1_line_plot_comparison.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/0.0/baseline_s_simple/mcc_line_plot_comparison.png"
+    shell:
+        """
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm F1 --models baseline_s simple
+        python3 src/recognizer/plots/metrics_embedding_per_walk_distances_bg.py \
+            -c {joined_cancers} -a {amount_of_summed_embeddings} -sm MCC --models baseline_s simple
+        """
+
+rule create_simple_noise_grid:
+    input:
+        f"results/recognizer/aggregated_metrics/simple/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Simple_noise_grid.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Simple_reduced_noise_grid.png"
+    shell:
+        "python3 src/recognizer/plots/plot_noise_metrics.py -c {wildcards.cancers} -a {wildcards.amount} --metric MCC"
+
+
+rule create_simple_composite_noise_grid:
+    input:
+        f"results/recognizer/aggregated_metrics/simple/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Simple_Composite_noise_grid.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Simple_Composite_reduced_noise_grid.png"
+    shell:
+        "python3 src/recognizer/plots/plot_noise_metrics.py -c {wildcards.cancers} -a {wildcards.amount} --foundation --metric MCC"
+
+
+rule create_cancer_specific_noise_grid:
+    input:
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Cancer Specific_noise_grid.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Cancer Specific_reduced_noise_grid.png"
+    shell:
+        "python3 src/recognizer/plots/plot_noise_metrics.py -c {wildcards.cancers} -a {wildcards.amount} -m --metric MCC"
+
+
+rule create_composite_cancer_specific_noise_grid:
+    input:
+        f"results/recognizer/aggregated_metrics/multi/{joined_cancers}/{amount_of_summed_embeddings}/metrics.csv"
+    output:
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Cancer Specific_Composite_noise_grid.png",
+        f"figures/recognizer/{joined_cancers}/{amount_of_summed_embeddings}/mcc_Cancer Specific_Composite_reduced_noise_grid.png"
+    shell:
+        "python3 src/recognizer/plots/plot_noise_metrics.py -c {wildcards.cancers} -a {wildcards.amount} --foundation -m --metric MCC"

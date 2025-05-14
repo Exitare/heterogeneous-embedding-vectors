@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 from keras.src.layers import BatchNormalization
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, matthews_corrcoef, balanced_accuracy_score
 from sklearn.preprocessing import label_binarize
 import pandas as pd
 from pathlib import Path
@@ -13,10 +13,12 @@ from collections import Counter
 import math
 import logging
 
+
 load_folder = Path("results", "classifier", "summed_embeddings")
 save_folder = Path("results", "classifier", "classification")
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def apply_weights_and_bias(model, loaded_weights_and_biases):
     # Apply the weights and biases to the model
@@ -77,11 +79,6 @@ def create_tf_dataset_specific_indices(h5_file_path, indices, batch_size, label_
 
 def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_folder: Path, iteration: int,
                              walk_distance: int, amount_of_walks: int, label_encoder):
-    import pickle
-    # Load the saved weights and biases
-    with open('weights_and_biases.pkl', 'rb') as f:
-        loaded_weights_and_biases = pickle.load(f)
-
     input_layer = tf.keras.layers.Input(shape=(train_ds.element_spec[0].shape[1],))
 
     x = BatchNormalization()(input_layer)
@@ -154,7 +151,7 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
         recall_cancer = recall_score(y_test_cancer, y_pred_cancer, average='weighted')
 
         logging.info(
-            f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}"
+            f"{cancer_name}: Accuracy: {accuracy_cancer:.4f}, F1: {f1_cancer:.4f}, Precision: {precision_cancer:.4f}, Recall: {recall_cancer:.4f}. "
         )
 
         results.append({
@@ -173,6 +170,8 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     precision_total = precision_score(y_test, y_pred, average='weighted')
     recall_total = recall_score(y_test, y_pred, average='weighted')
     accuracy_total = (y_test == y_pred).mean()
+    mcc_total = matthews_corrcoef(y_test, y_pred)
+    balanced_accuracy = balanced_accuracy_score(y_test, y_pred)
 
     logging.info(y_test.shape)
     logging.info(y_pred.shape)
@@ -183,12 +182,15 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     auc_score = roc_auc_score(y_test_one_hot, y_pred_proba, multi_class='ovo', average='macro')
 
     logging.info(
-        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f}")
+        f"Overall: Accuracy: {accuracy_total:.4f}, F1: {f1_total:.4f}, Precision: {precision_total:.4f}, Recall: {recall_total:.4f}, AUC: {auc_score:.4f},"
+        f"MCC: {mcc_total:.4f}, Balanced Accuracy: {balanced_accuracy:.4f}")
 
     results.append({
         "cancer": "All",
         "accuracy": accuracy_total,
         "f1": f1_total,
+        "mcc": mcc_total,
+        "balanced_accuracy": balanced_accuracy,
         "precision": precision_total,
         "recall": recall_total,
         "auc": auc_score,
@@ -215,8 +217,7 @@ if __name__ == "__main__":
     parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
     parser.add_argument("--iteration", "-i", type=int, required=True, help="The iteration number.")
     parser.add_argument("--walk_distance", "-w", type=int, required=True, help="The walk distance.",
-                        choices=[3, 4, 5, 6],
-                        default=3)
+                        choices=[3, 4, 5, 6],  default=3)
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True, help="The amount of walks.",
                         choices=[3, 4, 5, 6], default=3)
     args = parser.parse_args()
@@ -225,13 +226,8 @@ if __name__ == "__main__":
     walk_distance = args.walk_distance
     walk_amount = args.amount_of_walks
     iteration = args.iteration
-    selected_cancers = args.cancer
 
-    if len(selected_cancers) == 1:
-        logging.info("Selected cancers is a single string with spaces. Splitting into list...")
-        selected_cancers = selected_cancers[0].split()
-
-    cancers = "_".join(selected_cancers)
+    cancers = "_".join(args.cancer)
     logging.info(f"Selected cancers: {cancers}")
     logging.info(f"Walk distance: {walk_distance}, Amount of walks: {walk_amount}")
 
@@ -250,24 +246,20 @@ if __name__ == "__main__":
 
     logging.info(f"Loading data from: {h5_file_path}")
     logging.info(f"Saving results to: {iteration_save_folder}")
+    logging.info(f"Cancer save folder: {cancer_save_folder}")
 
     train_ratio = 0.7
     val_ratio = 0.05
     test_ratio = 0.25
 
-    class_counts = Counter()
-
+    # **LOAD ENTIRE DATASET INTO MEMORY**
     with h5py.File(h5_file_path, "r") as h5_file:
-        y = h5_file["y"]
-        chunk_size = 10000  # Process data in chunks
-        total_samples = y.shape[0]
+        feature_dimension = h5_file.attrs["feature_shape"]
+        unique_classes = h5_file.attrs["classes"]
+        X = h5_file["X"][:]  # Load all features
+        y = np.array([label.decode("utf-8") for label in h5_file["y"][:]])  # Load all labels
 
-        for i in range(0, total_samples, chunk_size):
-            chunk = y[i:i + chunk_size]
-            # convert chunks to utf-8
-            chunk = [label.decode("utf-8") for label in chunk]
-            class_counts.update(chunk)
-
+    class_counts = Counter(y)
     split_sizes = {cls: {
         "train": int(count * train_ratio),
         "val": int(count * val_ratio),
@@ -277,26 +269,17 @@ if __name__ == "__main__":
     # To store indices
     split_indices = {"train": [], "val": [], "test": []}
     allocated = defaultdict(lambda: {"train": 0, "val": 0, "test": 0})
-    chunk_size = 10000
-    with h5py.File(h5_file_path, "r") as h5_file:
-        y = h5_file["y"]
-        feature_dimension = h5_file.attrs["feature_shape"]
-        unique_classes = h5_file.attrs["classes"]
-        for i in range(0, y.shape[0], chunk_size):
-            chunk = y[i:i + chunk_size]  # Load a chunk
-            chunk_indices = np.arange(i, i + len(chunk))  # Indices of the chunk
 
-            for idx, label in zip(chunk_indices, chunk):
-                label = label.decode("utf-8")
-                if allocated[label]["train"] < split_sizes[label]["train"]:
-                    split_indices["train"].append(idx)
-                    allocated[label]["train"] += 1
-                elif allocated[label]["val"] < split_sizes[label]["val"]:
-                    split_indices["val"].append(idx)
-                    allocated[label]["val"] += 1
-                else:
-                    split_indices["test"].append(idx)
-                    allocated[label]["test"] += 1
+    for idx, label in enumerate(y):
+        if allocated[label]["train"] < split_sizes[label]["train"]:
+            split_indices["train"].append(idx)
+            allocated[label]["train"] += 1
+        elif allocated[label]["val"] < split_sizes[label]["val"]:
+            split_indices["val"].append(idx)
+            allocated[label]["val"] += 1
+        else:
+            split_indices["test"].append(idx)
+            allocated[label]["test"] += 1
 
     logging.info(
         f"Train size: {len(split_indices['train'])}, Validation size: {len(split_indices['val'])}, Test size: {len(split_indices['test'])} "
@@ -326,6 +309,10 @@ if __name__ == "__main__":
     test_ds = create_tf_dataset_specific_indices(
         h5_file_path, split_indices['test'], batch_size, label_encoder
     ).prefetch(tf.data.AUTOTUNE)
+
+    assert set(np.unique(y[split_indices["train"]])) == set(np.unique(y)), "Missing classes in training set!"
+    assert set(np.unique(y[split_indices["val"]])) == set(np.unique(y)), "Missing classes in validation set!"
+    assert set(np.unique(y[split_indices["test"]])) == set(np.unique(y)), "Missing classes in test set!"
 
     # Train and evaluate model
     train_and_evaluate_model(

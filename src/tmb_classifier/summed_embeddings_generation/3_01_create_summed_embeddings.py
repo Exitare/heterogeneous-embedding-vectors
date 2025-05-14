@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 from typing import Dict, List, Tuple, Optional
+import pandas as pd
 
 LATENT_DIM = 768
 CHUNK_SIZE = 100000  # For processing large image datasets
@@ -89,8 +90,9 @@ def collect_all_submitter_ids(h5_file: h5py.File, modalities: List[str]) -> List
 def main():
     parser = argparse.ArgumentParser(description="Process and sum patient embeddings.")
     parser.add_argument(
-        "--cancer", "-c", nargs="+", required=True,
-        help="The cancer types to work with."
+        "--cancer", "-c", nargs="+", required=False,
+        help="The cancer types to work with.",
+        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
     )
     parser.add_argument(
         "--walk_distance", "-w", type=int, required=True,
@@ -117,7 +119,7 @@ def main():
     cancers: str = "_".join(selected_cancers)
     load_path: Path = Path(args.load_path)
 
-    save_folder = Path("results", "classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}")
+    save_folder = Path("results", "tmb_classifier", "summed_embeddings", cancers, f"{walk_distance}_{walk_amount}")
     save_folder.mkdir(parents=True, exist_ok=True)
 
     h5_load_path: Path = Path(load_path, f"{cancers}_classifier.h5")
@@ -142,6 +144,32 @@ def main():
         for patient_id in tqdm(patient_ids, desc="Processing Patients"):
             try:
                 patient_data, patient_cancer = load_patient_data(h5_file, patient_id)
+                mutations = pd.read_csv(Path("data", "mutations", "mutations.csv"))
+                # change submitter id to split at - and only keep first 3 parts
+                mutations["submitter_id"] = mutations["submitter_id"].apply(lambda x: "-".join(x.split("-")[:3]))
+                # Filter mutation data for the current patient
+                patient_mutations = mutations[mutations["submitter_id"] == patient_id]
+
+                if not patient_mutations.empty:
+                    # Drop the submitter_id column to count mutations
+                    mutation_values = patient_mutations.drop(columns=["submitter_id"])
+
+                    # Count number of mutated genes (where value == 1)
+                    num_mutations = (mutation_values == 1).sum(axis=1).iloc[0]
+
+                    # Assume a standard exonic coverage of 30 Mb
+                    tmb = num_mutations / 30  # Mutations per Mb
+
+                    # Classify TMB as High (1) or Low (0) based on a threshold (e.g., 10 mutations/Mb)
+                    tmb_class = int(tmb >= 0.5)  # 1 if High, 0 if Low
+
+                else:
+                    tmb = 0  # If no mutations found, TMB is 0
+                    tmb_class = 2  # Default to extra class when no mutations are present
+
+                #print(f"TMB for patient {patient_id}: {tmb:.2f} mutations/Mb (Class: {tmb_class})")
+
+
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
@@ -150,7 +178,7 @@ def main():
                 summed_embedding = sum_random_embeddings(
                     patient_id, patient_data, walk_distance, walk_amount
                 )
-                summed_embeddings_data.append((summed_embedding, patient_cancer, patient_id))
+                summed_embeddings_data.append((summed_embedding, patient_cancer, patient_id, tmb_class))
                 mutation_count += 1
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
@@ -163,9 +191,9 @@ def main():
         shape = LATENT_DIM * walk_amount
         # Initialize datasets with zero rows and allow them to grow
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="float32")
-        out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
+        out_file.create_dataset("y", (0,), maxshape=(None,), dtype="int32")
         out_file.create_dataset("submitter_ids", (0,), maxshape=(None,), dtype=h5py.string_dtype())
-        out_file.attrs["classes"] = selected_cancers
+        out_file.attrs["classes"] = [0, 1, 2]
         out_file.attrs["feature_shape"] = shape
 
         # Use batch resizing for better performance
@@ -173,9 +201,9 @@ def main():
         y_data = []
         submitter_ids = []
 
-        for summed_embedding, cancer, submitter_id in tqdm(summed_embeddings_data, desc="Saving Data"):
+        for summed_embedding, cancer, submitter_id, tmb in tqdm(summed_embeddings_data, desc="Saving Data"):
             X_data.append(summed_embedding)
-            y_data.append(cancer.encode("utf-8"))
+            y_data.append(tmb)
             submitter_ids.append(submitter_id.encode("utf-8"))
 
             # Write in chunks to avoid high memory usage

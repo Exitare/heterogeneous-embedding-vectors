@@ -44,4 +44,4 @@ echo "walk_amount: $walk_amount"
 echo "iteration: $iteration"
 
 # call script
-python ./src/classifier/models/4_01_cancer_classifier_nc.py -c ${cancers} -i ${iteration} -w ${walk_distance} -a ${walk_amount}
+python ./src/classifier/models/4_01_cancer_classifier.py -c ${cancers} -i ${iteration} -w ${walk_distance} -a ${walk_amount}

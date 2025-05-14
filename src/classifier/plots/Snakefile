@@ -10,9 +10,14 @@ max_iterations = range(1,config['run_iterations'])
 
 rule all:
     input:
-        # all plots
         expand(
-            f"figures/classifier/{{cancers}}/umap/{{walk_distance}}_{{walk_amount}}/combined_summed_embeddings.png",
+            f"figures/classifier/{{cancers}}/clustering/{{walk_distance}}_{{walk_amount}}_gmm_clustering.png",
+            cancers=joined_cancers,
+            walk_distance= requested_walk_distance[-1],
+            walk_amount= requested_walk_amounts[-1]
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/clustering/{{walk_distance}}_{{walk_amount}}_pca_clustering.png",
             cancers=joined_cancers,
             walk_distance= requested_walk_distance[-1],
             walk_amount= requested_walk_amounts[-1]
@@ -96,28 +101,35 @@ rule all:
         )
 
 
-
-
-rule generate_combined_umap_embeddings:
+rule generate_gmm_plots:
     input:
         expand(
-            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_amount}}_{{walk_distance}}/summed_embeddings.h5",
+            f"results/classifier/summed_embeddings/{{cancers}}/{{walk_distance}}_{{walk_amount}}/summed_embeddings.h5",
             cancers=joined_cancers,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance
         )
+
     output:
         expand(
-        f"figures/classifier/{{cancers}}/umap/{{walk_distance}}_{{walk_amount}}/combined_summed_embeddings.png",
-        cancers=joined_cancers,
-        walk_distance= requested_walk_distance[-1],
-        walk_amount= requested_walk_amounts[-1]
+            f"figures/classifier/{{cancers}}/clustering/{{walk_distance}}_{{walk_amount}}_gmm_clustering.png",
+            cancers=joined_cancers,
+            walk_distance= requested_walk_distance[-1],
+            walk_amount= requested_walk_amounts[-1]
+        ),
+        expand(
+            f"figures/classifier/{{cancers}}/clustering/{{walk_distance}}_{{walk_amount}}_pca_clustering.png",
+            cancers=joined_cancers,
+            walk_distance= requested_walk_distance[-1],
+            walk_amount= requested_walk_amounts[-1]
         )
+
     run:
-        cancers=all_cancers
-        amount_of_walks=config['classifier_max_walk_amounts']
-        walk_distances=config['classifier_max_walk_distance']
-        shell(f"python ./src/classifier/plots/5_10_umap_grid_summed_embeddings.py -c {{cancers}} -d 3 {config['classifier_max_walk_amounts']}")
+        cancers = ' '.join(all_cancers)
+        for walk_distance in requested_walk_distance:
+            for walk in requested_walk_amounts:
+                shell(f"python3 src/classifier/plots/6_05_gmm_clustering.py -c {{cancers}} -w {{walk_distance}} -a {{walk}}")
+
 
 
 rule generate_generic_polar_plots:
