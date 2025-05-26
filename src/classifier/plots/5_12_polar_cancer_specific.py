@@ -51,7 +51,7 @@ def create_polar_line_plot(df, primary_cancer, ax, color_dict, all_combos, metri
 
     # Set the labels for each combination
     ax.set_xticks(angles[:-1])
-    all_combos_df['combo'] = all_combos_df['combo'].apply(lambda x: f"SC: {x.split('_')[0]} and R: {x.split('_')[1]}")
+    all_combos_df['combo'] = all_combos_df['combo'].apply(lambda x: f"SC: {x.split('_')[0]}\n R: {x.split('_')[1]}")
 
     # Now, set the tick labels
     ax.set_xticklabels(all_combos_df['combo'], fontsize=10)
