@@ -11,6 +11,10 @@ max_iterations = range(1,config['run_iterations'])
 rule all:
     input:
         expand(
+            f"figures/classifier/{{cancers}}/performance/overview_scores_heatmap_MCC.png",
+            cancers=joined_cancers
+        ),
+        expand(
             f"figures/classifier/{{cancers}}/clustering/{{walk_distance}}_{{walk_amount}}_gmm_clustering.png",
             cancers=joined_cancers,
             walk_distance= requested_walk_distance[-1],
@@ -276,7 +280,7 @@ rule create_history:
 rule create_performance_plots:
     input:
         expand(
-            f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/history.csv",
+            f"results/classifier/classification/{{cancers}}/{{walk_distance}}_{{walk_amount}}/{{iteration}}/results.csv",
             cancers=joined_cancers,
             walk_distance=requested_walk_distance,
             walk_amount=requested_walk_amounts,
@@ -293,6 +297,10 @@ rule create_performance_plots:
         ),
         expand(
             f"figures/classifier/{{cancers}}/performance/overview_scores.png",
+            cancers=joined_cancers
+        ),
+         expand(
+            f"figures/classifier/{{cancers}}/performance/overview_scores_heatmap_MCC.png",
             cancers=joined_cancers
         ),
         expand(
