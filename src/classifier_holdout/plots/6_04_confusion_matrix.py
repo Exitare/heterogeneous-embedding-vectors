@@ -24,7 +24,8 @@ if __name__ == '__main__':
 
     all_predictions = []
 
-    load_path = Path("results", "classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
+    load_path = Path("results", "classifier_modality_adjusted", "classification", cancers,
+                     f"{walk_distance}_{amount_of_walks}")
     for run_directory in load_path.iterdir():
         if run_directory.is_file():
             continue
@@ -48,6 +49,8 @@ if __name__ == '__main__':
     # visualize the confusion matrix
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
+    save_folder: Path = Path("figures", "classifier_modality_adjusted", cancers, "performance")
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+    plt.savefig(Path(save_folder, f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
                 dpi=300)
