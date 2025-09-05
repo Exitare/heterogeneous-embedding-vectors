@@ -7,6 +7,8 @@ import h5py
 import logging
 from argparse import ArgumentParser
 from pathlib import Path
+from sklearn.metrics import silhouette_score, silhouette_samples, pairwise_distances
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 fig_save_folder = Path("figures", "classifier_holdout")
@@ -75,6 +77,95 @@ if __name__ == '__main__':
     num_clusters = len(unique_cancers)  # Use the number of unique cancer types
     gmm = GaussianMixture(n_components=num_clusters, random_state=42)
     cluster_labels = gmm.fit_predict(X_data)
+
+    # ---------------------------------------------------------
+    # Silhouette analysis & intra/inter-cluster distance stats
+    # ---------------------------------------------------------
+
+    # (A) Silhouette using TRUE cancer labels (how well cancers separate in embedding space)
+    # Encode string labels for sklearn silhouette
+    _, cancer_inverse = np.unique(cancer_types, return_inverse=True)
+    sil_true_global = silhouette_score(X_data, cancer_inverse, metric='euclidean')
+
+    # (B) Silhouette using GMM cluster labels (how well the fitted clusters separate)
+    sil_gmm_global = silhouette_score(X_data, cluster_labels, metric='euclidean')
+
+    # (C) Per-sample silhouettes for TRUE labels, then aggregate by cancer type
+    sil_samples_true = silhouette_samples(X_data, cancer_inverse, metric='euclidean')
+    per_cancer_sil = (
+        pd.DataFrame({"cancer": cancer_types, "silhouette": sil_samples_true})
+        .groupby("cancer")["silhouette"]
+        .agg(["mean", "std", "count"])
+        .reset_index()
+        .rename(columns={"mean": "silhouette_mean", "std": "silhouette_std", "count": "n"})
+    )
+
+    # (D) Intra- and inter- cluster distances per cancer (exact mean pairwise distances)
+    #     - intra: mean of all pairwise distances within the cancer
+    #     - inter: for each other cancer, mean of all cross distances; take the minimum (nearest other cluster)
+    records = []
+    unique_cancers_list = list(np.unique(cancer_types))
+
+    for c in unique_cancers_list:
+        mask_c = (cancer_types == c)
+        Xc = X_data[mask_c]
+        # Intra distances (upper triangle to avoid double counting & zeros)
+        if Xc.shape[0] > 1:
+            d_intra = pairwise_distances(Xc, Xc, metric='euclidean')
+            tri = np.triu_indices_from(d_intra, k=1)
+            intra_mean = d_intra[tri].mean() if tri[0].size > 0 else np.nan
+        else:
+            intra_mean = np.nan
+
+        # Inter distances: mean distance to each other group's points; take the minimum
+        inter_means = []
+        for c2 in unique_cancers_list:
+            if c2 == c:
+                continue
+            Xo = X_data[cancer_types == c2]
+            if Xc.size > 0 and Xo.size > 0:
+                d_inter = pairwise_distances(Xc, Xo, metric='euclidean')
+                inter_means.append(d_inter.mean())
+        nearest_inter_mean = np.min(inter_means) if len(inter_means) else np.nan
+
+        # Class-level silhouette derived from intra/inter means
+        if np.isfinite(intra_mean) and np.isfinite(nearest_inter_mean) and max(intra_mean, nearest_inter_mean) > 0:
+            s_class = (nearest_inter_mean - intra_mean) / max(intra_mean, nearest_inter_mean)
+        else:
+            s_class = np.nan
+
+        records.append({
+            "cancer": c,
+            "intra_mean_dist": intra_mean,
+            "nearest_inter_mean_dist": nearest_inter_mean,
+            "silhouette_class_from_means": s_class,
+            "n_samples": int(mask_c.sum())
+        })
+
+    per_cancer_dist = pd.DataFrame(records)
+
+    # Merge per-cancer silhouette (from samples) with distance stats
+    per_cancer_summary = per_cancer_sil.merge(per_cancer_dist, on="cancer", how="outer")
+
+    # Print concise summary
+    logging.info(f"Global silhouette (TRUE cancer labels): {sil_true_global:.4f}")
+    logging.info(f"Global silhouette (GMM cluster labels): {sil_gmm_global:.4f}")
+    logging.info("Per-cancer summary:\n" + per_cancer_summary.sort_values("cancer").to_string(index=False))
+
+    # Save to CSV
+    metrics_folder = Path(fig_save_folder)  # you already created this
+    per_cancer_summary.to_csv(metrics_folder / f"{walk_distance}_{walk_amount}_silhouette_and_distances_by_cancer.csv",
+                              index=False)
+
+    # Optional: Save a compact text file with the two global scores
+    with open(metrics_folder / f"{walk_distance}_{walk_amount}_global_silhouette.txt", "w") as f:
+        f.write(f"Silhouette (TRUE cancer labels): {sil_true_global:.6f}\n")
+        f.write(f"Silhouette (GMM cluster labels):  {sil_gmm_global:.6f}\n")
+
+
+    ################################################################
+    ############# Visualization of Clustering Results ################
+    ################################################################
 
     # Manually map cancer types to colors use the color_palette
     cancer_palette = {cancer: color_palette[cancer] for cancer in unique_cancers}
