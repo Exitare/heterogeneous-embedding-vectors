@@ -184,7 +184,7 @@ if __name__ == "__main__":
     modalities = '_'.join(selected_modalities)
     cancers = "_".join(args.cancer)
 
-    load_folder = Path(load_folder, cancers, modalities, f"{walk_distance}_{walk_amount}")
+    load_folder = Path(load_folder, cancers, modalities, f"{walk_distance}_{walk_amount}", str(iteration))
     train_h5_file_path = Path(load_folder, "train_summed_embeddings.h5")
     test_h5_file_path = Path(load_folder, "test_summed_embeddings.h5")
 

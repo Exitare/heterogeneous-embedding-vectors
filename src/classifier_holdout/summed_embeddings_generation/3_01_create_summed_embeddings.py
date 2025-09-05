@@ -160,15 +160,17 @@ def main():
         "--load_path", "-l", type=str, default="results/embeddings",
         help="Path to the embeddings folder."
     )
-    parser.add_argument("--modalities", "-m", nargs="+", default=["rna", "annotations", "mutations", "images"],
+    parser.add_argument("--modalities", "-m", nargs="+", default=["annotations", "images","mutations",  "rna"],
                         help="Modalities to include in the summing process.",
-                        choices=["rna", "annotations", "mutations", "images"])
+                        choices=["annotations", "images","mutations",  "rna"])
+    parser.add_argument("--iteration", "-i", type=int, required=True)
     args = parser.parse_args()
 
     selected_cancers: List[str] = args.cancer
     walk_distance: int = args.walk_distance
     walk_amount: int = args.amount_of_walks
     selected_modalities: List[str] = args.modalities
+    iteration: int = args.iteration
 
     if len(selected_modalities) < 2:
         raise ValueError("At least two modalities must be selected for summing embeddings.")
@@ -181,10 +183,11 @@ def main():
     load_path: Path = Path(args.load_path)
 
     save_folder = Path("results", "classifier_holdout", "summed_embeddings", cancers, '_'.join(selected_modalities),
-                       f"{walk_distance}_{walk_amount}")
+                       f"{walk_distance}_{walk_amount}", str(iteration))
     save_folder.mkdir(parents=True, exist_ok=True)
 
     h5_load_path: Path = Path(load_path, f"{cancers}_classifier.h5")
+    output_file: Path = Path(save_folder, "summed_embeddings.h5")
     train_output_file: Path = Path(save_folder, "train_summed_embeddings.h5")
     test_output_file: Path = Path(save_folder, "test_summed_embeddings.h5")
 
@@ -253,6 +256,10 @@ def main():
 
     write_h5_data(summed_train_embeddings_data, train_output_file, walk_amount, selected_cancers)
     write_h5_data(summed_test_embeddings_data, test_output_file, walk_amount, selected_cancers)
+
+    # merge the train and test summed embeddings into one file for easier loading
+    all_summed_embeddings_data = summed_train_embeddings_data + summed_test_embeddings_data
+    write_h5_data(all_summed_embeddings_data, output_file, walk_amount, selected_cancers)
 
     logging.info(f"✅ Summed embeddings saved to {train_output_file} and {test_output_file}")
     logging.info(f"Total patients processed and saved: {patient_count}")

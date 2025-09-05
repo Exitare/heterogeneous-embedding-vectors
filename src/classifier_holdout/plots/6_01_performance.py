@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
 
-save_folder = Path("figures", "classifier_modality_adjusted")
+save_folder = Path("figures", "classifier_holdout")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 metrics = {
@@ -154,29 +154,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        if metric == "Precision":
-            v_min=0.85
-            v_max = 0.92
-        elif metric == "Recall":
-            v_min=0.82
-            v_max = 0.92
-        elif metric == "AUC":
-            v_min=0.95
-            v_max = 1
-        elif metric == "Accuracy":
-            v_min=0.82
-            v_max = 0.92
-        elif metric == "F1 Score":
-            v_min=0.82
-            v_max = 0.92
-        elif metric == "MCC":
-            v_min=0.80
-            v_max = 0.92
-        else:
-            print(f"Using fallback vmin and vmax for metric: {metric}.")
-            v_min=0.8
-            v_max = 0.9
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=v_min, vmax=v_max)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5)
 
         plt.title(f"{metric} Scores Heatmap")
         plt.xlabel("Sample Counts")
@@ -191,15 +169,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
+    parser.add_argument("--modalities", "-m", nargs="+", default=["annotations", "images", "mutations", "rna"],
+                        choices=["rna", "annotations", "mutations", "images"])
     args = parser.parse_args()
 
     selected_cancers = args.cancer
+    selected_modalities: list[str] = args.modalities
 
     logging.info(f"Using cancer types: {selected_cancers}")
+    logging.info(f"Using modalities: {selected_modalities}")
 
     cancers = "_".join(selected_cancers)
+    modalities = '_'.join(selected_modalities)
 
-    save_folder = Path(save_folder, cancers, "performance")
+    save_folder = Path(save_folder, cancers, modalities, "performance")
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
@@ -207,7 +190,7 @@ if __name__ == '__main__':
     # load all runs from results/classifier/classification
     results = []
     # iterate over all subfolders
-    cancer_folder = Path("results", "classifier_modality_adjusted", "classification", cancers)
+    cancer_folder = Path("results", "classifier_holdout", "classification", cancers, modalities)
     for run in cancer_folder.iterdir():
         if run.is_file():
             continue

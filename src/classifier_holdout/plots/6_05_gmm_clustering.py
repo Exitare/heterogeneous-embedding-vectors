@@ -32,7 +32,7 @@ if __name__ == '__main__':
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--walk_amount", "-a", required=False, type=int, help="The walk amount.", default=3)
     parser.add_argument("--walk_distance", "-w", required=False, type=int, help="The walk distance.", default=3)
-    parser.add_argument("--modalities", "-m", nargs="+", default=["rna", "annotations", "mutations", "images"],
+    parser.add_argument("--modalities", "-m", nargs="+", default=["annotations", "images", "mutations", "rna"],
                         help="Modalities to include in the summing process.",
                         choices=["rna", "annotations", "mutations", "images"])
     args = parser.parse_args()
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         fig_save_folder.mkdir(parents=True)
 
     h5_file_path = Path("results", "classifier_holdout", "summed_embeddings", selected_cancers, selected_modalities,
-                        f"{walk_amount}_{walk_distance}", "summed_embeddings.h5")
+                        f"{walk_amount}_{walk_distance}", "0", "summed_embeddings.h5")
     logging.info(f"Loading embeddings from {h5_file_path}")
 
     # Load embeddings and cancer types

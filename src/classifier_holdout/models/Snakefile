@@ -45,11 +45,10 @@ rule all:
             iteration=run_iterations
         )
 
-# === Rule: run classification for one specific combination ===
 rule run_classification:
     input:
-        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/train_summed_embeddings.h5",
-        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/test_summed_embeddings.h5"
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5"
     output:
         "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
         "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
