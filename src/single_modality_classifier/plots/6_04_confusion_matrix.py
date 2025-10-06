@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import argparse
 from pathlib import Path
 import pandas as pd
@@ -7,47 +8,62 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
-                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
-    parser.add_argument("--walk_distance", "-w", type=int, required=True,
-                        help="The walk distance used for the classification.")
-    parser.add_argument("--amount_of_walks", "-a", type=int, required=True,
-                        help="The amount of walks used for the classification.")
+FIG_ROOT = Path("figures", "single_modality_classifier")
+CLASS_ROOT = Path("results", "single_modality_classifier", "classification")
+
+def main():
+    parser = argparse.ArgumentParser(description="Aggregate predictions and plot confusion matrix")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False,
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"],
+                        help="Cancer types to work with.")
+    parser.add_argument("--selected_modality", "-sm", type=str, required=True,
+                        choices=["rna", "annotations", "mutations", "images"],
+                        help="Modality used for classification (matches training output).")
     args = parser.parse_args()
 
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
-    walk_distance = args.walk_distance
-    amount_of_walks = args.amount_of_walks
+    modality: str = args.selected_modality
+
+    # results/single_modality_classifier/classification/{CANCERS}/{MODALITY}/{ITER}/predictions.csv
+    load_path = CLASS_ROOT / cancers / modality
+    if not load_path.exists():
+        raise FileNotFoundError(f"Classification folder not found: {load_path}")
 
     all_predictions = []
-
-    load_path = Path("results", "classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
-    for run_directory in load_path.iterdir():
-        if run_directory.is_file():
+    for run_dir in sorted(load_path.iterdir()):
+        if not run_dir.is_dir():
             continue
+        pred_csv = run_dir / "predictions.csv"
+        if pred_csv.exists():
+            logging.info(f"Loading {pred_csv}")
+            all_predictions.append(pd.read_csv(pred_csv))
 
-        path: Path
-        for path in run_directory.iterdir():
-            if path.is_dir():
-                continue
+    if not all_predictions:
+        raise FileNotFoundError(f"No predictions.csv found under {load_path}/*/")
 
-            if "predictions.csv" in str(path):
-                logging.info(f"Loading {path}")
-                predictions = pd.read_csv(path)
-                all_predictions.append(predictions)
+    predictions = pd.concat(all_predictions, ignore_index=True)
 
-    predictions = pd.concat(all_predictions)
+    # Build confusion matrix (use sorted labels for stable axes)
+    true_labels = predictions["y_test_decoded"].astype(str)
+    pred_labels = predictions["y_pred_decoded"].astype(str)
+    labels = sorted(set(true_labels) | set(pred_labels))
 
-    # create confusion matrix
-    confusion_matrix = pd.crosstab(predictions["y_test_decoded"], predictions["y_pred_decoded"], rownames=['True'],
-                                   colnames=['Predicted'])
+    confusion_matrix = pd.crosstab(true_labels, pred_labels,
+                                   rownames=["True"], colnames=["Predicted"]).reindex(index=labels, columns=labels, fill_value=0)
 
-    # visualize the confusion matrix
+    # Save figure
+    fig_save_folder = FIG_ROOT / cancers / modality / "performance"
+    fig_save_folder.mkdir(parents=True, exist_ok=True)
+
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
-                dpi=300)
+    plt.title(f"Confusion Matrix • {modality.capitalize()} • {' '.join(cancers.split('_'))}")
+    plt.tight_layout()
+    out_path = fig_save_folder / "confusion_matrix.png"
+    plt.savefig(out_path, dpi=300)
+    plt.close()
+    logging.info(f"Saved confusion matrix to: {out_path}")
+
+if __name__ == "__main__":
+    main()
