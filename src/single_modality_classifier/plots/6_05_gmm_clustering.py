@@ -1,7 +1,6 @@
 from sklearn.mixture import GaussianMixture
 from sklearn.decomposition import PCA
 import numpy as np
-import seaborn as sns  # optional; not strictly required but kept per your import
 import matplotlib.pyplot as plt
 import h5py
 import logging
@@ -10,10 +9,8 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Where figures will be saved
 FIG_ROOT = Path("figures", "single_modality_classifier")
 
-# Consistent palette (falls back to default if key not found)
 COLOR_PALETTE = {
     "Annotation": "#c8b7b7ff",
     "Image": "#d38d5fff",

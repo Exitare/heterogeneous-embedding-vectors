@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import argparse
 from pathlib import Path
 import pandas as pd
@@ -22,11 +21,10 @@ def main():
     args = parser.parse_args()
 
     selected_cancers = args.cancer
-    cancers = "_".join(selected_cancers)
+    cancers: str = "_".join(selected_cancers)
     modality: str = args.selected_modality
 
-    # results/single_modality_classifier/classification/{CANCERS}/{MODALITY}/{ITER}/predictions.csv
-    load_path = CLASS_ROOT / cancers / modality
+    load_path: Path = Path(CLASS_ROOT,cancers, modality)
     if not load_path.exists():
         raise FileNotFoundError(f"Classification folder not found: {load_path}")
 
@@ -53,7 +51,7 @@ def main():
                                    rownames=["True"], colnames=["Predicted"]).reindex(index=labels, columns=labels, fill_value=0)
 
     # Save figure
-    fig_save_folder = FIG_ROOT / cancers / modality / "performance"
+    fig_save_folder: Path = Path(FIG_ROOT, cancers, modality, "performance")
     fig_save_folder.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(10, 7))

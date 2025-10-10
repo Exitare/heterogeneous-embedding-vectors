@@ -1,18 +1,10 @@
-#!/usr/bin/env python3
 from pathlib import Path
 import pandas as pd
 import argparse
 import logging
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-# Try to import statannotations; fall back gracefully if missing
-try:
-    from statannotations.Annotator import Annotator
-
-    HAS_STATANNOTATIONS = True
-except Exception:
-    HAS_STATANNOTATIONS = False
+from statannotations.Annotator import Annotator
 
 # ------- Config -------
 FIG_ROOT = Path("figures", "single_modality_classifier")
