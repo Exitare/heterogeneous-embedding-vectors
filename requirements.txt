@@ -10,3 +10,6 @@ networkx
 node2vec
 umap-learn
 statannotations
+snakemake
+sentence_transformers
+tf-keras

@@ -1,6 +1,7 @@
-import netvae
+from embkit.layers import LayerInfo
+from embkit.models.vae import NetVAE
 import pandas as pd
-import keras
+import torch
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -48,20 +49,38 @@ if __name__ == '__main__':
     # Drop submitter_id & cancer from training data
     X.drop(columns=["submitter_id", "cancer"], inplace=True)
 
-    # Add early stopping
-    early_stopping = keras.callbacks.EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)
+    enc_layers: list[LayerInfo] = [
+        LayerInfo(X.shape[1], activation="relu"),
+        LayerInfo(latent_dim, activation="relu"),
+    ]
+
+    dec_layers: list[LayerInfo] = [
+        LayerInfo(X.shape[1], activation=None),
+    ]
 
     # Build VAE
-    X_encoder = netvae.build_encoder(X.shape[1], latent_dim)  # All remaining columns are used
-    X_decoder = netvae.build_decoder(X.shape[1], latent_dim)
-    X_vae = netvae.VAE(features=X.columns, encoder=X_encoder, decoder=X_decoder)
-    X_vae.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate))
+    X_encoder = NetVAE.build_encoder(X.shape[1], latent_dim, layers=enc_layers)  # All remaining columns are used
+    X_decoder = NetVAE.build_decoder(X.shape[1], latent_dim, layers=dec_layers)
+
+    X_vae = NetVAE(features=X.columns, encoder=X_encoder, decoder=X_decoder)
 
     # Train VAE
-    history = X_vae.fit(X, epochs=epochs, batch_size=batch_size, shuffle=True, callbacks=[early_stopping])
+    history = X_vae.fit(X, epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
 
-    # Generate embeddings
-    embeddings = pd.DataFrame(X_vae.encoder.predict(X)[0])
+    # Generate embeddings (PyTorch style - UPDATED)
+    X_vae.eval()
+    with torch.no_grad():
+        X_tensor = torch.tensor(X.values, dtype=torch.float32)
+
+        # Move to same device as model
+        device = next(X_vae.parameters()).device
+        X_tensor = X_tensor.to(device)
+
+        # encoder returns (mu, logvar, z)
+        mu, logvar, z = X_vae.encoder(X_tensor)
+        embeddings_array = mu.cpu().numpy()
+
+    embeddings = pd.DataFrame(embeddings_array)
 
     # Ensure correct number of columns
     assert embeddings.shape[1] == latent_dim, f"Expected {latent_dim} columns, got {embeddings.shape[1]} instead."

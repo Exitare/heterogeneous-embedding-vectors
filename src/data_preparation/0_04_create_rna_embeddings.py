@@ -1,94 +1,54 @@
-import os, time, argparse
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Layer
-from tensorflow.keras import optimizers
-from tensorflow.keras.callbacks import Callback
-from tensorflow.keras import backend as K
-import tensorflow as tf
+import argparse
+import torch
 import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler
+from embkit.models.vae import RNAVAE
+from embkit import get_device
 
 save_folder = Path("results", "embeddings", "rna")
 cancer_load_path = Path("data", "rna")
-latent_dim = 768
-
-
-def compute_latent(x):
-    mu, sigma = x
-    batch = K.shape(mu)[0]
-    dim = K.shape(mu)[1]
-    eps = K.random_normal(shape=(batch, dim), mean=0., stddev=1.0)
-    return mu + K.exp(sigma / 2) * eps
-
-
-class CustomVariationalLayer(Layer):
-    """
-    Define a custom layer for Variational Autoencoder with loss calculation
-    """
-
-    def __init__(self, **kwargs):
-        super(CustomVariationalLayer, self).__init__(**kwargs)
-
-    def vae_loss(self, x_input, x_decoded, z_mean_encoded, z_log_var_encoded, beta):
-        reconstruction_loss = feature_dim * tf.keras.losses.binary_crossentropy(x_input, x_decoded)
-        kl_loss = -0.5 * K.sum(1 + z_log_var_encoded - K.square(z_mean_encoded) - K.exp(z_log_var_encoded), axis=-1)
-        total_loss = K.mean(reconstruction_loss + 5 * (beta * kl_loss))
-        return total_loss
-
-    def call(self, inputs):
-        x = inputs[0]
-        x_decoded = inputs[1]
-        z_mean_encoded = inputs[2]
-        z_log_var_encoded = inputs[3]
-        beta = inputs[4]
-        loss = self.vae_loss(x, x_decoded, z_mean_encoded, z_log_var_encoded, beta)
-        self.add_loss(loss)
-        return x_decoded
-
-
-class WarmUpCallback(Callback):
-    def __init__(self, beta, kappa):
-        super(WarmUpCallback, self).__init__()
-        self.beta = beta
-        self.kappa = kappa
-
-    def on_epoch_end(self, epoch, logs=None):
-        new_beta = K.get_value(self.beta) + self.kappa
-        K.set_value(self.beta, new_beta if new_beta < 1 else 1)
-
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False,default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"],
+                        help="The cancer types to work with.")
+    parser.add_argument("--latent_dim", "-ld", type=int, default=768,
+                        help="The latent dimension for the VAE.")
 
     args = parser.parse_args()
 
     pre_train_epochs = args.pre_train_epochs
     fine_tune_epochs = args.fine_tune_epochs
     selected_cancers = args.cancer
+    latent_dim: int = args.latent_dim
 
     cancers = "_".join(selected_cancers)
-    save_folder = Path(save_folder, cancers)
+    if latent_dim == 768:
+        save_folder = Path(save_folder, cancers)
+    else:
+        save_folder = Path(save_folder, str(latent_dim), cancers)
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
+    # Load cancer data
     cancer_df = []
     for cancer in selected_cancers:
-        df = pd.read_csv(Path(cancer_load_path, cancer.upper(), f"data.csv"), index_col=0, nrows=1000)
+        df = pd.read_csv(
+            Path(cancer_load_path, cancer.upper(), f"data.csv"),
+            index_col=0,
+            nrows=1000
+        )
         df["Cancer"] = cancer
         cancer_df.append(df)
 
     data = pd.concat(cancer_df, axis=0)
     data.reset_index(drop=True, inplace=True)
 
-    # check that all columns to be float
+    # Check that all columns are float
     for column in data.columns:
         if column == "Cancer" or column == "Patient":
             continue
@@ -96,81 +56,92 @@ if __name__ == '__main__':
             print(f"{column} is not float. Converting...")
             data[column] = data[column].astype(float)
 
-    cancer_types = data["Cancer"]
-    patient_ids = data["Patient"]
+    # Extract metadata
+    cancer_types = data["Cancer"].values
+    patient_ids = data["Patient"].values
 
-    # drop the cancer column
-    data.drop(columns=["Cancer"], inplace=True)
-    data.drop(columns=["Patient"], inplace=True)
+    # Drop metadata columns
+    data.drop(columns=["Cancer", "Patient"], inplace=True)
 
-    # assert not cancer or patient colunms are in data
+    # Assertions
     assert "Cancer" not in data.columns, "Cancer column should not be present"
     assert "Patient" not in data.columns, "Patient column should not be present"
 
-    # scale the data
-    data = pd.DataFrame(MinMaxScaler().fit_transform(data), columns=data.columns)
+    # Scale the data (MinMaxScaler to [0, 1] range)
+    scaler = MinMaxScaler()
+    data_scaled = pd.DataFrame(
+        scaler.fit_transform(data),
+        columns=data.columns,
+        index=data.index
+    )
 
-    feature_dim = len(data.columns)
-
+    feature_dim = len(data_scaled.columns)
     batch_size = 512
 
-    encoder_inputs = keras.Input(shape=(feature_dim,))
-    # add dense layer
-    x = layers.Dense(feature_dim // 2, activation='relu')(encoder_inputs)
-    x = layers.Dense(feature_dim // 3, activation='relu')(x)
-    z_mean_dense_linear = layers.Dense(
-        latent_dim, kernel_initializer='glorot_uniform', name="encoder_1")(x)
-    z_mean_dense_batchnorm = layers.BatchNormalization()(z_mean_dense_linear)
-    z_mean_encoded = layers.Activation('relu')(z_mean_dense_batchnorm)
+    print(f"Feature dimension: {feature_dim}")
+    print(f"Latent dimension: {latent_dim}")
+    print(f"Number of samples: {len(data_scaled)}")
+    print(f"Cancer types: {selected_cancers}")
+    print(f"Save folder: {save_folder}")
 
-    z_log_var_dense_linear = layers.Dense(
-        latent_dim, kernel_initializer='glorot_uniform', name="encoder_2")(x)
-    z_log_var_dense_batchnorm = layers.BatchNormalization()(z_log_var_dense_linear)
-    z_log_var_encoded = layers.Activation('relu')(z_log_var_dense_batchnorm)
+    # Create RNAVAE model
+    rna_vae = RNAVAE(
+        features=data_scaled.columns.tolist(),
+        latent_dim=latent_dim,
+        lr=0.0005,
+        batch_norm=True
+    )
 
-    latent_space = layers.Lambda(
-        compute_latent, output_shape=(
-            latent_dim,), name="latent_space")([z_mean_encoded, z_log_var_encoded])
+    # Train with beta warmup
+    print("\nTraining RNA VAE with beta warmup...")
+    print(f"Using devive: {get_device()}")
+    history = rna_vae.fit(
+        data_scaled,
+        epochs=pre_train_epochs,
+        batch_size=batch_size,
+        kappa=1.0,
+        early_stopping_patience=3,
+        progress=True
+    )
 
-    decoder_to_reconstruct = layers.Dense(
-        feature_dim, kernel_initializer='glorot_uniform', activation='sigmoid')
-    decoder_outputs = decoder_to_reconstruct(latent_space)
+    # Generate embeddings
+    print("\nGenerating embeddings...")
+    rna_vae.eval()
+    with torch.no_grad():
+        X_tensor = torch.tensor(data_scaled.values, dtype=torch.float32)
 
-    learning_rate = 0.0005
+        # Move to same device as model
+        device = next(rna_vae.parameters()).device
+        X_tensor = X_tensor.to(device)
 
-    kappa = 1
-    beta = K.variable(0)
+        # Get latent representation (mu)
+        mu, logvar, z = rna_vae.encoder(X_tensor)
+        latent_space_array = mu.cpu().numpy()
 
-    adam = optimizers.Adam(learning_rate=learning_rate)
-    vae_layer = CustomVariationalLayer()([encoder_inputs, decoder_outputs, z_mean_encoded, z_log_var_encoded, beta])
-    vae = Model(encoder_inputs, vae_layer)
-    vae.compile(optimizer=adam, loss=None, loss_weights=[beta])
+    # Create latent space DataFrame
+    latent_space = pd.DataFrame(latent_space_array, index=data_scaled.index)
 
-    pre_train_epochs = pre_train_epochs
-    # add early stopping callback
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3)
-    fit_start = time.time()
-    history = vae.fit(data,
-                      epochs=pre_train_epochs,
-                      batch_size=batch_size,
-                      shuffle=True,
-                      callbacks=[WarmUpCallback(beta, kappa), early_stopping],
-                      verbose=1)
-
-    encoder = Model(encoder_inputs, z_mean_encoded)
-    decoder_input = keras.Input(shape=(latent_dim,))
-    _x_decoded_mean = decoder_to_reconstruct(decoder_input)
-    decoder = Model(decoder_input, _x_decoded_mean)
-
-    decoded = pd.DataFrame(decoder.predict(encoder.predict(data)), columns=data.columns)
-
-    latent_space = pd.DataFrame(encoder.predict(data), index=data.index)
-
-    # assign cancer types to latent space
+    # Add metadata
     latent_space["cancer"] = cancer_types
     latent_space["submitter_id"] = patient_ids
 
-    # iterate through all cancer types and the save the subset of the latent space
+    # Save embeddings for each cancer type
+    print("\nSaving embeddings...")
     for cancer in selected_cancers:
         subset = latent_space[latent_space["cancer"] == cancer].copy()
-        subset.to_csv(Path(save_folder, f"{cancer.lower()}_embeddings.csv"), index=False)
+        output_path = Path(save_folder, f"{cancer.lower()}_embeddings.csv")
+        subset.to_csv(output_path, index=False)
+        print(f"Saved {len(subset)} embeddings for {cancer} to {output_path}")
+
+    # Optionally save the model
+    model_path = Path(save_folder, "rna_vae_model")
+    rna_vae.save(str(model_path))
+    print(f"\nModel saved to {model_path}")
+
+    # Print training summary
+    print("\n=== Training Summary ===")
+    print(f"Final loss: {history['loss'][-1]:.4f}")
+    print(f"Final reconstruction loss: {history['recon'][-1]:.4f}")
+    print(f"Final KL loss: {history['kl'][-1]:.4f}")
+    print(f"Final beta: {history['beta'][-1]:.4f}")
+    print(f"Total epochs: {len(history['loss'])}")
