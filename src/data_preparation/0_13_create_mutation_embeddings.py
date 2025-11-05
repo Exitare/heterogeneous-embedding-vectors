@@ -10,22 +10,29 @@ tf_min_size = 3
 learning_rate = 1e-4
 batch_size = 256
 epochs = 50
-latent_dim = 768
 rotation_factor = 0.3
 
 # Save path
-save_folder = Path("results", "embeddings")
+
 
 if __name__ == '__main__':
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
 
     parser = ArgumentParser(description='Create mutation embeddings.')
     parser.add_argument("--data", "-d", type=Path, help="The path to the data.", required=True)
+    parser.add_argument("--latent_dim", "-ld", type=int, default=768, help="The latent dimension for the VAE.")
     args = parser.parse_args()
 
     data: Path = args.data
     epochs: int = 250
+    latent_dim: int = args.latent_dim
+
+    if latent_dim == 768:
+        save_folder = Path("results", "embeddings")
+    else:
+        save_folder = Path("results", "embeddings", "mutations", str(latent_dim))
+
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
 
     # Load lookup table
     lookup: pd.DataFrame = pd.read_csv(Path("results", "embeddings", "lookup.csv"))
@@ -91,7 +98,8 @@ if __name__ == '__main__':
 
     print(embeddings)
     # assert that there are 6 unique cancer types
-    assert embeddings["cancer"].nunique() == 6, f"Expected 6 unique cancer types, got {embeddings['cancer'].nunique()} instead."
+    assert embeddings[
+               "cancer"].nunique() == 6, f"Expected 6 unique cancer types, got {embeddings['cancer'].nunique()} instead."
     # Save results
     embeddings.to_csv(Path(save_folder, "mutation_embeddings.csv"), index=False)
 

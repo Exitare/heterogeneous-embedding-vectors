@@ -1,0 +1,172 @@
+# Snakefile
+
+configfile: "./config.yaml"
+
+# --- Inputs / constants -------------------------------------------------------
+all_cancers      = config["cancers"]                    # e.g. ["BRCA","LUAD","STAD","BLCA","COAD","THCA"]
+joined_cancers   = "_".join(all_cancers)                # e.g. "BRCA_LUAD_STAD_BLCA_COAD_THCA"
+lower_cancers    = [c.lower() for c in all_cancers]
+latent_dims      = [50,100,150,200,250,300,350,400,450,500,550,600,650,700,768]
+
+def rna_output_for(ld: int, cancer: str) -> str:
+    base = "results/embeddings/rna"
+    if ld == 768:
+        # RNAVAE default saves under .../rna/{joined}/{cancer}_embeddings.csv
+        return f"{base}/{joined_cancers}/{cancer}_embeddings.csv"
+    else:
+        # Non-default ld saves under .../rna/{ld}/{joined}/{cancer}_embeddings.csv
+        return f"{base}/{ld}/{joined_cancers}/{cancer}_embeddings.csv"
+
+def mut_output_for(ld: int) -> str:
+    if ld == 768:
+        return "results/embeddings/mutation_embeddings.csv"
+    else:
+        return f"results/embeddings/mutations/{ld}/mutation_embeddings.csv"
+
+def h5_output_for(ld: int) -> str:
+    if ld == 768:
+        return f"results/embeddings/h5/{joined_cancers}_classifier.h5"
+    else:
+        return f"results/embeddings/h5/{ld}/{joined_cancers}_classifier.h5"
+
+
+# --- Final targets ------------------------------------------------------------
+# The ultimate outputs are the H5 classifier files for each latent dimension
+h5_targets = [h5_output_for(ld) for ld in latent_dims]
+
+rule all:
+    input:
+        # H5 classifier files are the ultimate outputs
+        h5_targets
+
+
+# --- Data acquisition ---------------------------------------------------------
+rule download_case_manifest:
+    output:
+        "data/annotations/case_manifest.json"
+    shell:
+        "python ./src/data_preparation/0_03_download_case_manifest.py -d data/annotations/ > {output}"
+
+rule download_annotations:
+    input:
+        "data/annotations/case_manifest.json"
+    output:
+        "data/annotations/download_complete.txt"
+    shell:
+        "python ./src/data_preparation/0_02_download_annotations.py -d data/annotations/ > {output}"
+
+rule download_rna_data:
+    output:
+        "data/rna/{cancer}/data.csv"
+    params:
+        credentials=lambda wc: config["credentials_file"]
+    shell:
+        """
+        python ./src/data_preparation/0_01_download_rna_data.py \
+            --cancer {wildcards.cancer} \
+            --credentials {params.credentials} > {output}
+        """
+
+rule download_mutations_data:
+    output:
+        "data/mutations/mutations.csv"
+    params:
+        credentials=lambda wc: config["credentials_file"]
+    shell:
+        "python ./src/data_preparation/0_05_download_mutations.py --credentials {params.credentials} > {output}"
+
+
+# --- Embedding generation: RNA ------------------------------------------------
+# For ld=768: special output location
+rule create_rna_embeddings_768:
+    input:
+        expand("data/rna/{cancer}/data.csv", cancer=all_cancers)
+    output:
+        expand("results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
+               joined=joined_cancers, cancer=lower_cancers)
+    params:
+        cancers=" ".join(all_cancers),
+        ld=768
+    shell:
+        "python ./src/data_preparation/0_04_create_rna_embeddings.py -c {params.cancers} -ld {params.ld}"
+
+# For ld != 768: different output location pattern
+rule create_rna_embeddings_custom:
+    input:
+        expand("data/rna/{cancer}/data.csv", cancer=all_cancers)
+    output:
+        expand("results/embeddings/rna/{{ld}}/{joined}/{cancer}_embeddings.csv",
+               joined=joined_cancers, cancer=lower_cancers)
+    params:
+        cancers=" ".join(all_cancers)
+    wildcard_constraints:
+        ld=r"(50|100|150|200|250|300|350|400|450|500|550|600|650|700)"
+    shell:
+        "python ./src/data_preparation/0_04_create_rna_embeddings.py -c {params.cancers} -ld {wildcards.ld}"
+
+
+# --- Embedding generation: Mutations -----------------------------------------
+# For ld=768: special output location
+rule create_mutation_embeddings_768:
+    input:
+        "data/mutations/mutations.csv"
+    output:
+        "results/embeddings/mutation_embeddings.csv"
+    params:
+        ld=768
+    shell:
+        "python ./src/data_preparation/0_13_create_mutation_embeddings.py -d {input} -ld {params.ld}"
+
+# For ld != 768: different output location
+rule create_mutation_embeddings_custom:
+    input:
+        "data/mutations/mutations.csv"
+    output:
+        "results/embeddings/mutations/{ld}/mutation_embeddings.csv"
+    wildcard_constraints:
+        ld=r"(50|100|150|200|250|300|350|400|450|500|550|600|650|700)"
+    shell:
+        "python ./src/data_preparation/0_13_create_mutation_embeddings.py -d {input} -ld {wildcards.ld}"
+
+
+# --- H5 Classifier generation -------------------------------------------------
+# For ld=768: special paths
+rule create_h5_classifier_768:
+    input:
+        annotation_emb=f"results/embeddings/annotations/{joined_cancers}/embeddings.csv",
+        mutation_emb="results/embeddings/mutation_embeddings.csv",
+        rna_emb=expand("results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
+                      joined=joined_cancers, cancer=lower_cancers)
+    output:
+        f"results/embeddings/h5/{joined_cancers}_classifier.h5"
+    params:
+        cancers=" ".join(all_cancers),
+        ld=768
+    shell:
+        """
+        python ./src/data_preparation/latent_dim_adjustments/create_h5_classifier.py \
+            -c {params.cancers} \
+            -ld {params.ld}
+        """
+
+# For ld != 768: different paths
+rule create_h5_classifier_custom:
+    input:
+        annotation_emb=f"results/embeddings/annotations/{joined_cancers}/embeddings.csv",
+        mutation_emb="results/embeddings/mutations/{ld}/mutation_embeddings.csv",
+        rna_emb=expand("results/embeddings/rna/{{ld}}/{joined}/{cancer}_embeddings.csv",
+                      joined=joined_cancers, cancer=lower_cancers)
+    output:
+        "results/embeddings/h5/{ld}/{joined}_classifier.h5"
+    params:
+        cancers=" ".join(all_cancers)
+    wildcard_constraints:
+        ld=r"(50|100|150|200|250|300|350|400|450|500|550|600|650|700)",
+        joined=joined_cancers.replace("_", r"\_") if "_" in joined_cancers else joined_cancers
+    shell:
+        """
+        python ./src/data_preparation/latent_dim_adjustments/create_h5_classifier.py \
+            -c {params.cancers} \
+            -ld {wildcards.ld}
+        """
+
