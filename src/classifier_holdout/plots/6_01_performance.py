@@ -241,7 +241,7 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
             index="walk_distance", columns="amount_of_walks", values="score", aggfunc="mean"
         )
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5)
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.83, vmax=0.92)
         plt.title(f"{metric} Scores Heatmap")
         plt.xlabel("Sample Counts")
         plt.ylabel("Repeats")

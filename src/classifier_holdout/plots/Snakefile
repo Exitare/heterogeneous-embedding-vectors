@@ -20,6 +20,7 @@ cancer_arg = ' '.join(all_cancers)
 def modality_to_cli(modality_combo):
     return modality_combo.replace('_', ' ')
 
+
 rule all:
     input:
         expand(
