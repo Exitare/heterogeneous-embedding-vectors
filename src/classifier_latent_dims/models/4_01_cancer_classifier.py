@@ -13,6 +13,7 @@ from collections import defaultdict
 from collections import Counter
 import logging
 from typing import List
+import time
 
 
 
@@ -50,6 +51,10 @@ def create_tf_dataset_from_array(X, y, batch_size):
 
 def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_folder: Path, iteration: int,
                              walk_distance: int, amount_of_walks: int, label_encoder, feature_dimension: int):
+    
+    logging.info("Building model...")
+    model_start = time.time()
+    
     input_layer = tf.keras.layers.Input(shape=(feature_dimension,))
 
     x = BatchNormalization()(input_layer)
@@ -66,6 +71,12 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
 
     model = tf.keras.models.Model(inputs=input_layer, outputs=output_layer)
     model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    
+    model_time = time.time() - model_start
+    logging.info(f"Model built in {model_time:.2f} seconds")
+    
+    logging.info("Starting training...")
+    train_start = time.time()
 
     history = model.fit(train_ds,
                         epochs=50,
@@ -75,6 +86,12 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
                             tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=5, mode='max',
                                                              restore_best_weights=True)
                         ])
+    
+    train_time = time.time() - train_start
+    logging.info(f"Training completed in {train_time:.2f} seconds")
+    
+    logging.info("Evaluating on test set...")
+    eval_start = time.time()
 
     loss, accuracy = model.evaluate(test_ds)
     logging.info(f"Test Loss: {loss}, Test Accuracy: {accuracy}")
@@ -90,6 +107,9 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     y_test = np.array(y_test)
     y_pred = np.array(y_pred)
     y_pred_proba = np.array(y_pred_proba)
+    
+    eval_time = time.time() - eval_start
+    logging.info(f"Evaluation completed in {eval_time:.2f} seconds")
 
     predictions = pd.DataFrame({
         "y_test": y_test,
@@ -160,7 +180,22 @@ def train_and_evaluate_model(train_ds, val_ds, test_ds, num_classes: int, save_f
     model.save(Path(save_folder, f"model.keras"))
     history_df = pd.DataFrame(history.history)
     history_df.to_csv(Path(save_folder, f"history.csv"), index=False)
-    logging.info("Model and history saved.")
+    
+    # Save timing information
+    total_time = model_time + train_time + eval_time
+    benchmark_df = pd.DataFrame([{
+        'framework': 'tensorflow',
+        'model_build_time': model_time,
+        'train_time': train_time,
+        'eval_time': eval_time,
+        'total_time': total_time,
+        'iteration': iteration,
+        'walk_distance': walk_distance,
+        'amount_of_walks': amount_of_walks
+    }])
+    benchmark_df.to_csv(Path(save_folder, f"benchmark.csv"), index=False)
+    
+    logging.info("Model, history, and benchmark saved.")
 
 
 if __name__ == "__main__":

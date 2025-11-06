@@ -63,7 +63,7 @@ rule run_classification:
     threads: 1
     shell:
         """
-        python ./src/classifier_latent_dims/models/4_01_cancer_classifier.py \
+        python ./src/classifier_latent_dims/models/4_01_cancer_classifier_pytorch.py \
             -c {params.cancer_list} \
             -a {wildcards.walk_amount} \
             -w {wildcards.walk_distance} \
