@@ -11,6 +11,9 @@ requested_walk_distance = range(5, 5 + 1)
 
 run_iterations = range(config['run_iterations'])
 
+# Define all latent dimensions to process
+latent_dims = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700]
+
 cancer_arg = ' '.join(all_cancers)
 
 modality_combinations = [
@@ -21,37 +24,40 @@ modality_combinations = [
 rule all:
     input:
         expand(
-            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
+            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
             cancers=[joined_cancers],
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             iteration=run_iterations
         ),
         expand(
-            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
+            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
             cancers=[joined_cancers],
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             iteration=run_iterations
         ),
         expand(
-            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+            "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
             cancers=[joined_cancers],
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             iteration=run_iterations
         )
 
 rule create_summed_embeddings:
     input:
-        f"results/embeddings/{joined_cancers}_classifier.h5"
+        "results/embeddings/h5/{latent_dim}/{cancers}_classifier.h5"
     output:
-        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
-        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
-        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5"
+        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
+        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5"
     params:
         cancer_list=cancer_arg,
         modality_string=lambda wildcards: wildcards.modalities.replace('_', ' ')
@@ -62,5 +68,6 @@ rule create_summed_embeddings:
             -a {wildcards.walk_amount} \
             -w {wildcards.walk_distance} \
             -m {params.modality_string} \
-            -i {wildcards.iteration}
+            -i {wildcards.iteration} \
+            -ld {wildcards.latent_dim}
         """

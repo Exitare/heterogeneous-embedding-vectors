@@ -12,10 +12,10 @@ CHUNK_SIZE = 100000  # For processing large image datasets
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def write_h5_data(summed_embeddings_data: List[Tuple[np.ndarray, str, str]], output_file, walk_amount, selected_cancers):
+def write_h5_data(summed_embeddings_data: List[Tuple[np.ndarray, str, str]], output_file, walk_amount, selected_cancers, latent_dim):
     # ✅ Save summed embeddings to HDF5
     with h5py.File(output_file, "w") as out_file:
-        shape = LATENT_DIM * walk_amount
+        shape = latent_dim * walk_amount
         # Initialize datasets with zero rows and allow them to grow
         out_file.create_dataset("X", (0, shape), maxshape=(None, shape), dtype="float32")
         out_file.create_dataset("y", (0,), maxshape=(None,), dtype=h5py.string_dtype())
@@ -67,18 +67,25 @@ def write_h5_data(summed_embeddings_data: List[Tuple[np.ndarray, str, str]], out
             out_file["submitter_ids"][current_size_id:current_size_id + len(submitter_ids)] = submitter_ids
 
 
-def sum_random_embeddings(patient_id: str, patient_data: Dict[str, np.ndarray], walk_distance: int,
-                          walk_amount: int, modalities: List[str]) -> np.ndarray:
+def sum_patient_embeddings(patient_data: Dict[str, np.ndarray], walk_amount: int, walk_distance: int,
+                          selected_modalities: List[str], latent_dim: int) -> np.ndarray:
     """
-    Creates summed embeddings by randomly selecting embeddings from available modalities.
+    Sums embeddings for a patient using random walks.
+
+    Args:
+        patient_data (Dict[str, np.ndarray]): Available embeddings for each modality.
+        walk_amount (int): Number of random walks to perform.
+        walk_distance (int): Number of steps in each random walk.
+        selected_modalities (List[str]): Modalities to include in the summing process.
+        latent_dim (int): The latent dimension size.
+
+    Returns:
+        np.ndarray: Concatenated summed embeddings from all walks.
     """
-    available_modalities = [
-        key for key in modalities
-        if key in patient_data and patient_data[key] is not None
-    ]
+    available_modalities = [mod for mod in selected_modalities if mod in patient_data]
 
     if not available_modalities:
-        raise ValueError(f"No valid embeddings found for patient {patient_id}.")
+        raise ValueError(f"No valid embeddings found in selected modalities.")
 
     summed_embeddings = []
     for _ in range(walk_amount):
@@ -97,17 +104,18 @@ def sum_random_embeddings(patient_id: str, patient_data: Dict[str, np.ndarray], 
 
     embedding = np.concatenate(summed_embeddings, axis=0)
 
-    assert len(embedding) == LATENT_DIM * walk_amount, f"Summed embedding has incorrect shape: {embedding.shape}"
+    assert len(embedding) == latent_dim * walk_amount, f"Summed embedding has incorrect shape: {embedding.shape}"
     return embedding
 
 
-def load_patient_data(h5_file: h5py.File, patient_id: str) -> Tuple[Dict[str, np.ndarray], str]:
+def load_patient_data(h5_file: h5py.File, patient_id: str, selected_modalities: List[str]) -> Tuple[Dict[str, np.ndarray], str]:
     """
     Loads patient data from the HDF5 file for all available modalities.
+    Only returns data if the patient has ALL selected modalities.
     """
     patient_data = {}
     cancer_type = ""
-    for modality in ["rna", "annotations", "mutations", "images"]:
+    for modality in selected_modalities:
         if modality in h5_file and patient_id in h5_file[modality]:
             dataset = h5_file[modality][patient_id]
             # Extract cancer type BEFORE reading data into NumPy array
@@ -117,12 +125,15 @@ def load_patient_data(h5_file: h5py.File, patient_id: str) -> Tuple[Dict[str, np
                 raise ValueError(f"No cancer type found for patient {patient_id} in modality {modality}.")
 
             patient_data[modality] = dataset[()]  # Now safely extract data
+        else:
+            # Patient doesn't have this required modality
+            raise ValueError(f"Patient {patient_id} does not have required modality: {modality}")
 
     if not cancer_type:
         raise ValueError(f"No cancer type found for patient {patient_id} in any modality.")
 
-    if len(patient_data) < 2:
-        raise ValueError(f"Patient {patient_id} has less than 2 valid embeddings.")
+    if len(patient_data) != len(selected_modalities):
+        raise ValueError(f"Patient {patient_id} does not have all required modalities. Has {list(patient_data.keys())}, needs {selected_modalities}")
 
     return patient_data, cancer_type
 
@@ -185,15 +196,11 @@ def main():
     load_path: Path = Path(args.load_path)
 
     if latent_dim != 768:
-        load_path = Path("results", "h5", str(latent_dim))
+        load_path = Path("results", "embeddings", "h5", str(latent_dim))
 
-    if latent_dim == 768:
-        save_folder = Path("results", "classifier_latent_dims", "summed_embeddings", cancers, '_'.join(selected_modalities),
-                       f"{walk_distance}_{walk_amount}", str(iteration))
-    else:
-        save_folder = Path("results", "classifier_latent_dims", "summed_embeddings", str(latent_dim), cancers,
-                       '_'.join(selected_modalities), f"{walk_distance}_{walk_amount}", str(iteration))
-
+    # Always use the same path structure: cancers/modalities/latent_dim/walk_distance_walk_amount/iteration
+    save_folder = Path("results", "classifier_latent_dims", "summed_embeddings", cancers, '_'.join(selected_modalities),
+                       str(latent_dim), f"{walk_distance}_{walk_amount}", str(iteration))
 
     save_folder.mkdir(parents=True, exist_ok=True)
 
@@ -229,15 +236,15 @@ def main():
 
         for patient_id in tqdm(train_patient_ids, desc="Processing Patients"):
             try:
-                patient_data, patient_cancer = load_patient_data(h5_file, patient_id)
+                patient_data, patient_cancer = load_patient_data(h5_file, patient_id, selected_modalities)
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
 
             try:
-                summed_embedding = sum_random_embeddings(
-                    patient_id, patient_data, walk_distance, walk_amount,
-                    modalities=selected_modalities
+                summed_embedding = sum_patient_embeddings(
+                    patient_data, walk_amount, walk_distance,
+                    selected_modalities, latent_dim
                 )
                 summed_train_embeddings_data.append((summed_embedding, patient_cancer, patient_id))
                 patient_count += 1
@@ -247,15 +254,15 @@ def main():
 
         for patient_id in tqdm(test_patient_ids, desc="Processing Patients"):
             try:
-                patient_data, patient_cancer = load_patient_data(h5_file, patient_id)
+                patient_data, patient_cancer = load_patient_data(h5_file, patient_id, selected_modalities)
             except ValueError as e:
                 logging.warning(f"Skipping {patient_id}: {e}")
                 continue
 
             try:
-                summed_embedding = sum_random_embeddings(
-                    patient_id, patient_data, walk_distance, walk_amount,
-                    modalities=selected_modalities
+                summed_embedding = sum_patient_embeddings(
+                    patient_data, walk_amount, walk_distance,
+                    selected_modalities, latent_dim
                 )
                 summed_test_embeddings_data.append((summed_embedding, patient_cancer, patient_id))
                 patient_count += 1
@@ -265,12 +272,12 @@ def main():
 
     logging.info(f"Processed {patient_count} patients with valid embeddings.")
 
-    write_h5_data(summed_train_embeddings_data, train_output_file, walk_amount, selected_cancers)
-    write_h5_data(summed_test_embeddings_data, test_output_file, walk_amount, selected_cancers)
+    write_h5_data(summed_train_embeddings_data, train_output_file, walk_amount, selected_cancers, latent_dim)
+    write_h5_data(summed_test_embeddings_data, test_output_file, walk_amount, selected_cancers, latent_dim)
 
     # merge the train and test summed embeddings into one file for easier loading
     all_summed_embeddings_data = summed_train_embeddings_data + summed_test_embeddings_data
-    write_h5_data(all_summed_embeddings_data, output_file, walk_amount, selected_cancers)
+    write_h5_data(all_summed_embeddings_data, output_file, walk_amount, selected_cancers, latent_dim)
 
     logging.info(f"✅ Summed embeddings saved to {train_output_file} and {test_output_file}")
     logging.info(f"Total patients processed and saved: {patient_count}")

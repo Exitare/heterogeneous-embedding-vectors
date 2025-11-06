@@ -11,6 +11,9 @@ requested_walk_distance = range(5, 5 + 1)
 run_iterations = range(config['run_iterations'])
 cancer_arg = ' '.join(all_cancers)
 
+# Define all latent dimensions to process
+latent_dims = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700]
+
 # === All valid combinations of modalities (min size = 2) ===
 modality_combinations = [
     "_".join(sorted(combo)) for r in range(2, len(modalities) + 1)
@@ -21,25 +24,28 @@ modality_combinations = [
 rule all:
     input:
         expand(
-            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
+            "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
             cancers=[joined_cancers],
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             iteration=run_iterations
         ),
         expand(
-            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+            "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
             cancers=[joined_cancers],
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             iteration=run_iterations
         ),
         expand(
-            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
+            "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
             cancers=[joined_cancers],
             modalities=modality_combinations,
+            latent_dim=latent_dims,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             iteration=run_iterations
@@ -47,22 +53,23 @@ rule all:
 
 rule run_classification:
     input:
-        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
-        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5"
+        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+        "results/classifier_latent_dims/summed_embeddings/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5"
     output:
-        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
-        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
-        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv"
+        "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
+        "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+        "results/classifier_latent_dims/classification/{cancers}/{modalities}/{latent_dim}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv"
     params:
         cancer_list=cancer_arg,
         modality_string=lambda wildcards: wildcards.modalities.replace('_', ' ')
     threads: 1
     shell:
         """
-        python ./src/classifier_holdout/models/4_01_cancer_classifier.py \
+        python ./src/classifier_latent_dims/models/4_01_cancer_classifier_pytorch.py \
             -c {params.cancer_list} \
             -a {wildcards.walk_amount} \
             -w {wildcards.walk_distance} \
             -i {wildcards.iteration} \
-            -m {params.modality_string}
+            -m {params.modality_string} \
+            -ld {wildcards.latent_dim}
         """
