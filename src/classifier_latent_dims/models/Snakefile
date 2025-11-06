@@ -1,0 +1,68 @@
+configfile: './config.yaml'
+
+import itertools
+
+# === Load config ===
+all_cancers = config['cancers']
+modalities = config['modalities']
+joined_cancers = '_'.join(all_cancers)
+requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+run_iterations = range(config['run_iterations'])
+cancer_arg = ' '.join(all_cancers)
+
+# === All valid combinations of modalities (min size = 2) ===
+modality_combinations = [
+    "_".join(sorted(combo)) for r in range(2, len(modalities) + 1)
+    for combo in itertools.combinations(modalities, r)
+]
+
+# === Rule: all expected outputs ===
+rule all:
+    input:
+        expand(
+            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
+            cancers=[joined_cancers],
+            modalities=modality_combinations,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            iteration=run_iterations
+        ),
+        expand(
+            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+            cancers=[joined_cancers],
+            modalities=modality_combinations,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            iteration=run_iterations
+        ),
+        expand(
+            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
+            cancers=[joined_cancers],
+            modalities=modality_combinations,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            iteration=run_iterations
+        )
+
+rule run_classification:
+    input:
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5"
+    output:
+        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/history.csv",
+        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+        "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv"
+    params:
+        cancer_list=cancer_arg,
+        modality_string=lambda wildcards: wildcards.modalities.replace('_', ' ')
+    threads: 1
+    shell:
+        """
+        python ./src/classifier_holdout/models/4_01_cancer_classifier.py \
+            -c {params.cancer_list} \
+            -a {wildcards.walk_amount} \
+            -w {wildcards.walk_distance} \
+            -i {wildcards.iteration} \
+            -m {params.modality_string}
+        """
