@@ -18,47 +18,9 @@ order = ["Text", "Image", "RNA", "Mutation", "BRCA", "LUAD", "BLCA", "THCA", "ST
 
 Metric = namedtuple("Metric", ["name", "label"])
 
-metrics = {
-    "A": Metric("accuracy", "Accuracy"),
-    "P": Metric("precision", "Precision"),
-    "R": Metric("recall", "Recall"),
-    "F1": Metric("f1", "F1"),
-    "F1Z": Metric("f1_zeros", "F1 Zero"),
-    "BA": Metric("balanced_accuracy", "Balanced Accuracy"),
-    "MCC": Metric("mcc", "Matthews Correlation Coefficient")
-}
-
-
-def create_bar_chart(metric: Metric, grouped_df: pd.DataFrame, df: pd.DataFrame, save_folder: Path):
-    plt.figure(figsize=(10, 6))
-
-    # Bar plot
-    ax = sns.barplot(x="walk_distance", y=metric.name, hue="embedding", data=grouped_df,
-                     palette=color_palette, hue_order=order, alpha=0.8, edgecolor="black")
-
-    # Scatter plot overlay (showing all data points)
-    sns.stripplot(x="walk_distance", y=metric.name, hue="embedding", data=df,
-                  palette=color_palette, hue_order=order, jitter=True, dodge=True, alpha=0.5, marker="o", size=6)
-
-    # Set title and labels
-    ax.set_title(f"{metric.label} per Walk Distance and Modality")
-    ax.set_ylabel(metric.label)
-    ax.set_xlabel("Walk Distance")
-
-    # set y lim between 0 and 1
-    ax.set_ylim(-0.1, 1.1)
-
-    # Remove duplicate legends from scatter plot
-    handles, labels = ax.get_legend_handles_labels()
-    plt.legend(handles[:len(order)], labels[:len(order)], title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
-
-    # Improve layout and show the plot
-    plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_bar_chart.png"), dpi=300)
-
 
 def create_line_chart(metric: Metric, grouped_df: pd.DataFrame, save_folder: Path):
-    # create a line chart too
+    # create a line chart
     plt.figure(figsize=(10, 6))
     ax = sns.lineplot(x="walk_distance", y=metric.name, hue="embedding", data=grouped_df,
                       palette=color_palette, hue_order=order)
@@ -73,28 +35,11 @@ def create_line_chart(metric: Metric, grouped_df: pd.DataFrame, save_folder: Pat
     # Improve layout and show the plot
     plt.tight_layout()
     plt.savefig(Path(save_folder, f"{metric.name}_line_plot.png"), dpi=300)
-
-def create_box_plot(metric: Metric, df: pd.DataFrame, save_folder: Path):
-    # create a line chart too
-    plt.figure(figsize=(10, 6))
-    ax = sns.boxplot(x="walk_distance", y=metric.name, hue="embedding", data=df,
-                      palette=color_palette, hue_order=order)
-
-    # Set title and labels
-    ax.set_title(f"{metric.label} per Sample Count and Modality")
-    ax.set_ylabel(metric.label)
-    ax.set_xlabel("Sample Count")
-    # put legend outside of plot
-    plt.legend(title="Embedding", loc='upper left', bbox_to_anchor=(1, 1))
-    ax.set_ylim(0.8, 1.01)
-
-    # Improve layout and show the plot
-    plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric.name}_box_plot.png"), dpi=300)
+    plt.close('all')
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Aggregate metrics from recognizer results')
+    parser = ArgumentParser(description='Aggregate metrics from recognizer results - Zero metrics version')
     parser.add_argument("-c", "--cancer", required=False, nargs='+',
                         default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--amount_of_walk_embeddings", "-a", help="The amount of embeddings to sum", type=int,
@@ -103,8 +48,6 @@ if __name__ == '__main__':
                         help="The model to use")
     parser.add_argument("--foundation", "-f", action="store_true", help="Use of the foundation model metrics")
     parser.add_argument("--noise_ratio", "-n", type=float, help="The noise ratio to use", default=0.0)
-    parser.add_argument("--selected_metric", "-sm", required=True, choices=["A", "P", "R", "F1", "F1Z", "BA", "MCC"],
-                        default="A")
 
     args = parser.parse_args()
     model: str = args.models
@@ -113,9 +56,6 @@ if __name__ == '__main__':
     foundation: bool = args.foundation
     selected_cancers: str = '_'.join(cancers)
     noise_ratio: float = args.noise_ratio
-    selected_metric: str = args.selected_metric
-
-    metric = metrics[selected_metric]
 
     logging.info(
         f"Loading data for model: {model}, cancers: {cancers}, foundation: {foundation}, amount_of_walk_embeddings: {amount_of_walk_embeddings},"
@@ -150,16 +90,29 @@ if __name__ == '__main__':
     if not save_folder.exists():
         save_folder.mkdir(parents=True)
 
-    # color palette should inlcude only the mebedding that are availabe in the dataset
-
+    # color palette should include only the embedding that are available in the dataset
     available_embeddings = df["embedding"].unique()
     color_palette = {k: v for k, v in color_palette.items() if k in df["embedding"].unique()}
     order = [k for k in order if k in available_embeddings]
 
-    # create bar plot for mcc for each walk_distance and modality
-    df_grouped_by_wd_embedding = df.groupby(["walk_distance", "embedding"]).mean()
-    df.reset_index(drop=True, inplace=True)
+    # Find all columns that end with "_zero" and have data
+    zero_columns = [col for col in df.columns if col.endswith("_zero") and df[col].notna().any()]
 
-    #create_bar_chart(metric, df_grouped_by_wd_embedding, df, save_folder)
-    create_line_chart(metric, df_grouped_by_wd_embedding, save_folder)
-    #create_box_plot(metric, df, save_folder)
+    logging.info(f"Found {len(zero_columns)} zero-labeled metrics: {zero_columns}")
+
+    # Generate plots for all zero-labeled metrics
+    for zero_col in zero_columns:
+        # Create a metric name for the plot (e.g., "accuracy_zero" -> "Accuracy Zero")
+        metric_label = " ".join(word.capitalize() for word in zero_col.split("_"))
+        zero_metric = Metric(zero_col, metric_label)
+
+        # Group data by walk_distance and embedding
+        df_grouped_by_wd_embedding = df.groupby(["walk_distance", "embedding"]).mean()
+        df.reset_index(drop=True, inplace=True)
+
+        create_line_chart(zero_metric, df_grouped_by_wd_embedding, save_folder)
+
+    if not zero_columns:
+        logging.warning("No zero-labeled metrics found in the data!")
+    else:
+        logging.info(f"Successfully generated {len(zero_columns)} zero-metric line plots!")
