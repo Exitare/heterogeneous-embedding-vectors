@@ -223,6 +223,363 @@ def create_box_plot(metric, df: pd.DataFrame, save_folder: Path):
     plt.close('all')
 
 
+def create_modality_comparison_barplot(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    """Create a grouped boxen plot comparing modalities (not cancers) between two models"""
+    # Define modalities to include (exclude cancer types)
+    modalities = ["Annotation", "Image", "RNA", "Mutation"]
+    
+    # Filter data to only include modalities
+    modality_df = df[df["embedding"].isin(modalities)].copy()
+    
+    if modality_df.empty:
+        logging.warning("No modality data found for comparison bar plot")
+        return
+    
+    # Add readable model names
+    modality_df["Model"] = modality_df["model"].map(model_names)
+    
+    # Calculate grid dimensions for separate plots per modality
+    n_modalities = len(modalities)
+    n_cols = 2
+    n_rows = (n_modalities + n_cols - 1) // n_cols
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(7 * n_cols, 4 * n_rows), sharey=True)
+    axes = axes.flatten() if n_modalities > 1 else [axes]
+    
+    for idx, modality in enumerate(modalities):
+        ax = axes[idx]
+        modality_subset = modality_df[modality_df["embedding"] == modality]
+        
+        # Create the boxen plot with walk_distance on x-axis
+        sns.boxenplot(
+            data=modality_subset,
+            x="walk_distance",
+            y=metric.name,
+            hue="Model",
+            palette=["#5DA5DA", "#FAA43A"],  # Blue and orange for models
+            ax=ax
+        )
+        
+        ax.set_title(f"{modality}", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Count", fontsize=10)
+        ax.set_ylabel(metric.label if idx % n_cols == 0 else "", fontsize=10)
+        ax.set_ylim(0, 1.05)
+        ax.grid(axis='y', alpha=0.3)
+        
+        if idx == 0:
+            ax.legend(title="Model", fontsize=9)
+        else:
+            ax.legend().remove()
+    
+    # Hide unused subplots
+    for idx in range(n_modalities, len(axes)):
+        axes[idx].set_visible(False)
+    
+    fig.suptitle(f"{metric.label} Comparison by Modality Across Sample Counts", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_modality_comparison_boxenplot.png"), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {metric.name}_modality_comparison_boxenplot.png")
+
+
+def create_modality_heatmap(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    """Create a heatmap showing performance of all modalities across sample counts for both models"""
+    # Define modalities to include (exclude cancer types)
+    modalities = ["Annotation", "Image", "RNA", "Mutation"]
+    
+    # Filter data to only include modalities
+    modality_df = df[df["embedding"].isin(modalities)].copy()
+    
+    if modality_df.empty:
+        logging.warning("No modality data found for heatmap")
+        return
+    
+    # Add readable model names
+    modality_df["Model"] = modality_df["model"].map(model_names)
+    
+    # Group by model, modality, and walk_distance, then calculate mean performance
+    grouped = modality_df.groupby(["Model", "embedding", "walk_distance"])[metric.name].mean().reset_index()
+    
+    # Create separate heatmaps for each model side-by-side
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+    
+    for idx, model in enumerate(sorted(grouped["Model"].unique())):
+        ax = axes[idx]
+        model_data = grouped[grouped["Model"] == model]
+        
+        # Pivot data for heatmap: modalities as rows, sample counts as columns
+        heatmap_data = model_data.pivot(index="embedding", columns="walk_distance", values=metric.name)
+        
+        # Reorder rows to match our preferred order
+        heatmap_data = heatmap_data.reindex([m for m in modalities if m in heatmap_data.index])
+        
+        # Create heatmap with annotations
+        sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt=".3f",
+            cmap="RdYlGn",
+            vmin=0,
+            vmax=1,
+            cbar_kws={'label': metric.label},
+            linewidths=0.5,
+            linecolor='gray',
+            ax=ax
+        )
+        
+        ax.set_title(f"{model}", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Count", fontsize=10)
+        ax.set_ylabel("Modality" if idx == 0 else "", fontsize=10)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+    
+    fig.suptitle(f"{metric.label} Heatmap: Modalities Across Sample Counts", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_modality_heatmap.png"), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {metric.name}_modality_heatmap.png")
+
+
+def create_cancer_heatmap(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    """Create a heatmap showing performance across sample counts for BOTH modalities and cancer type embeddings.
+
+    Rows: Modalities first (Annotation, Image, RNA, Mutation) then Cancer types (BRCA, LUAD, STAD, BLCA, COAD, THCA) if present.
+    Columns: Sample counts (walk_distance)
+    Cells: Mean metric value (e.g. F1)
+    One heatmap per model side-by-side.
+    """
+    modalities = ["Annotation", "Image", "RNA", "Mutation"]
+    cancer_types = ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+    all_embeddings = modalities + cancer_types
+
+    embedding_df = df[df["embedding"].isin(all_embeddings)].copy()
+    if embedding_df.empty:
+        logging.info("No modality or cancer embeddings found; skipping combined heatmap")
+        return
+
+    embedding_df["Model"] = embedding_df["model"].map(model_names)
+    grouped = embedding_df.groupby(["Model", "embedding", "walk_distance"])[metric.name].mean().reset_index()
+
+    fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+    for idx, model in enumerate(sorted(grouped["Model"].unique())):
+        ax = axes[idx]
+        model_data = grouped[grouped["Model"] == model]
+        heatmap_data = model_data.pivot(index="embedding", columns="walk_distance", values=metric.name)
+        # Reorder rows: modalities first then cancer types
+        ordered_rows = [e for e in all_embeddings if e in heatmap_data.index]
+        heatmap_data = heatmap_data.reindex(ordered_rows)
+
+        sns.heatmap(
+            heatmap_data,
+            annot=True,
+            fmt=".3f",
+            cmap="RdYlGn",
+            vmin=0,
+            vmax=1,
+            cbar_kws={'label': metric.label},
+            linewidths=0.5,
+            linecolor='gray',
+            ax=ax
+        )
+        ax.set_title(f"{model}", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Count", fontsize=10)
+        ax.set_ylabel("Embedding" if idx == 0 else "", fontsize=10)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
+    fig.suptitle(f"{metric.label} Heatmap: Modalities + Cancer Types Across Sample Counts", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_cancer_heatmap.png"), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {metric.name}_cancer_heatmap.png (combined modalities + cancers)")
+
+
+def create_modality_grouped_barchart(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    """Create a grouped bar chart showing all modalities across sample counts in one plot"""
+    # Define modalities to include (exclude cancer types)
+    modalities = ["Annotation", "Image", "RNA", "Mutation"]
+    
+    # Filter data to only include modalities
+    modality_df = df[df["embedding"].isin(modalities)].copy()
+    
+    if modality_df.empty:
+        logging.warning("No modality data found for grouped bar chart")
+        return
+    
+    # Add readable model names
+    modality_df["Model"] = modality_df["model"].map(model_names)
+    
+    # Group by model, modality, and walk_distance, then calculate mean and std
+    grouped = modality_df.groupby(["Model", "embedding", "walk_distance"])[metric.name].agg(['mean', 'std']).reset_index()
+    
+    # Create the plot
+    fig, ax = plt.subplots(figsize=(14, 6))
+    
+    # Get unique sample counts
+    sample_counts = sorted(grouped["walk_distance"].unique())
+    n_counts = len(sample_counts)
+    n_modalities = len(modalities)
+    
+    # Set up bar positions
+    x = range(n_counts)
+    width = 0.08  # Width of each bar
+    offset_per_group = width * n_modalities
+    
+    # Color palette for modalities
+    modality_colors = {
+        "Annotation": "#F17CB0",
+        "Image": "#B276B2", 
+        "RNA": "#60BD68",
+        "Mutation": "#F15854"
+    }
+    
+    # Plot bars for each model
+    for model_idx, model in enumerate(sorted(grouped["Model"].unique())):
+        model_data = grouped[grouped["Model"] == model]
+        base_offset = model_idx * (offset_per_group + 0.02)  # Add small gap between model groups
+        
+        for mod_idx, modality in enumerate(modalities):
+            mod_data = model_data[model_data["embedding"] == modality].sort_values("walk_distance")
+            
+            if mod_data.empty:
+                continue
+                
+            positions = [xi + base_offset + mod_idx * width for xi in x]
+            
+            # Different patterns for different models (hatch for second model)
+            hatch_pattern = None if model_idx == 0 else '//'
+            
+            ax.bar(
+                positions,
+                mod_data["mean"],
+                width,
+                yerr=mod_data["std"],
+                label=f"{model} - {modality}" if model_idx < 1 else None,
+                color=modality_colors[modality],
+                edgecolor='black',
+                linewidth=0.5,
+                alpha=0.85 if model_idx == 0 else 0.6,
+                hatch=hatch_pattern,
+                capsize=2
+            )
+    
+    # Customize plot
+    ax.set_xlabel("Sample Count", fontsize=12, fontweight='bold')
+    ax.set_ylabel(metric.label, fontsize=12, fontweight='bold')
+    ax.set_title(f"{metric.label}: All Modalities Across Sample Counts", fontsize=14, fontweight='bold')
+    ax.set_xticks([xi + (offset_per_group * len(grouped["Model"].unique()) + 0.02) / 2 - width for xi in x])
+    ax.set_xticklabels(sample_counts)
+    ax.set_ylim(0, 1.05)
+    ax.grid(axis='y', alpha=0.3, linestyle='--')
+    
+    # Create custom legend showing modalities
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor=modality_colors[mod], edgecolor='black', label=mod) 
+                      for mod in modalities]
+    
+    # Add model indicators to legend
+    models_sorted = sorted(grouped["Model"].unique())
+    legend_elements.append(Patch(facecolor='gray', alpha=0.85, label=f'{models_sorted[0]} (solid)'))
+    if len(models_sorted) > 1:
+        legend_elements.append(Patch(facecolor='gray', alpha=0.6, hatch='//', label=f'{models_sorted[1]} (hatched)'))
+    
+    ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1, 1), fontsize=9)
+    
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_modality_grouped_barchart.png"), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {metric.name}_modality_grouped_barchart.png")
+
+
+def create_cancer_comparison_barplots(models: List[str], metric: Metric, df: pd.DataFrame, save_folder: Path):
+    """Create individual bar plots with dots for each cancer type when comparing multi models"""
+    # Check if we're comparing multi models
+    is_multi_comparison = any("multi" in model for model in models)
+    
+    if not is_multi_comparison:
+        logging.info("Not comparing multi models, skipping cancer-specific bar plots")
+        return
+    
+    # Define cancer types
+    cancer_types = ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+    available_cancers = [cancer for cancer in cancer_types if cancer in df["embedding"].unique()]
+    
+    if not available_cancers:
+        logging.warning("No cancer type data found for comparison bar plots")
+        return
+    
+    # Add readable model names
+    df_with_names = df.copy()
+    df_with_names["Model"] = df_with_names["model"].map(model_names)
+    
+    # Calculate grid dimensions
+    n_cancers = len(available_cancers)
+    n_cols = 3
+    n_rows = (n_cancers + n_cols - 1) // n_cols
+    
+    # Create figure with subplots
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), sharey=True)
+    axes = axes.flatten() if n_cancers > 1 else [axes]
+    
+    for idx, cancer in enumerate(available_cancers):
+        ax = axes[idx]
+        
+        # Filter data for this cancer type
+        cancer_df = df_with_names[df_with_names["embedding"] == cancer].copy()
+        
+        # Group by model and walk_distance, calculate mean
+        grouped_cancer_df = cancer_df.groupby(["Model", "walk_distance"])[metric.name].mean().reset_index()
+        
+        # Create bar plot
+        sns.barplot(
+            data=grouped_cancer_df,
+            x="walk_distance",
+            y=metric.name,
+            hue="Model",
+            palette=["#5DA5DA", "#FAA43A"],
+            alpha=0.8,
+            edgecolor="black",
+            ax=ax
+        )
+        
+        # Add strip plot to show individual data points
+        sns.stripplot(
+            data=cancer_df,
+            x="walk_distance",
+            y=metric.name,
+            hue="Model",
+            dodge=True,
+            alpha=0.5,
+            size=4,
+            palette=["#5DA5DA", "#FAA43A"],
+            ax=ax,
+            legend=False
+        )
+        
+        ax.set_title(f"{cancer}", fontsize=12, fontweight='bold')
+        ax.set_xlabel("Sample Count", fontsize=10)
+        ax.set_ylabel(metric.label if idx % n_cols == 0 else "", fontsize=10)
+        ax.set_ylim(0, 1.05)
+        ax.grid(axis='y', alpha=0.3)
+        
+        # Get legend handles and labels, remove duplicates
+        if idx == 0:
+            handles, labels = ax.get_legend_handles_labels()
+            n_models = len(grouped_cancer_df["Model"].unique())
+            ax.legend(handles[:n_models], labels[:n_models], title="Model", fontsize=9)
+        else:
+            ax.legend().remove()
+    
+    # Hide unused subplots
+    for idx in range(n_cancers, len(axes)):
+        axes[idx].set_visible(False)
+    
+    fig.suptitle(f"{metric.label} Comparison by Cancer Type", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(Path(save_folder, f"{metric.name}_cancer_comparison_barplots.png"), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {metric.name}_cancer_comparison_barplots.png")
+
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Aggregate metrics from recognizer results')
     parser.add_argument("-c", "--cancer", required=False, nargs='+',
@@ -329,3 +686,18 @@ if __name__ == '__main__':
     # create_line_chart(models,metric, df_grouped_by_wd_embedding, save_folder)
     create_dist_line_chart(models, metric, df, save_folder)
     #create_box_plot(metric, df, save_folder)
+    
+    # Create modality comparison boxen plot
+    create_modality_comparison_barplot(models, metric, df, save_folder)
+    
+    # Create modality heatmap
+    create_modality_heatmap(models, metric, df, save_folder)
+    
+    # Create cancer heatmap (specific cancer embeddings across sample counts)
+    create_cancer_heatmap(models, metric, df, save_folder)
+
+    # Create modality grouped bar chart
+    create_modality_grouped_barchart(models, metric, df, save_folder)
+    
+    # Create cancer-specific comparison bar plots (only for multi model comparisons)
+    create_cancer_comparison_barplots(models, metric, df, save_folder)
