@@ -163,18 +163,28 @@ def plot_embedding_heatmap(df: pd.DataFrame, metric: str, file_name: str, noise_
         cmap="RdYlGn",
         vmin=0,
         vmax=1,
-        cbar_kws={'label': metric.upper()},
+        cbar_kws={
+            'label': metric.upper(),
+            'shrink': 0.8,  # Reduce colorbar size to decrease gap
+            'pad': 0.02     # Reduce padding between heatmap and colorbar
+        },
         linewidths=0.5,
         linecolor='gray',
         annot_kws={'fontsize': 14}
     )
+    
+    # Increase colorbar label font size
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=12)  # Increase tick label size
+    cbar.set_label(metric.upper(), fontsize=14)  # Increase colorbar label size
+    
     #plt.title(f"{metric.upper()} Heatmap: Modalities + Cancer Types Across Sample Counts (Noise: {int(noise_ratio*100)}%)", fontsize=16, fontweight='bold')
     plt.xlabel("Sample Count", fontsize=14)
     plt.ylabel("Embedding", fontsize=14)
     plt.tight_layout()
     
     # Set tick parameters with rotation AFTER tight_layout
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha='right', fontsize=12)
     ax.set_yticklabels(ax.get_yticklabels(), rotation=45, fontsize=12)
     
     plt.savefig(Path(save_folder, file_name), dpi=300, bbox_inches='tight')
