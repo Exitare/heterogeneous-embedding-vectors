@@ -156,7 +156,7 @@ def plot_embedding_heatmap(df: pd.DataFrame, metric: str, file_name: str, noise_
     heatmap_data = heatmap_data.reindex(ordered_rows)
 
     plt.figure(figsize=(12, 6))
-    sns.heatmap(
+    ax = sns.heatmap(
         heatmap_data,
         annot=True,
         fmt=".3f",
@@ -166,11 +166,17 @@ def plot_embedding_heatmap(df: pd.DataFrame, metric: str, file_name: str, noise_
         cbar_kws={'label': metric.upper()},
         linewidths=0.5,
         linecolor='gray',
+        annot_kws={'fontsize': 14}
     )
-    plt.title(f"{metric.upper()} Heatmap: Modalities + Cancer Types Across Sample Counts (Noise: {int(noise_ratio*100)}%)", fontsize=14, fontweight='bold')
-    plt.xlabel("Sample Count", fontsize=12)
-    plt.ylabel("Embedding", fontsize=12)
+    #plt.title(f"{metric.upper()} Heatmap: Modalities + Cancer Types Across Sample Counts (Noise: {int(noise_ratio*100)}%)", fontsize=16, fontweight='bold')
+    plt.xlabel("Sample Count", fontsize=14)
+    plt.ylabel("Embedding", fontsize=14)
     plt.tight_layout()
+    
+    # Set tick parameters with rotation AFTER tight_layout
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=12)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=45, fontsize=12)
+    
     plt.savefig(Path(save_folder, file_name), dpi=300, bbox_inches='tight')
     plt.close('all')
     logging.info(f"Saved {file_name}")
