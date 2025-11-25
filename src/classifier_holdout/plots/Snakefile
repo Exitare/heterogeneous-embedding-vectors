@@ -42,48 +42,6 @@ rule all:
             walk_distance=[requested_walk_distance[-1]],
             walk_amount=[requested_walk_amounts[-1]]
         ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/euclidean_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/cosine_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/dot_product_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{cancer}_euclidean_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            cancer=all_cancers
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/euclidean_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/cosine_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/dot_product_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
 
         expand(
             "figures/classifier_holdout/{cancers}/{modalities}/performance/accuracy_score_grid.png",

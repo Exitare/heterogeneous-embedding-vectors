@@ -117,12 +117,13 @@ def create_grid_plot(df: pd.DataFrame, metric: str):
     plt.close('all')
 
 
-def create_selected_walks_boxenplot(df: pd.DataFrame, metric: str):
+def create_selected_walks_boxenplot(df: pd.DataFrame, metric: str, wanted: list[str] = None):
     """
     Boxenplot for walks 3_3, 4_4, 5_5 only, with stats (baseline = 3_3) per cancer.
     Saves to: <metric>_selected_walks_3_3_4_4_5_5_box_annotated.png
     """
-    wanted = ["3_3", "4_4", "5_5"]
+    if wanted is None:
+        wanted = ["3_3", "4_4", "5_5"]
     sub = df[df["walks"].isin(wanted)].copy()
     if sub.empty or metric not in sub.columns:
         logging.warning(f"No data for selected walks or missing metric '{metric}'.")
@@ -137,13 +138,13 @@ def create_selected_walks_boxenplot(df: pd.DataFrame, metric: str):
         ax=ax, palette=color_palette, hue_order=wanted
     )
 
-    ax.set_title(f"{metrics.get(metric, metric)} — Selected Walks (3_3, 4_4, 5_5)")
+    ax.set_title(f"{metrics.get(metric, metric)} {' '.join(modalities)}")
     ax.set_ylabel(f"{metrics.get(metric, metric)}")
     ax.set_xlabel("")
 
     if sub[metric].notna().any():
         top99 = float(sub[metric].quantile(0.99))
-        ax.set_ylim(0.0, min(1.10, max(0.95, top99) + 0.06))
+        ax.set_ylim(0.45, min(1.10, max(0.95, top99) + 0.06))
 
     handles, labels = ax.get_legend_handles_labels()
     label_to_pretty = {w: f"SC: {w.split('_')[0]}  R: {w.split('_')[1]}" for w in wanted}
@@ -160,7 +161,7 @@ def create_selected_walks_boxenplot(df: pd.DataFrame, metric: str):
         ax.set_yticklabels([f"{yt:.2f}" for yt in yticks])
 
     plt.tight_layout()
-    plt.savefig(Path(save_folder, f"{metric}_selected_walks_3_3_4_4_5_5_box_annotated.png"), dpi=300)
+    plt.savefig(Path(save_folder, f"{metric}_selected_walks_{'_'.join(wanted)}_box_annotated.png"), dpi=300)
     plt.close('all')
 
 
@@ -345,3 +346,4 @@ if __name__ == '__main__':
 
     create_selected_walks_boxenplot(results, "accuracy")
     create_selected_walks_boxenplot(results, "f1")
+    create_selected_walks_boxenplot(results, "f1", wanted=["3_4", "3_5", "4_3", "4_5", "5_3", "5_4"])
