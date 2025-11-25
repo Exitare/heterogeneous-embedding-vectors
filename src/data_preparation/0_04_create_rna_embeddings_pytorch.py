@@ -33,14 +33,9 @@ class VAE(nn.Module):
             nn.Linear(feature_dim // 2, feature_dim // 3),
             nn.ReLU()
         )
-        
-        # Mean layer (Linear -> BatchNorm -> ReLU)
-        self.fc_mu_linear = nn.Linear(feature_dim // 3, latent_dim)
-        self.fc_mu_bn = nn.BatchNorm1d(latent_dim)
-        
-        # Log variance layer (Linear -> BatchNorm -> ReLU)
-        self.fc_logvar_linear = nn.Linear(feature_dim // 3, latent_dim)
-        self.fc_logvar_bn = nn.BatchNorm1d(latent_dim)
+
+        self.fc_mu = nn.Linear(feature_dim // 3, latent_dim)
+        self.fc_logvar = nn.Linear(feature_dim // 3, latent_dim)
         
         # Decoder
         self.decoder_linear = nn.Linear(latent_dim, feature_dim)
@@ -58,17 +53,10 @@ class VAE(nn.Module):
     
     def encode(self, x):
         h = self.encoder(x)
-        
-        # mu: Linear -> BatchNorm -> ReLU
-        mu = self.fc_mu_linear(h)
-        mu = self.fc_mu_bn(mu)
-        mu = torch.relu(mu)
-        
-        # logvar: Linear -> BatchNorm -> ReLU
-        logvar = self.fc_logvar_linear(h)
-        logvar = self.fc_logvar_bn(logvar)
-        logvar = torch.relu(logvar)
-        
+
+        mu = self.fc_mu(h)  # no BN, no ReLU
+        logvar = self.fc_logvar(h)
+
         return mu, logvar
     
     def reparameterize(self, mu, logvar):
