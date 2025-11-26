@@ -138,7 +138,7 @@ def create_selected_walks_boxenplot(df: pd.DataFrame, metric: str, wanted: list[
         ax=ax, palette=color_palette, hue_order=wanted
     )
 
-    ax.set_title(f"{metrics.get(metric, metric)} {' '.join(modalities)}")
+    ax.set_title(f"{metrics.get(metric, metric)} {' '.join(modalities.split('_')).capitalize()}")
     ax.set_ylabel(f"{metrics.get(metric, metric)}")
     ax.set_xlabel("")
 
