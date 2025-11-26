@@ -14,7 +14,7 @@ latent_dims = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 7
 
 # === All valid combinations of modalities (min size = 2) ===
 modality_combinations = [
-    "_".join(combo) for r in range(2, len(modalities) + 1)
+    "_".join(sorted(combo)) for r in range(2, len(modalities) + 1)
     for combo in itertools.combinations(modalities, r)
 ]
 

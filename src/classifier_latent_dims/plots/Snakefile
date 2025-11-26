@@ -4,12 +4,13 @@ import itertools
 
 all_cancers = config['cancers']
 joined_cancers = '_'.join(config['cancers'])
-requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
-requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+requested_walk_amounts = range(5, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(5, config['classifier_max_walk_distance'] + 1)
 distance_metrics = config['distance_metrics']
 max_iterations = range(1, config['run_iterations'])
+latent_dims = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700]
 
-modalities = config['modalities']
+modalities = ["rna", "mutations"]
 modality_combinations = [
     "_".join(sorted(combo)) for r in range(2, len(modalities) + 1)
     for combo in itertools.combinations(modalities, r)
@@ -23,339 +24,51 @@ def modality_to_cli(modality_combo):
 
 rule all:
     input:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/overview_scores_heatmap_MCC.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/clustering/{walk_distance}_{walk_amount}_gmm_clustering.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=[requested_walk_distance[-1]],
-            walk_amount=[requested_walk_amounts[-1]]
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/clustering/{walk_distance}_{walk_amount}_pca_clustering.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=[requested_walk_distance[-1]],
-            walk_amount=[requested_walk_amounts[-1]]
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/euclidean_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/cosine_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/dot_product_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{cancer}_euclidean_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            cancer=all_cancers
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/euclidean_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/cosine_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/dot_product_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        ),
+        "figures/classifier_latent_dims/plots/accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/accuracy_per_cancer.png",
+        "figures/classifier_latent_dims/plots/all_metrics_panel.png",
+        "figures/classifier_latent_dims/plots/auc_overall.png",
+        "figures/classifier_latent_dims/plots/balanced_accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/f1_overall.png",
+        "figures/classifier_latent_dims/plots/f1_per_cancer.png",
+        "figures/classifier_latent_dims/plots/mcc_overall.png",
+        "figures/classifier_latent_dims/plots/precision_overall.png",
+        "figures/classifier_latent_dims/plots/precision_per_cancer.png",
+        "figures/classifier_latent_dims/plots/recall_overall.png",
+        "figures/classifier_latent_dims/plots/recall_per_cancer.png",
 
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/accuracy_score_grid.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/f1_score_grid.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/f1_score.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/accuracy_score.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/{walk_distance}_{walk_amount}_confusion_matrix.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        )
 
-rule generate_gmm_plots:
+rule generate_plots:
     input:
         expand(
-            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
+            "results/classifier_latent_dims/classification/{latent_dim}/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+            latent_dim=latent_dims,
             cancers=[joined_cancers],
             modalities=modality_combinations,
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance,
             iteration=max_iterations
         )
+    params:
+        cancers=cancer_arg,
+        modalities=' '.join(modality_combinations),
+        walk_amounts=' '.join(map(str, requested_walk_amounts)),
+        walk_distances=' '.join(map(str, requested_walk_distance)),
+        distance_metrics=' '.join(distance_metrics),
+        latent_dims=' '.join(map(str, latent_dims)),
+        iterations=str(config['run_iterations'])
     output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/clustering/{walk_distance}_{walk_amount}_gmm_clustering.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=[requested_walk_distance[-1]],
-            walk_amount=[requested_walk_amounts[-1]]
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/clustering/{walk_distance}_{walk_amount}_pca_clustering.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=[requested_walk_distance[-1]],
-            walk_amount=[requested_walk_amounts[-1]]
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for walk_distance in requested_walk_distance:
-                for walk in requested_walk_amounts:
-                    shell(f"python3 src/classifier_holdout/plots/6_05_gmm_clustering.py -c {cancer_arg} -m {m_cli} -w {walk_distance} -a {walk}")
-
-rule generate_generic_polar_plots:
-    input:
-        expand(
-            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_amount=requested_walk_amounts,
-            walk_distance=requested_walk_distance,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/euclidean_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/cosine_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/dot_product_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "results/classifier_holdout/distances/{cancers}/{modality_combo}/euclidean_combined_distances.csv",
-            cancers=[joined_cancers],
-            modality_combo=modality_combinations
-        ),
-        expand(
-            "results/classifier_holdout/distances/{cancers}/{modality_combo}/cosine_combined_distances.csv",
-            cancers=[joined_cancers],
-            modality_combo=modality_combinations
-        ),
-        expand(
-            "results/classifier_holdout/distances/{cancers}/{modality_combo}/dot_product_combined_distances.csv",
-            cancers=[joined_cancers],
-            modality_combo=modality_combinations
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            shell(f"python ./src/classifier_holdout/plots/5_11_polar_generic.py -c {cancer_arg} -m {m_cli}")
-
-rule generate_polar_single_cancer_plots:
-    input:
-        expand(
-            "results/classifier_holdout/distances/{cancers}/{modality_combo}/{distance_metric}_combined_distances.csv",
-            cancers=[joined_cancers],
-            modality_combo=modality_combinations,
-            distance_metric=distance_metrics
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{cancer}_{distance_metric}_polar.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            cancer=all_cancers,
-            distance_metric=distance_metrics
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for dm in distance_metrics:
-                shell(f"python ./src/classifier_holdout/plots/5_12_polar_cancer_specific.py -c {cancer_arg} -m {m_cli} -dm {dm}")
-
-rule create_euclidean_distance_plots:
-    input:
-        expand(
-            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_amount=requested_walk_amounts,
-            walk_distance=requested_walk_distance,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/euclidean_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for walk_distance in requested_walk_distance:
-                for walk in requested_walk_amounts:
-                    shell(f"python3 src/classifier_holdout/plots/5_08_euclidean.py -c {cancer_arg} -m {m_cli} -w {walk_distance} -a {walk}")
-
-rule create_cosine_distance_plots:
-    input:
-        expand(
-            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_amount=requested_walk_amounts,
-            walk_distance=requested_walk_distance,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/cosine_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for walk_distance in requested_walk_distance:
-                for walk in requested_walk_amounts:
-                    shell(f"python3 src/classifier_holdout/plots/5_06_cosine.py -c {cancer_arg} -m {m_cli} -w {walk_distance} -a {walk}")
-
-rule create_dot_product_plots:
-    input:
-        expand(
-            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_amount=requested_walk_amounts,
-            walk_distance=requested_walk_distance,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/distances/{walk_distance}_{walk_amount}/dot_product_per_cancer.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for walk_distance in requested_walk_distance:
-                for walk in requested_walk_amounts:
-                    shell(f"python3 src/classifier_holdout/plots/5_07_dot_product.py -c {cancer_arg} -m {m_cli} -w {walk_distance} -a {walk}")
-
-rule create_performance_plots:
-    input:
-        expand(
-            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/accuracy_score_grid.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/f1_score_grid.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/overview_scores.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/overview_scores_heatmap_MCC.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/f1_score.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        ),
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/accuracy_score.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            shell(f"python3 src/classifier_holdout/plots/6_01_performance.py -c {cancer_arg} -m {m_cli}")
-
-
-rule create_confusion_matrix:
-    input:
-        expand(
-            "results/classifier_holdout/classification/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/predictions.csv",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts,
-            iteration=max_iterations
-        )
-    output:
-        expand(
-            "figures/classifier_holdout/{cancers}/{modalities}/performance/{walk_distance}_{walk_amount}_confusion_matrix.png",
-            cancers=[joined_cancers],
-            modalities=modality_combinations,
-            walk_distance=requested_walk_distance,
-            walk_amount=requested_walk_amounts
-        )
-    run:
-        for m in modality_combinations:
-            m_cli = modality_to_cli(m)
-            for walk_distance in requested_walk_distance:
-                for walk in requested_walk_amounts:
-                    shell(f"python3 src/classifier_holdout/plots/6_04_confusion_matrix.py -c {cancer_arg} -m {m_cli} -w {walk_distance} -a {walk}")
+        "figures/classifier_latent_dims/plots/accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/accuracy_per_cancer.png",
+        "figures/classifier_latent_dims/plots/all_metrics_panel.png",
+        "figures/classifier_latent_dims/plots/auc_overall.png",
+        "figures/classifier_latent_dims/plots/balanced_accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/f1_overall.png",
+        "figures/classifier_latent_dims/plots/f1_per_cancer.png",
+        "figures/classifier_latent_dims/plots/mcc_overall.png",
+        "figures/classifier_latent_dims/plots/precision_overall.png",
+        "figures/classifier_latent_dims/plots/precision_per_cancer.png",
+        "figures/classifier_latent_dims/plots/recall_overall.png",
+        "figures/classifier_latent_dims/plots/recall_per_cancer.png",
+    shell:
+        "python src/classifier_latent_dims/plots/plot_latent_dim_performance.py "

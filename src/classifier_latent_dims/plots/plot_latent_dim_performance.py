@@ -119,6 +119,7 @@ def plot_per_cancer_metric(df: pd.DataFrame, metric: str, save_path: Path, all_c
     plt.tight_layout()
     
     plt.savefig(save_path / f'{metric}_per_cancer.png', dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / f'{metric}_per_cancer.svg', dpi=500, bbox_inches='tight')
     plt.close()
     print(f"Saved: {save_path / f'{metric}_per_cancer.png'}")
 
@@ -161,7 +162,8 @@ def plot_overall_metric(df: pd.DataFrame, metric: str, save_path: Path):
     
     plt.tight_layout()
     
-    plt.savefig(save_path / f'{metric}_overall.png', dpi=300, bbox_inches='tight')
+    plt.savefig(save_path / f'{metric}_overall.png', dpi=500, bbox_inches='tight')
+    plt.savefig(save_path / f'{metric}_overall.svg', dpi=500, bbox_inches='tight')
     plt.close()
     print(f"Saved: {save_path / f'{metric}_overall.png'}")
 
@@ -277,7 +279,7 @@ def main():
     parser.add_argument('--cancers', '-c', nargs='+', 
                        default=['BRCA', 'LUAD', 'STAD', 'BLCA', 'COAD', 'THCA'],
                        help='Cancer types')
-    parser.add_argument('--modalities', '-m', type=str, default='rna_mutations',
+    parser.add_argument('--modalities', '-m', type=str, default='mutations_rna',
                        help='Modality combination')
     parser.add_argument('--walk_distance', '-w', type=int, default=5,
                        help='Walk distance')
