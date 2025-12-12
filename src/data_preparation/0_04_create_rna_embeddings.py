@@ -13,7 +13,6 @@ from sklearn.preprocessing import MinMaxScaler
 
 save_folder = Path("results", "embeddings", "rna")
 cancer_load_path = Path("data", "rna")
-latent_dim = 768
 
 
 def compute_latent(x):
@@ -65,16 +64,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--pre_train_epochs", "-pt", type=int, default=100)
     parser.add_argument("--fine_tune_epochs", "-ft", type=int, default=100)
-    parser.add_argument("--cancer", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancer", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
+    parser.add_argument("--latent_dim", "-ld", type=int, default=768, help="Latent dimension size.",
+                        choices=[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 768])
 
     args = parser.parse_args()
 
+    latent_dim = args.latent_dim
     pre_train_epochs = args.pre_train_epochs
     fine_tune_epochs = args.fine_tune_epochs
     selected_cancers = args.cancer
 
     cancers = "_".join(selected_cancers)
-    save_folder = Path(save_folder, cancers)
+    if latent_dim == 768:
+        save_folder = Path(save_folder, cancers)
+    else:
+        save_folder = Path(save_folder, str(latent_dim), cancers)
 
     if not save_folder.exists():
         save_folder.mkdir(parents=True)

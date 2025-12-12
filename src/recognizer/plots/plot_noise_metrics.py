@@ -24,31 +24,6 @@ metric_mappings = {
 }
 
 
-def plot_bar_plot(df: pd.DataFrame):
-    fig = plt.figure(figsize=(10, 5), dpi=300)
-    sns.set_theme(style="whitegrid")
-    sns.set_context("paper")
-
-    # Plot individual embeddings
-    sns.barplot(data=df, x="embedding", y="f1", hue="embedding", alpha=0.6)
-
-    plt.savefig(Path(save_folder, "bar_plot.png"), dpi=300)
-
-
-def plot_noise(df: pd.DataFrame, metric: str):
-    # calculate mean for each noise
-    df = df.groupby(["walk_distance", "noise"]).mean(numeric_only=True)
-
-    fig = plt.figure(figsize=(10, 5), dpi=300)
-    sns.set_theme(style="whitegrid")
-    sns.set_context("paper")
-
-    # Plot individual embeddings
-    sns.lineplot(data=df, x="walk_distance", y=metric, hue="noise", alpha=0.6)
-
-    plt.savefig(Path(save_folder, "noise_plot.png"), dpi=300)
-
-
 def noise_grid(df, metric: str, file_name: str):
     # Ensure 'noise' is treated as a categorical variable for plotting
     # convert noise to percentage
@@ -147,6 +122,76 @@ def reduced_noise_grid(df, metric: str, file_name: str, title: str):
     plt.savefig(Path(save_folder, file_name), dpi=300, bbox_inches="tight")
 
 
+def plot_embedding_heatmap(df: pd.DataFrame, metric: str, file_name: str, noise_ratio: float):
+    """Create a heatmap showing mean metric for each embedding (modality and cancer type) across sample counts."""
+    # Define modalities and cancer types
+    modalities = ["Annotation", "Image", "RNA", "Mutation"]
+    cancer_types = ["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"]
+    all_embeddings = modalities + cancer_types
+
+    # Replace Text with Annotation
+    tmp_df = df.copy()
+    tmp_df["embedding"] = tmp_df["embedding"].replace("Text", "Annotation")
+    
+    # Filter by the specified noise ratio
+    if "noise" in tmp_df.columns:
+        tmp_df = tmp_df[tmp_df["noise"] == noise_ratio].copy()
+        if tmp_df.empty:
+            logging.warning(f"No data found for noise ratio {noise_ratio}")
+            return
+
+    # Only keep relevant embeddings
+    tmp_df = tmp_df[tmp_df["embedding"].isin(all_embeddings)].copy()
+    if tmp_df.empty:
+        logging.info("No embeddings found for heatmap plot.")
+        return
+
+    # Group by embedding and walk_distance, calculate mean
+    grouped = tmp_df.groupby(["embedding", "walk_distance"])[metric].mean().reset_index()
+
+    # Pivot for heatmap: embeddings as rows, sample counts as columns
+    heatmap_data = grouped.pivot(index="embedding", columns="walk_distance", values=metric)
+    # Reorder rows: modalities first, then cancer types
+    ordered_rows = [e for e in all_embeddings if e in heatmap_data.index]
+    heatmap_data = heatmap_data.reindex(ordered_rows)
+
+    plt.figure(figsize=(12, 6))
+    ax = sns.heatmap(
+        heatmap_data,
+        annot=True,
+        fmt=".3f",
+        cmap="RdYlGn",
+        vmin=0,
+        vmax=1,
+        cbar_kws={
+            'label': metric.upper(),
+            'shrink': 0.8,  # Reduce colorbar size to decrease gap
+            'pad': 0.02     # Reduce padding between heatmap and colorbar
+        },
+        linewidths=0.5,
+        linecolor='gray',
+        annot_kws={'fontsize': 14}
+    )
+    
+    # Increase colorbar label font size
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=12)  # Increase tick label size
+    cbar.set_label(metric.upper(), fontsize=14)  # Increase colorbar label size
+    
+    #plt.title(f"{metric.upper()} Heatmap: Modalities + Cancer Types Across Sample Counts (Noise: {int(noise_ratio*100)}%)", fontsize=16, fontweight='bold')
+    plt.xlabel("Sample Count", fontsize=14)
+    plt.ylabel("Embedding", fontsize=14)
+    plt.tight_layout()
+    
+    # Set tick parameters with rotation AFTER tight_layout
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha='right', fontsize=12)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=45, fontsize=12)
+    
+    plt.savefig(Path(save_folder, file_name), dpi=300, bbox_inches='tight')
+    plt.close('all')
+    logging.info(f"Saved {file_name}")
+
+
 if __name__ == '__main__':
     plt.rcParams['font.family'] = 'Times New Roman'
     plt.rcParams['font.size'] = 12
@@ -166,6 +211,7 @@ if __name__ == '__main__':
     cancers: List[str] = args.cancer
     foundation: bool = args.foundation
     metric: str = args.metric
+    noise_ratio: float = args.noise
     selected_cancers: str = '_'.join(cancers)
 
     metric_input = metric
@@ -173,9 +219,18 @@ if __name__ == '__main__':
 
     logging.info(
         f"Loading data for multi: {multi}, cancers: {cancers}, foundation: {foundation}, metric: {metric},"
-        f" amount_of_walk_embeddings: {amount_of_walk_embeddings}")
+        f" amount_of_walk_embeddings: {amount_of_walk_embeddings}, noise_ratio: {noise_ratio}")
 
-    save_folder = Path(save_folder, selected_cancers, str(amount_of_walk_embeddings))
+    multi_name = "multi" if multi else "simple"
+    foundation_name = "foundation" if foundation else ""
+    
+    # Build save folder path based on model type and foundation status
+    if foundation_name:
+        model_folder = f"{multi_name}_{foundation_name}"
+    else:
+        model_folder = multi_name
+    
+    save_folder = Path(save_folder, selected_cancers, str(amount_of_walk_embeddings), str(noise_ratio), model_folder)
     logging.info(f"Saving results to: {save_folder}")
 
     if not save_folder.exists():
@@ -216,25 +271,24 @@ if __name__ == '__main__':
     # plot line plot for embeddings, embeddings and accuracy
     grouped = grouped.reset_index()
 
-    plot_bar_plot(grouped)
-
-    plot_noise(grouped, metric)
-
-    multi_name = "Cancer Specific" if multi else "Simple"
-    foundation_name = "Composite" if foundation else ""
-
     if foundation_name:
         file_name = f"{metric}_{multi_name}_{foundation_name}_noise_grid.png"
         reduced_file_name = f"{metric}_{multi_name}_{foundation_name}_reduced_noise_grid.png"
-        figure_title = f"{multi_name.capitalize()} {foundation_name.capitalize()}"
+        heatmap_file = f"{metric}_{multi_name}_{foundation_name}_embedding_heatmap.png"
+        figure_title = f"{multi_name.replace('_', ' ').capitalize()} {foundation_name.capitalize()}"
     else:
         file_name = f"{metric}_{multi_name}_noise_grid.png"
         reduced_file_name = f"{metric}_{multi_name}_reduced_noise_grid.png"
-        figure_title = f"{multi_name.capitalize()}"
+        heatmap_file = f"{metric}_{multi_name}_embedding_heatmap.png"
+        figure_title = f"{multi_name.replace('_', ' ').capitalize()}"
 
-    logging.info(f"Saving to {file_name}")
-    logging.info(f"Saving to {reduced_file_name}")
+    logging.info(f"Saving to {save_folder / file_name}")
+    logging.info(f"Saving to {save_folder / reduced_file_name}")
+    logging.info(f"Saving to {save_folder / heatmap_file}")
     noise_grid(df, metric, file_name)
     reduced_noise_grid(df, metric, reduced_file_name, figure_title)
+
+    # Add embedding heatmap (modalities + cancer types) - filtered by noise ratio
+    plot_embedding_heatmap(df, metric, heatmap_file, noise_ratio)
 
     logging.info("Done")

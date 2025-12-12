@@ -154,8 +154,29 @@ def create_performance_overview_heatmap(df: pd.DataFrame):
         )
 
         plt.figure(figsize=(8, 6))
-        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=0.8, vmax=0.95)
-        # adjust heatmap range to 0.8 - 1.0
+        if metric == "Precision":
+            v_min=0.85
+            v_max = 0.92
+        elif metric == "Recall":
+            v_min=0.82
+            v_max = 0.92
+        elif metric == "AUC":
+            v_min=0.95
+            v_max = 1
+        elif metric == "Accuracy":
+            v_min=0.82
+            v_max = 0.92
+        elif metric == "F1 Score":
+            v_min=0.82
+            v_max = 0.92
+        elif metric == "MCC":
+            v_min=0.80
+            v_max = 0.92
+        else:
+            print(f"Using fallback vmin and vmax for metric: {metric}.")
+            v_min=0.8
+            v_max = 0.9
+        sns.heatmap(metric_data, annot=True, fmt=".3f", cmap="coolwarm", linewidths=0.5, vmin=v_min, vmax=v_max)
 
         plt.title(f"{metric} Scores Heatmap")
         plt.xlabel("Sample Counts")

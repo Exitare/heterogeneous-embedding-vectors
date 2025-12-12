@@ -1,0 +1,74 @@
+configfile: './config.yaml'
+
+import itertools
+
+all_cancers = config['cancers']
+joined_cancers = '_'.join(config['cancers'])
+requested_walk_amounts = range(5, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(5, config['classifier_max_walk_distance'] + 1)
+distance_metrics = config['distance_metrics']
+max_iterations = range(1, config['run_iterations'])
+latent_dims = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700]
+
+modalities = ["rna", "mutations"]
+modality_combinations = [
+    "_".join(sorted(combo)) for r in range(2, len(modalities) + 1)
+    for combo in itertools.combinations(modalities, r)
+]
+
+cancer_arg = ' '.join(all_cancers)
+
+def modality_to_cli(modality_combo):
+    return modality_combo.replace('_', ' ')
+
+
+rule all:
+    input:
+        "figures/classifier_latent_dims/plots/accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/accuracy_per_cancer.png",
+        "figures/classifier_latent_dims/plots/all_metrics_panel.png",
+        "figures/classifier_latent_dims/plots/auc_overall.png",
+        "figures/classifier_latent_dims/plots/balanced_accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/f1_overall.png",
+        "figures/classifier_latent_dims/plots/f1_per_cancer.png",
+        "figures/classifier_latent_dims/plots/mcc_overall.png",
+        "figures/classifier_latent_dims/plots/precision_overall.png",
+        "figures/classifier_latent_dims/plots/precision_per_cancer.png",
+        "figures/classifier_latent_dims/plots/recall_overall.png",
+        "figures/classifier_latent_dims/plots/recall_per_cancer.png",
+
+
+rule generate_plots:
+    input:
+        expand(
+            "results/classifier_latent_dims/classification/{latent_dim}/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/results.csv",
+            latent_dim=latent_dims,
+            cancers=[joined_cancers],
+            modalities=modality_combinations,
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            iteration=max_iterations
+        )
+    params:
+        cancers=cancer_arg,
+        modalities=' '.join(modality_combinations),
+        walk_amounts=' '.join(map(str, requested_walk_amounts)),
+        walk_distances=' '.join(map(str, requested_walk_distance)),
+        distance_metrics=' '.join(distance_metrics),
+        latent_dims=' '.join(map(str, latent_dims)),
+        iterations=str(config['run_iterations'])
+    output:
+        "figures/classifier_latent_dims/plots/accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/accuracy_per_cancer.png",
+        "figures/classifier_latent_dims/plots/all_metrics_panel.png",
+        "figures/classifier_latent_dims/plots/auc_overall.png",
+        "figures/classifier_latent_dims/plots/balanced_accuracy_overall.png",
+        "figures/classifier_latent_dims/plots/f1_overall.png",
+        "figures/classifier_latent_dims/plots/f1_per_cancer.png",
+        "figures/classifier_latent_dims/plots/mcc_overall.png",
+        "figures/classifier_latent_dims/plots/precision_overall.png",
+        "figures/classifier_latent_dims/plots/precision_per_cancer.png",
+        "figures/classifier_latent_dims/plots/recall_overall.png",
+        "figures/classifier_latent_dims/plots/recall_per_cancer.png",
+    shell:
+        "python src/classifier_latent_dims/plots/plot_latent_dim_performance.py "

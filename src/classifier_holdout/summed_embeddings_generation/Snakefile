@@ -1,0 +1,68 @@
+configfile: './config.yaml'
+
+import itertools
+
+all_cancers = config['cancers']
+modalities = config['modalities']
+joined_cancers = '_'.join(all_cancers)
+
+requested_walk_amounts = range(3, config['classifier_max_walk_amounts'] + 1)
+requested_walk_distance = range(3, config['classifier_max_walk_distance'] + 1)
+
+# if you want iterations numbered 1..N, use +1
+run_iterations = range(config['run_iterations'])
+
+cancer_arg = ' '.join(all_cancers)
+
+# Generate all modality combinations of size >= 2
+modality_combinations = [
+    "_".join(sorted(combo)) for r in range(2, len(modalities)+1)
+    for combo in itertools.combinations(modalities, r)
+]
+
+rule all:
+    input:
+        expand(
+            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5",
+            cancers=[joined_cancers],
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            modalities=modality_combinations,
+            iteration=run_iterations
+        ),
+        expand(
+            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
+            cancers=[joined_cancers],
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            modalities=modality_combinations,
+            iteration=run_iterations
+        ),
+        expand(
+            "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+            cancers=[joined_cancers],
+            walk_amount=requested_walk_amounts,
+            walk_distance=requested_walk_distance,
+            modalities=modality_combinations,
+            iteration=run_iterations
+        )
+
+rule create_summed_embeddings:
+    input:
+        f"results/embeddings/{joined_cancers}_classifier.h5"
+    output:
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/train_summed_embeddings.h5",
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/test_summed_embeddings.h5",
+        "results/classifier_holdout/summed_embeddings/{cancers}/{modalities}/{walk_distance}_{walk_amount}/{iteration}/summed_embeddings.h5"
+    params:
+        cancer_list=cancer_arg,
+        modality_string=lambda wildcards: wildcards.modalities.replace('_', ' ')
+    shell:
+        """
+        python ./src/classifier_holdout/summed_embeddings_generation/3_01_create_summed_embeddings.py \
+            -c {params.cancer_list} \
+            -a {wildcards.walk_amount} \
+            -w {wildcards.walk_distance} \
+            -m {params.modality_string} \
+            -i {wildcards.iteration}
+        """

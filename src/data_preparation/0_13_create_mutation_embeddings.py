@@ -1,7 +1,11 @@
+import sys
+from pathlib import Path
+
+embedding_experiments_path = Path(__file__).resolve().parent.parent.parent.parent / "embedding-experiments"
+sys.path.insert(0, str(embedding_experiments_path))
 import netvae
 import pandas as pd
 import keras
-from pathlib import Path
 from argparse import ArgumentParser
 
 # Hyperparameters
@@ -9,22 +13,27 @@ tf_min_size = 3
 learning_rate = 1e-4
 batch_size = 256
 epochs = 50
-latent_dim = 768
 rotation_factor = 0.3
 
-# Save path
-save_folder = Path("results", "embeddings")
-
 if __name__ == '__main__':
-    if not save_folder.exists():
-        save_folder.mkdir(parents=True)
 
     parser = ArgumentParser(description='Create mutation embeddings.')
     parser.add_argument("--data", "-d", type=Path, help="The path to the data.", required=True)
+    parser.add_argument("--latent_dim", "-ld", type=int, default=768, help="Latent dimension size.",
+                        choices=[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 768])
     args = parser.parse_args()
 
     data: Path = args.data
     epochs: int = 250
+    latent_dim: int = args.latent_dim
+
+    if latent_dim == 768:
+        save_folder = Path("results", "embeddings")
+    else:
+        save_folder = Path("results", "embeddings", "mutations", str(latent_dim))
+
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
 
     # Load lookup table
     lookup: pd.DataFrame = pd.read_csv(Path("results", "embeddings", "lookup.csv"))
@@ -54,7 +63,7 @@ if __name__ == '__main__':
     # Build VAE
     X_encoder = netvae.build_encoder(X.shape[1], latent_dim)  # All remaining columns are used
     X_decoder = netvae.build_decoder(X.shape[1], latent_dim)
-    X_vae = netvae.VAE(features=X.columns, encoder=X_encoder, decoder=X_decoder)
+    X_vae = netvae.VAE(encoder=X_encoder, decoder=X_decoder)
     X_vae.compile(optimizer=keras.optimizers.Adam(learning_rate=learning_rate))
 
     # Train VAE
@@ -72,7 +81,8 @@ if __name__ == '__main__':
 
     print(embeddings)
     # assert that there are 6 unique cancer types
-    assert embeddings["cancer"].nunique() == 6, f"Expected 6 unique cancer types, got {embeddings['cancer'].nunique()} instead."
+    assert embeddings[
+               "cancer"].nunique() == 6, f"Expected 6 unique cancer types, got {embeddings['cancer'].nunique()} instead."
     # Save results
     embeddings.to_csv(Path(save_folder, "mutation_embeddings.csv"), index=False)
 

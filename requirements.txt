@@ -9,3 +9,4 @@ gripql==0.7.0
 networkx
 node2vec
 umap-learn
+statannotations

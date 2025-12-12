@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
+from typing import List
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -15,16 +16,22 @@ if __name__ == '__main__':
                         help="The walk distance used for the classification.")
     parser.add_argument("--amount_of_walks", "-a", type=int, required=True,
                         help="The amount of walks used for the classification.")
+    parser.add_argument("--modalities", "-m", nargs="+", default=["annotations", "images","mutations",  "rna"],
+                        choices=["rna", "annotations", "mutations", "images"])
     args = parser.parse_args()
 
     selected_cancers = args.cancer
     cancers = "_".join(selected_cancers)
     walk_distance = args.walk_distance
     amount_of_walks = args.amount_of_walks
+    selected_modalities: List[str] = args.modalities
+
+    modalities = '_'.join(selected_modalities)
 
     all_predictions = []
 
-    load_path = Path("results", "classifier", "classification", cancers, f"{walk_distance}_{amount_of_walks}")
+    load_path = Path("results", "classifier_holdout", "classification", cancers, modalities,
+                     f"{walk_distance}_{amount_of_walks}")
     for run_directory in load_path.iterdir():
         if run_directory.is_file():
             continue
@@ -48,6 +55,8 @@ if __name__ == '__main__':
     # visualize the confusion matrix
     plt.figure(figsize=(10, 7))
     sns.heatmap(confusion_matrix, annot=True, fmt='g')
-    plt.savefig(Path("figures", "classifier", cancers, "performance",
-                     f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
+    save_folder: Path = Path("figures", "classifier_holdout", cancers, modalities, "performance")
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+    plt.savefig(Path(save_folder, f"{walk_distance}_{amount_of_walks}_confusion_matrix.png"),
                 dpi=300)

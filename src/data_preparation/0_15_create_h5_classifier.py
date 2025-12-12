@@ -6,7 +6,6 @@ import h5py
 import sys
 import logging
 
-save_folder = Path("results", "embeddings")
 chunk_size = 100000
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -103,11 +102,15 @@ def process_and_store_per_submitter(dataset_name, loader, h5_file):
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--cancers", "-c", nargs="+", required=True, help="The cancer types to work with.")
+    parser.add_argument("--cancers", "-c", nargs="+", required=False, help="The cancer types to work with.",
+                        default=["BRCA", "LUAD", "STAD", "BLCA", "COAD", "THCA"])
     parser.add_argument("--image_embedding_count", "-ec", type=int,
                         help="The total count of image embeddings per patient.", default=-1)
+    parser.add_argument("--latent_dim", "-ld", type=int, default=768, help="Latent dimension size.",
+                        choices=[50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 768])
     args = parser.parse_args()
     selected_cancers = args.cancers
+    latent_dim = args.latent_dim
 
     if len(selected_cancers) == 1:
         logging.info("Selected cancers is a single string. Converting...")
@@ -118,14 +121,27 @@ if __name__ == "__main__":
 
     image_file_name: str = f"combined_image_embeddings_{image_embedding_counts}.tsv" if image_embedding_counts != -1 else "combined_image_embeddings.tsv"
 
+    if latent_dim == 768:
+        save_folder = Path("results", "embeddings")
+    else:
+        save_folder = Path("results", "embeddings", "h5", str(latent_dim))
+
+    if not save_folder.exists():
+        save_folder.mkdir(parents=True)
+
     logging.info(f"Selected cancers: {selected_cancers}")
     logging.info(f"Image embedding count: {image_embedding_counts}")
     logging.info(f"Image file name: {image_file_name}")
 
-    rna_load_folder = Path("results", "embeddings", "rna", cancers)
-    annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
-    mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
+    if latent_dim == 768:
+        rna_load_folder = Path("results", "embeddings", "rna", cancers)
+        mutation_embedding_file = Path("results", "embeddings", "mutation_embeddings.csv")
+    else:
+        rna_load_folder = Path("results", "embeddings", "rna", str(latent_dim), cancers)
+        mutation_embedding_file = Path("results", "embeddings", "mutations", str(latent_dim), "mutation_embeddings.csv")
+
     image_embedding_file = Path("results", "embeddings", image_file_name)
+    annotation_embedding_file = Path("results", "embeddings", "annotations", cancers, "embeddings.csv")
 
     try:
         with h5py.File(Path(save_folder, f"{cancers}_classifier.h5"), "w") as f:
@@ -133,17 +149,18 @@ if __name__ == "__main__":
             rna_loader = chunked_dataframe_loader(rna_load_folder)
             process_and_store_per_submitter("rna", rna_loader, f)
 
-            # Process Image embeddings (chunked)
-            image_loader = chunked_image_dataframe_loader(image_embedding_file, chunk_size=chunk_size)
-            process_and_store_per_submitter("images", image_loader, f)
-
-            # Process Annotation embeddings
-            annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
-            process_and_store_per_submitter("annotations", annotation_loader, f)
-
             # Process Mutation embeddings
             mutation_loader = chunked_dataframe_loader(mutation_embedding_file)
             process_and_store_per_submitter("mutations", mutation_loader, f)
+
+            if latent_dim == 768:
+                # Process Image embeddings (chunked)
+                image_loader = chunked_image_dataframe_loader(image_embedding_file, chunk_size=chunk_size)
+                process_and_store_per_submitter("images", image_loader, f)
+
+                # Process Annotation embeddings
+                annotation_loader = chunked_dataframe_loader(annotation_embedding_file)
+                process_and_store_per_submitter("annotations", annotation_loader, f)
 
             logging.info("✅ HDF5 file with submitter-specific datasets created successfully.")
             logging.info(f"Available groups: {list(f.keys())}")
