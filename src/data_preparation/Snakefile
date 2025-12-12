@@ -26,16 +26,16 @@ rule download_rna_data:
         credentials=lambda wildcards: config["credentials_file"]
     shell:
         """
-        python ./src/data_preparation/0_01_download_rna_data.py \
+        python ./src/data_preparation/downloads/download_rna_data.py \
             --cancer {wildcards.cancer} \
-            --credentials {params.credentials} > {output}
+            --credentials {params.credentials}
         """
 
 rule download_mutations_data:
     output:
         "data/mutations/mutations.csv"
     shell:
-        "python ./src/data_preparation/0_05_download_mutations.py --credentials {config[credentials_file]} > {output}"
+        "python ./src/data_preparation/downloads/download_mutations.py --creds {config[credentials_file]}"
 
 
 rule create_rna_embeddings:
@@ -59,21 +59,21 @@ rule create_mutation_embeddings:
 
 rule download_case_manifest:
     output:
-        "data/annotations/case_manifest.json"
+        "data/annotations/manifest.json"
     shell:
-        "python ./src/data_preparation/0_03_download_case_manifest.py -d data/annotations/ > {output}"
+        "python ./src/data_preparation/downloads/download_case_manifest.py -d data/annotations/"
 
 rule download_annotations:
     input:
-        "data/annotations/case_manifest.json"
+        "data/annotations/manifest.json"
     output:
         "data/annotations/download_complete.txt"
     shell:
-        "python ./src/data_preparation/0_02_download_annotations.py -d data/annotations/ > {output}"
+        "python ./src/data_preparation/downloads/download_annotations.py"
 
 rule extract_text_from_pdf_annotations_1:
     input:
-        "data/annotations/case_manifest.json",
+        "data/annotations/manifest.json",
         "data/annotations/download_complete.txt"
     output:
         "data/annotations/extracted_text_success.txt"
@@ -83,7 +83,7 @@ rule extract_text_from_pdf_annotations_1:
 
 rule combine_annotations_1:
     input:
-        "data/annotations/case_manifest.json",
+        "data/annotations/manifest.json",
         "data/annotations/download_complete.txt"
     output:
         f"data/annotations/{joined_cancers}/embeddings.csv"
@@ -96,7 +96,7 @@ rule find_empty_txts:
     output:
         "data/annotations/empty_txts.csv"
     shell:
-        f"python ./src/data_preparation/0_09_find_empty_txts.py -c {cancer_arg} > {{output}}"
+        f"python ./src/data_preparation/0_09_find_empty_txt.py -c {cancer_arg} > {{output}}"
 
 rule tesseract_conversion:
     input:
@@ -132,7 +132,7 @@ rule create_h5:
           rna_embeddings=expand(
             "results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
             joined=joined_cancers,
-            cancer=all_cancers
+            cancer=lower_cancers
         )
 
     output:
@@ -156,7 +156,7 @@ rule create_classifier_h5:
           rna_embeddings=expand(
             "results/embeddings/rna/{joined}/{cancer}_embeddings.csv",
             joined=joined_cancers,
-            cancer=all_cancers
+            cancer=lower_cancers
         )
 
     output:

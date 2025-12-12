@@ -1,3 +1,5 @@
+import sys
+
 import gripql
 import pandas as pd
 from pathlib import Path
@@ -22,7 +24,7 @@ if __name__ == '__main__':
         save_folder.mkdir(parents=True)
 
     conn = gripql.Connection("https://bmeg.io/api", credential_file=credentials)
-    G = conn.graph("rc5")
+    G = conn.graph("rc6")
 
     c = G.query().V(f"Project:TCGA-{cancer}").out("cases").out("samples").as_("sample")
     c = c.out("aliquots").out("gene_expressions").as_("exp")
@@ -31,14 +33,19 @@ if __name__ == '__main__':
 
     print("Downloading data...")
     data = {}
-    for row in c.execute(stream=True):
-        submitter_id = row[0]
-        values = row[1]
+    try:
+        for row in c.execute(stream=True):
+            print(row)
+            submitter_id = row[0]
+            values = row[1]
 
-        if submitter_id not in data:
-            data[submitter_id] = {}
-        for gene, value in values.items():
-            data[submitter_id][gene] = value
+            if submitter_id not in data:
+                data[submitter_id] = {}
+            for gene, value in values.items():
+                data[submitter_id][gene] = value
+    except Exception as e:
+        print(f"Error during download: {e}")
+        sys.exit(1)
 
     samples = pd.DataFrame.from_dict(data, orient='index').fillna(0.0)
     samples.reset_index(drop=False, inplace=True)

@@ -1,7 +1,6 @@
 import pandas as pd
 from pathlib import Path
 import requests
-from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
@@ -60,13 +59,18 @@ def main():
     assert combined_ids[0][1] == annotations["cases"][0][0][
         "submitter_id"], "First case id should contain first submitter id"
 
+    print(f"Starting download of {len(case_ids)} files...")
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {
             executor.submit(download_file, case_id, submitter_id, project_id): (case_id, submitter_id, project_id) for
             case_id, submitter_id, project_id in combined_ids}
 
-        for future in tqdm(as_completed(futures), total=len(case_ids)):
+        completed = 0
+        for future in as_completed(futures):
             future.result()  # Will raise an exception if the download failed
+            completed += 1
+            if completed % 10 == 0 or completed == len(case_ids):
+                print(f"Progress: {completed}/{len(case_ids)} files processed", flush=True)
 
     # after downloading all files, print the number of files downloaded
     print(f"Downloaded {len(case_ids)} files.")

@@ -14,3 +14,5 @@ venv
 .venv
 error_reports/*
 output_reports/*
+results_save/*
+data_save/*
