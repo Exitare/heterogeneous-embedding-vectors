@@ -1,8 +1,9 @@
 import sys
 from pathlib import Path
 
-embedding_experiments_path = Path(__file__).resolve().parent.parent.parent.parent / "embedding-experiments"
-sys.path.insert(0, str(embedding_experiments_path))
+# Add src directory to path so we can import netvae module
+src_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(src_path))
 import netvae
 import pandas as pd
 import keras

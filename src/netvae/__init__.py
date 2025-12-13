@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
-from .net_vae_train import groupNodes, subDF, G
+from .net_vae_train import groupNodes
 from scipy.special import softmax
 
 

@@ -6,7 +6,9 @@
 - (THCA) Thyroid carcinoma
 - (BLCA) Bladder Urothelial Carcinoma
 
+# Disclaimer
 
+Running the recognizer requires significant computational resources.
 # Usage
 
 ## Install requirements

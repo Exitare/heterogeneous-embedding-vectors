@@ -48,6 +48,8 @@ if __name__ == '__main__':
     annotations = pd.read_csv(Path(load_folder, "annotations.csv"))
     text_annotations = []
 
+    print(annotations)
+
     for submitter_id in annotations["submitter_id"]:
 
         # split the submitter text using the .

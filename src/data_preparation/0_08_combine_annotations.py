@@ -31,6 +31,7 @@ if __name__ == '__main__':
 
     # save data as dataframe
     df = pd.DataFrame(data)
+    print(df.head())
     # assert that all cancers are in the cancer column
     assert all(
         [cancer in df["cancer"].unique() for cancer in selected_cancers]), "All cancers should be in the cancer column"

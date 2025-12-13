@@ -54,7 +54,7 @@ rule create_mutation_embeddings:
     output:
         "results/embeddings/mutation_embeddings.csv"
     shell:
-        "python ./src/data_preparation/0_13_create_mutation_embeddings.py -d data/mutations/mutations.csv > {output}"
+        "python ./src/data_preparation/0_13_create_mutation_embeddings.py -d data/mutations/mutations.csv"
 
 
 rule download_case_manifest:
@@ -83,8 +83,7 @@ rule extract_text_from_pdf_annotations_1:
 
 rule combine_annotations_1:
     input:
-        "data/annotations/manifest.json",
-        "data/annotations/download_complete.txt"
+        "data/annotations/extracted_text_success.txt"
     output:
         f"data/annotations/{joined_cancers}/embeddings.csv"
     shell:
@@ -112,7 +111,7 @@ rule final_annotation_combination:
     output:
         f"data/annotations/{joined_cancers}/annotations.csv"
     shell:
-        f"python ./src/data_preparation/0_11_combine_annotations.py -c {cancer_arg} > {{output}}"
+        f"python ./src/data_preparation/0_11_combine_annotations.py -c {cancer_arg}"
 
 rule create_annotation_embeddings:
     input:
@@ -120,7 +119,7 @@ rule create_annotation_embeddings:
     output:
         f"results/embeddings/annotations/{joined_cancers}/embeddings.csv"
     shell:
-        f"python ./src/data_preparation/0_12_create_annotation_embeddings.py -c {cancer_arg} > {{output}} 2>/dev/null"
+        f"python ./src/data_preparation/0_12_create_annotation_embeddings.py -c {cancer_arg}"
 
 rule create_h5:
     input:
