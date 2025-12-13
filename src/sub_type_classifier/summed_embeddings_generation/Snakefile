@@ -9,7 +9,7 @@ cancer_arg = ' '.join(all_cancers)
 rule all:
     input:
         expand(
-            "results/sub_type_classifier/summed_embeddings/{cancers}/{walk_amount}_{walk_distance}/summed_embeddings.h5",
+            "results/sub_type_classifier/summed_embeddings/{cancers}/{walk_distance}_{walk_amount}/summed_embeddings.h5",
             cancers=[joined_cancers],
             walk_amount=requested_walk_amounts,
             walk_distance=requested_walk_distance
@@ -19,7 +19,7 @@ rule create_summed_embeddings:
     input:
         f"results/embeddings/{joined_cancers}_classifier.h5"
     output:
-        "results/sub_type_classifier/summed_embeddings/{cancers}/{walk_amount}_{walk_distance}/summed_embeddings.h5"
+        "results/sub_type_classifier/summed_embeddings/{cancers}/{walk_distance}_{walk_amount}/summed_embeddings.h5"
     params:
         cancer_list=cancer_arg
     shell:
