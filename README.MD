@@ -16,7 +16,14 @@ Running the recognizer requires significant computational resources.
 
 
 ## Data preparation
+
+if you prepare to download the data yourself, use this command to run the data preparation pipeline:  
 ```snakemake -s ./src/data_preparation/Snakefile --cores 1```
+
+if you want to use already prepared data run the data_download script:  
+```python src/data_download.py```  
+
+It will download the data from a public repository to the appropriate folders.
 
 ## Running the holdout classifier 
 
