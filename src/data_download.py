@@ -104,7 +104,7 @@ def download_data(url: str, output_path: Path, file_name: str):
 
 
 if __name__ == "__main__":
-    print("Downloading embedding files...")
+    print("Downloading necessary files...")
 
     results_embeddings_save_path: Path = Path(f"results/embeddings")
     if not results_embeddings_save_path.exists():
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 
     mutations_save_path: Path = Path("data", "mutations")
     if not mutations_save_path.exists():
-        cancer_subtype_save_path.mkdir(parents=True)
+        mutations_save_path.mkdir(parents=True)
 
     download_data("https://dataverse.harvard.edu/api/access/datafile/13244567", output_path=mutations_save_path, file_name="gene_mutations.tsv")
 
